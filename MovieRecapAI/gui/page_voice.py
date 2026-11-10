@@ -5,13 +5,14 @@ import tempfile
 from pathlib import Path
 
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QComboBox, QDialog, QFormLayout, QGroupBox, QHBoxLayout, QLineEdit, QListWidget,
-                               QListWidgetItem, QMessageBox, QPlainTextEdit, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFileDialog, QFormLayout, QGroupBox, QHBoxLayout,
+                               QHeaderView, QLineEdit, QListWidget, QListWidgetItem, QMessageBox, QPlainTextEdit,
+                               QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
-from recap import tts
+from recap import textnorm, tts
 
 from .player import AudioPlayer
-from .widgets import LabeledSlider, Page, PathPicker, bind_labeled_slider, button, fill_combo, hrow, muted
+from .widgets import LabeledSlider, Page, PathPicker, bind_labeled_slider, button, fill_combo, hrow, muted, scroll
 
 SAMPLE = {
     "vi": "Chào mừng các bạn quay trở lại kênh. Hôm nay chúng ta sẽ cùng tóm tắt một bộ phim cực kỳ hấp dẫn, "
@@ -29,8 +30,9 @@ STYLE_HINT = {
 class VoicePage(Page):
     def __init__(self, app):
         super().__init__(app, "🎙️  Bước 3 · Giọng đọc thuyết minh",
-                         "Hơn 1000 giọng từ 11 công cụ: miễn phí (Edge TTS, gTTS), offline (Piper, giọng Windows, "
-                         "XTTS nhân bản giọng) và cao cấp (ElevenLabs, OpenAI, Gemini, Google Cloud, Azure, FPT.AI).")
+                         "Hơn 1000 giọng từ 12 công cụ: ⭐ VieNeu-TTS (AI giọng Việt chuẩn, offline), miễn phí (Edge TTS, gTTS), "
+                         "offline (Piper, giọng Windows, XTTS) và cao cấp (ElevenLabs, OpenAI, Gemini, Google Cloud, "
+                         "Azure, FPT.AI). Bật 'Phát âm chuẩn' để số, ngày tháng, tên riêng được đọc đúng.")
         b = app.binder
         self.voices: list[tts.Voice] = []
         body = QHBoxLayout()
@@ -87,7 +89,7 @@ class VoicePage(Page):
         self.g_extra = QGroupBox("Tùy chọn riêng")
         fe = QFormLayout(self.g_extra)
         self.btn_piper = button("⬇ Tải thêm giọng Piper (offline, 40+ ngôn ngữ)", self.piper_dialog, "primary")
-        self.xtts_ref = PathPicker("file", "Âm thanh (*.wav *.mp3 *.flac *.m4a)", "File giọng mẫu 6-30 giây")
+        self.xtts_ref = PathPicker("file", "Âm thanh (*.wav *.mp3 *.flac *.m4a)", "File giọng mẫu (VieNeu: 3-8 giây, XTTS: 6-30 giây)")
         self.xtts_ref.setText(app.settings.get("voice", "xtts_ref", ""))
         self.xtts_ref.changed.connect(lambda v: b._set("voice", "xtts_ref", v))
         self.xtts_dir = PathPicker("dir", placeholder="(tùy chọn) Thư mục model viXTTS / XTTS tinh chỉnh")
@@ -99,6 +101,21 @@ class VoicePage(Page):
         self.lb_extra = muted("")
         fe.addRow(self.lb_extra)
         right.addWidget(self.g_extra)
+
+        gp = QGroupBox("🗣️ Phát âm chuẩn")
+        fp = QVBoxLayout(gp)
+        self.c_norm = b.check(QCheckBox("Tự đọc đúng số, ngày tháng, giờ, tiền, %, đơn vị, chữ viết tắt"),
+                              "voice", "normalize")
+        self.c_ai = b.check(QCheckBox("AI soát phát âm trước khi đọc (dùng AI đã chọn ở Bước 2)"), "voice", "ai_pron")
+        self.c_tr = b.check(QCheckBox("Phiên âm tên nước ngoài sang tiếng Việt (Batman → Bát-men)"),
+                            "voice", "transliterate")
+        self.c_ai.toggled.connect(self.c_tr.setEnabled)
+        self.c_tr.setEnabled(self.c_ai.isChecked())
+        for w in (self.c_norm, self.c_ai, self.c_tr):
+            fp.addWidget(w)
+        fp.addWidget(hrow(button("📖 Từ điển phát âm", self.edit_dict, tip="Tự quy định cách đọc tên riêng, từ khó"),
+                          button("🔎 Xem cách đọc", self.show_spoken, tip="Xem văn bản thực sự được đọc"), "stretch"))
+        right.addWidget(gp)
 
         g2 = QGroupBox("🔊 Nghe thử")
         v2 = QVBoxLayout(g2)
@@ -114,10 +131,19 @@ class VoicePage(Page):
         lw.setLayout(left)
         rw.setLayout(right)
         body.addWidget(lw, 5)
-        body.addWidget(rw, 4)
+        rs = scroll(rw)
+        rs.setMinimumWidth(470)
+        body.addWidget(rs, 4)
         self.root.addLayout(body, 1)
         self.audio = AudioPlayer(self)
         self._loaded_engine = None
+        self._busy_ui = False
+        self.model.currentTextChanged.connect(self._model_changed)
+
+    def _model_changed(self, _t):
+        # VieNeu: Turbo và Nano có bộ giọng khác nhau
+        if not self._busy_ui and self.engine.currentData() == "vieneu" and self._loaded_engine == "vieneu":
+            self.load_voices()
 
     def on_show(self):
         if self._loaded_engine != self.engine.currentData():
@@ -138,6 +164,7 @@ class VoicePage(Page):
         else:
             txt += " Không cần API key."
         self.lb_engine.setText(txt)
+        self._busy_ui = True
         cur = self.app.settings.get("voice", "model", "")
         self.model.blockSignals(True)
         self.model.clear()
@@ -148,16 +175,19 @@ class VoicePage(Page):
             self.model.setCurrentText(cur if cur in info["models"] else info["models"][0])
         self.style.setEnabled(bool(info.get("style")))
         self.style.setPlaceholderText(STYLE_HINT.get(eng, "(engine này không hỗ trợ)"))
-        self.g_extra.setVisible(eng in ("piper", "xtts"))
+        self._busy_ui = False
+        self.g_extra.setVisible(eng in ("piper", "xtts", "vieneu"))
         self.btn_piper.setVisible(eng == "piper")
-        self.xtts_ref.setVisible(eng == "xtts")
+        self.xtts_ref.setVisible(eng in ("xtts", "vieneu"))
         self.xtts_dir.setVisible(eng == "xtts")
         fe = self.g_extra.layout()
-        for w in (self.xtts_ref, self.xtts_dir):
+        for w, show in ((self.xtts_ref, eng in ("xtts", "vieneu")), (self.xtts_dir, eng == "xtts")):
             lb = fe.labelForField(w)
             if lb:
-                lb.setVisible(eng == "xtts")
+                lb.setVisible(show)
         self.lb_extra.setText({
+            "vieneu": "Model v3turbo: hay nhất (48kHz) · v3nano: nhẹ cho máy yếu. Lần đầu tự tải model. "
+                      "Chọn '🎤 Nhân bản' + file mẫu 3-8 giây để đọc bằng giọng riêng.",
             "piper": "Giọng Piper lưu trong thư mục models/piper. Tiếng Việt: vi_VN-vais1000-medium, "
                      "vi_VN-25hours_single-low, vi_VN-vivos-x_low.",
             "xtts": "Cài thêm: pip install coqui-tts. XTTS-v2 hỗ trợ 17 ngôn ngữ (chưa có tiếng Việt). "
@@ -246,7 +276,7 @@ class VoicePage(Page):
         if not text:
             return
         p = self.app.project
-        opts = p.voice_opts() if p else dict(self.app.settings.section("voice"))
+        opts = p.voice_opts() if p else dict(self.app.settings.section("voice"), lang_code=self._lang_code())
         eng, voice = opts["engine"], opts["voice"]
         if not voice:
             QMessageBox.information(self, "Giọng đọc", "Hãy chọn 1 giọng trong danh sách.")
@@ -258,6 +288,20 @@ class VoicePage(Page):
                 tts.synthesize(eng, text, voice, out, opts, self.app.settings, cancel)
             return str(out)
         self.app.run_task(job, on_done=self.audio.play, title="Đọc thử giọng")
+
+    # ------------------------------------------------ Phát âm
+    def _lang_code(self):
+        return tts.LANG_CODES.get(self.app.settings.get("script", "language", "Tiếng Việt"), "vi")
+
+    def show_spoken(self):
+        text = self.sample.toPlainText().strip()
+        opts = dict(self.app.settings.section("voice"), lang_code=self._lang_code())
+        QMessageBox.information(self, "Cách giọng AI sẽ đọc",
+                                f"Văn bản gốc:\n{text}\n\nSẽ được đọc là:\n{tts.speak_text(text, opts)}"
+                                + ("\n\n(+ AI soát phát âm khi xuất video)" if opts.get("ai_pron") else ""))
+
+    def edit_dict(self):
+        PronDictDialog(self).exec()
 
     # ------------------------------------------------ Piper
     def piper_dialog(self):
@@ -320,3 +364,97 @@ class PiperDialog(QDialog):
                 tts.piper_download(k, self.catalog[k], self.app.settings, progress)
             return True
         self.app.run_task(job, on_done=lambda _r: self.fill(), title="Tải giọng Piper")
+
+
+class PronDictDialog(QDialog):
+    """Từ điển phát âm: quy định cách đọc tên riêng, từ nước ngoài, từ hay bị đọc sai."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle("📖 Từ điển phát âm")
+        self.resize(620, 560)
+        lay = QVBoxLayout(self)
+        lay.addWidget(muted("Mỗi dòng: từ/cụm từ trong kịch bản → cách đọc. Áp dụng cho mọi giọng, phụ đề vẫn giữ chữ gốc. "
+                            "Ví dụ: 'Thanos' → 'Tha-nốt', 'MCU' → 'em xi diu', 'DiCaprio' → 'Đi-ca-pri-ô'."))
+        self.table = QTableWidget(0, 3)
+        self.table.setHorizontalHeaderLabels(["Từ trong kịch bản", "Đọc là", "Aa"])
+        self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
+        self.table.horizontalHeader().setSectionResizeMode(1, QHeaderView.Stretch)
+        self.table.verticalHeader().setVisible(False)
+        self.table.horizontalHeaderItem(2).setToolTip("Tích = phân biệt chữ hoa/thường")
+        self.table.setColumnWidth(2, 44)
+        lay.addWidget(self.table, 1)
+        for e in textnorm.load_dict():
+            self._add(e)
+        self.test = QLineEdit()
+        self.test.setPlaceholderText("Gõ câu để thử, vd: Năm 2019 Thanos búng tay xóa 50% sự sống")
+        self.out = muted("")
+        self.test.textChanged.connect(self._try)
+        lay.addWidget(self.test)
+        lay.addWidget(self.out)
+        lay.addWidget(hrow(button("➕ Thêm", lambda: self._add({})), button("➖ Xóa", self._del),
+                           button("📥 Nhập", self._import), button("📤 Xuất", self._export),
+                           button("↺ Mặc định", self._reset), "stretch",
+                           button("💾 Lưu", self._save, "primary"), button("Đóng", self.reject)))
+
+    def _add(self, e):
+        r = self.table.rowCount()
+        self.table.insertRow(r)
+        self.table.setItem(r, 0, QTableWidgetItem(e.get("from", "")))
+        self.table.setItem(r, 1, QTableWidgetItem(e.get("to", "")))
+        it = QTableWidgetItem()
+        it.setFlags(Qt.ItemIsUserCheckable | Qt.ItemIsEnabled)
+        it.setCheckState(Qt.Checked if e.get("case") else Qt.Unchecked)
+        self.table.setItem(r, 2, it)
+        if not e:
+            self.table.editItem(self.table.item(r, 0))
+
+    def _del(self):
+        for r in sorted({i.row() for i in self.table.selectedIndexes()}, reverse=True):
+            self.table.removeRow(r)
+
+    def entries(self):
+        out = []
+        for r in range(self.table.rowCount()):
+            a = (self.table.item(r, 0).text() if self.table.item(r, 0) else "").strip()
+            b = self.table.item(r, 1).text() if self.table.item(r, 1) else ""
+            c = self.table.item(r, 2).checkState() == Qt.Checked if self.table.item(r, 2) else False
+            if a:
+                out.append({"from": a, "to": b, "case": c})
+        return out
+
+    def _try(self, t):
+        self.out.setText("→ " + textnorm.prepare(t, "vi", True, self.entries()) if t.strip() else "")
+
+    def _save(self):
+        textnorm.save_dict(self.entries())
+        self.accept()
+
+    def _reset(self):
+        self.table.setRowCount(0)
+        for e in textnorm.DEFAULT_DICT:
+            self._add(e)
+
+    def _import(self):
+        f, _ = QFileDialog.getOpenFileName(self, "Nhập từ điển", "", "Từ điển (*.json *.csv *.txt)")
+        if not f:
+            return
+        import csv
+        import json
+
+        if f.lower().endswith(".json"):
+            items = json.loads(Path(f).read_text(encoding="utf-8"))
+        else:
+            items = []
+            for row in csv.reader(Path(f).read_text(encoding="utf-8-sig").splitlines()):
+                if len(row) >= 2 and row[0].strip():
+                    items.append({"from": row[0].strip(), "to": row[1].strip()})
+        for e in items:
+            self._add(e)
+
+    def _export(self):
+        f, _ = QFileDialog.getSaveFileName(self, "Xuất từ điển", "tu_dien_phat_am.json", "JSON (*.json)")
+        if f:
+            import json
+
+            Path(f).write_text(json.dumps(self.entries(), ensure_ascii=False, indent=2), encoding="utf-8")

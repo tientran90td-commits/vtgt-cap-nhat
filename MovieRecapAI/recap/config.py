@@ -75,6 +75,9 @@ DEFAULTS: dict = {
         "style": "",
         "xtts_ref": "",
         "xtts_model_dir": "",
+        "normalize": True,       # chuẩn hóa số, ngày, đơn vị, viết tắt trước khi đọc
+        "ai_pron": False,        # nhờ AI soát lại câu cho dễ đọc
+        "transliterate": False,  # phiên âm tên nước ngoài sang tiếng Việt
     },
     "render": {
         "aspect": "16:9",

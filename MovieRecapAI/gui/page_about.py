@@ -15,6 +15,9 @@ OSS = [
     ("PySceneDetect", "https://github.com/Breakthrough/PySceneDetect", "BSD-3", "Dò chuyển cảnh"),
     ("OpenCV", "https://github.com/opencv/opencv", "Apache-2.0", "Đọc khung hình cho dò cảnh"),
     ("yt-dlp", "https://github.com/yt-dlp/yt-dlp", "Unlicense", "Tải phim từ YouTube, Facebook, TikTok... + phụ đề"),
+    ("VieNeu-TTS", "https://github.com/pnnbao97/VieNeu-TTS", "Apache-2.0",
+     "AI giọng Việt phát âm chuẩn, 25 giọng, nhân bản giọng (offline)"),
+    ("num2words", "https://github.com/savoirfairelinux/num2words", "LGPL-2.1", "Đọc số thành chữ (ngôn ngữ khác)"),
     ("edge-tts", "https://github.com/rany2/edge-tts", "LGPL-3.0", "400+ giọng Microsoft Edge miễn phí"),
     ("gTTS", "https://github.com/pndurette/gTTS", "MIT", "Giọng Google Translate miễn phí"),
     ("Piper", "https://github.com/rhasspy/piper", "MIT/GPL", "Giọng đọc neural offline"),
@@ -53,6 +56,8 @@ class AboutPage(Page):
 <li>Phim có phụ đề .srt: chọn <i>Dùng file phụ đề có sẵn</i> - nhanh và chính xác hơn nhận dạng.</li>
 <li>Máy có card NVIDIA: chọn model Whisper <i>large-v3</i> và bộ mã hóa <i>NVENC</i> để nhanh hơn nhiều lần.</li>
 <li>Kiểu <i>Cắt highlight giữ thoại gốc</i> không cần giọng đọc; để trống lời thuyết minh 1 dòng để giữ câu thoại đắt giá.</li>
+<li>Phát âm chuẩn: dùng giọng <i>⭐ VieNeu-TTS</i>, bật <i>Phát âm chuẩn</i> ở bước 3 (số, ngày, tiền, đơn vị
+    được đọc thành chữ), thêm tên riêng vào <i>📖 Từ điển phát âm</i>, hoặc bật <i>AI soát phát âm</i>.</li>
 <li>Video TikTok: bấm mẫu <i>📱 TikTok / Reels / Shorts</i> ở bước 4.</li>
 </ul>
 <h3>⚖️ Lưu ý bản quyền</h3>

@@ -14,5 +14,7 @@ gTTS>=2.5
 pyttsx3>=2.98
 # Tải phim từ link
 yt-dlp>=2025.1.1
+# Đọc số thành chữ cho các ngôn ngữ khác tiếng Việt
+num2words>=0.5.13
 # FFmpeg dự phòng nếu máy chưa cài
 imageio-ffmpeg>=0.5

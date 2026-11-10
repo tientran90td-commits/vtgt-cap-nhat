@@ -6,5 +6,6 @@ if [ ! -d .venv ]; then
   .venv/bin/pip install --upgrade pip
   .venv/bin/pip install -r requirements.txt
   .venv/bin/pip install "piper-tts>=1.2" || true
+  .venv/bin/pip install "vieneu>=3.8" || true
 fi
 exec .venv/bin/python main.py "$@"

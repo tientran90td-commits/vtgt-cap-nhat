@@ -1,5 +1,6 @@
 """Giọng đọc (Text-to-Speech) - nhiều engine, online lẫn offline.
 
+  vieneu      VieNeu-TTS (pnnbao97/VieNeu-TTS) - OFFLINE, AI tiếng Việt phát âm chuẩn, 25 giọng, nhân bản giọng
   edge        Microsoft Edge TTS (rany2/edge-tts)  - MIỄN PHÍ, 400+ giọng, 140+ ngôn ngữ (có Hoài My, Nam Minh)
   gtts        Google Translate TTS (pndurette/gTTS) - miễn phí, nhiều ngôn ngữ/giọng vùng miền
   openai      OpenAI TTS (tts-1, tts-1-hd, gpt-4o-mini-tts có điều khiển cảm xúc)
@@ -19,6 +20,7 @@ import base64
 import hashlib
 import json
 import os
+import re
 import subprocess
 import sys
 import time
@@ -28,6 +30,7 @@ from pathlib import Path
 
 import requests
 
+from . import textnorm
 from .config import Settings, app_home
 from .ffmpeg_utils import run_ffmpeg
 from .subtitles import chunk_text
@@ -57,6 +60,8 @@ class Voice:
 
 
 ENGINES: dict[str, dict] = {
+    "vieneu": {"name": "⭐ VieNeu-TTS - AI giọng Việt phát âm chuẩn, nhân bản giọng (offline)", "offline": True,
+               "key": None, "rate": False, "pitch": False, "models": ["v3turbo", "v3nano"]},
     "edge": {"name": "Microsoft Edge TTS - miễn phí, 400+ giọng", "offline": False, "key": None,
              "rate": True, "pitch": True, "models": []},
     "gtts": {"name": "Google Translate TTS - miễn phí", "offline": False, "key": None,
@@ -174,6 +179,56 @@ def _voices_edge(settings, refresh):
         # Không có mạng: dùng danh sách giọng phổ biến dựng sẵn (không lưu cache)
         return [Voice(id=v, name=v.split("-", 2)[-1].replace("Neural", ""), lang="-".join(v.split("-")[:2]),
                       gender=g, engine="edge") for v, g in _EDGE_FALLBACK]
+
+
+_VIENEU_FALLBACK = {
+    "v3turbo": [("Hải Đăng", "male", "Nam · Bắc · Phong cách tự nhiên"), ("Trúc Ly", "female", "Nữ · Bắc · Phong cách tự nhiên"),
+                ("Thiện Minh", "male", "Nam · Bắc · Phong cách kể chuyện"), ("Mai Anh", "female", "Nữ · Bắc · Phong cách tin tức"),
+                ("Adam bựa", "male", "Nam · Bắc · Phong cách tự nhiên"), ("Thùy Dung", "female", "Nữ · Nam · Phong cách tin tức"),
+                ("Thiền Tâm Đức", "male", "Nam · Bắc · Phong cách kể chuyện"), ("Ngọc Huyền", "female", "Nữ · Bắc · Giọng đọc tự nhiên"),
+                ("Quang Sơn", "male", "Nam · Trung · Phong cách tự nhiên"), ("Ngọc Trân", "female", "Nữ · Trung · Phong cách tự nhiên"),
+                ("Thái Sơn", "male", "Nam · Nam · Phong cách kể chuyện"), ("Ngọc Linh", "female", "Nữ · Bắc · Phong cách kể chuyện"),
+                ("Mỹ Duyên", "female", "Nữ · Nam · Phong cách đọc truyện"), ("Đức Trí", "male", "Nam · Nam · Phong cách đọc truyện")],
+    "v3nano": [("Minh Quân", "male", "Nam · Bắc · Phong cách tự nhiên"), ("Ái Hân", "female", "Nữ · Nam · Phong cách tin tức"),
+               ("Mai Anh", "female", "Nữ · Bắc · Phong cách tin tức"), ("Anh Khôi", "male", "Nam · Bắc · Phong cách kể chuyện"),
+               ("Trúc Ly", "female", "Nữ · Bắc · Phong cách tự nhiên"), ("Mỹ Duyên", "female", "Nữ · Bắc · Phong cách đọc truyện")],
+}
+
+
+def _vieneu_desc(d: str) -> str:
+    """'Nam · Bắc · Phong cách tự nhiên' -> 'miền Bắc · Phong cách tự nhiên' (giới tính đã có cột riêng)."""
+    parts = [x.strip() for x in re.split(r"\s*·\s*", d or "") if x.strip()]
+    if parts and parts[0] in ("Nam", "Nữ"):
+        parts = parts[1:]
+    if parts and parts[0] in ("Bắc", "Trung", "Nam"):
+        parts[0] = "miền " + parts[0]
+    return " · ".join(parts)
+
+
+def _voices_vieneu(settings, refresh):
+    """Đọc danh sách giọng có sẵn từ file voices_*.json đi kèm gói vieneu (không cần nạp model)."""
+    mode = settings.get("voice", "model") or "v3turbo"
+    mode = mode if mode in _VIENEU_FALLBACK else "v3turbo"
+    items = []
+    try:
+        import importlib.util
+
+        spec = importlib.util.find_spec("vieneu")
+        f = Path(spec.origin).parent / "assets" / f"voices_{mode.replace('v3', 'v3_')}.json" if spec else None
+        if f and f.exists():
+            data = json.loads(f.read_text(encoding="utf-8"))
+            presets = data.get("presets", {})
+            order = sorted(presets.items(), key=lambda kv: (kv[1].get("featured") is None, kv[1].get("featured") or 0))
+            items = [(n, v.get("gender", ""), v.get("description", "")) for n, v in order]
+    except Exception:
+        items = []
+    if not items:
+        items = _VIENEU_FALLBACK[mode]
+    out = [Voice(id="clone", name="🎤 Nhân bản giọng từ file mẫu 3-8 giây", lang="vi-VN", engine="vieneu",
+                 desc="chọn file mẫu bên dưới")]
+    out += [Voice(id=n, name=n, lang="vi-VN", gender=g.capitalize(), engine="vieneu", desc=_vieneu_desc(d))
+            for n, g, d in items]
+    return out
 
 
 _GTTS_ACCENTS = {
@@ -395,6 +450,8 @@ def synthesize(engine: str, text: str, voice: str, out_wav: str | Path, opts: di
     opts: rate (%), pitch (nửa cung), volume (%), model, style, lang_code, xtts_ref, xtts_model_dir
     """
     text = (text or "").strip()
+    if not opts.get("raw"):
+        text = speak_text(text, opts)
     if not text:
         raise TTSError("Văn bản rỗng")
     out_wav = Path(out_wav)
@@ -521,8 +578,11 @@ def _synth_openai(text, voice, base: Path, opts, settings):
     model = opts.get("model") or "gpt-4o-mini-tts"
     speed = max(0.25, min(4.0, 1 + float(opts.get("rate", 0) or 0) / 100.0))
     body = {"model": model, "input": text, "voice": voice, "speed": speed, "response_format": "mp3"}
-    if model.startswith("gpt-") and opts.get("style"):
-        body["instructions"] = opts["style"]
+    if model.startswith("gpt-"):
+        lang = {v: k for k, v in LANG_CODES.items()}.get(opts.get("lang_code") or "", "")
+        body["instructions"] = opts.get("style") or (
+            f"Đọc bằng {lang} chuẩn, phát âm rõ ràng, tự nhiên như người dẫn chuyện phim." if lang == "Tiếng Việt"
+            else "Speak naturally and clearly with correct native pronunciation, like a movie narrator.")
     r = _session(settings).post(f"{api}/audio/speech", headers={"Authorization": f"Bearer {key}"}, json=body,
                                 timeout=180)
     if r.status_code >= 400:
@@ -647,6 +707,32 @@ def _synth_fpt(text, voice, base: Path, opts, settings):
             out.write_bytes(g.content)
             return out
     raise TTSError("FPT.AI: quá thời gian chờ file âm thanh.")
+
+
+_VIENEU: dict = {}
+
+
+def _synth_vieneu(text, voice, base: Path, opts, settings):
+    try:
+        from vieneu import Vieneu
+    except ImportError as e:
+        raise TTSError("Chưa cài VieNeu-TTS: pip install vieneu  (lần đầu sẽ tự tải model từ HuggingFace)") from e
+    mode = opts.get("model") or "v3turbo"
+    mode = mode if mode in ("v3turbo", "v3nano") else "v3turbo"
+    tts = _VIENEU.get(mode)
+    if tts is None:
+        tts = Vieneu(mode=mode)
+        _VIENEU[mode] = tts
+    if voice == "clone":
+        ref = opts.get("xtts_ref") or ""
+        if not ref or not Path(ref).exists():
+            raise TTSError("Chọn file giọng mẫu (3-8 giây, giọng rõ) để nhân bản.")
+        audio = tts.infer(text, ref_audio=ref)
+    else:
+        audio = tts.infer(text, voice=voice)
+    out = base.with_suffix(".wav")
+    tts.save(audio, str(out))
+    return out
 
 
 _PIPER_CACHE: dict = {}
@@ -786,7 +872,14 @@ def sapi_worker(argv: list[str]) -> int:
     return 1
 
 
+def speak_text(text: str, opts: dict) -> str:
+    """Văn bản thực sự được đọc: từ điển phát âm + chuẩn hóa số/ngày/đơn vị/viết tắt."""
+    return textnorm.prepare(text, opts.get("lang_code") or "vi", normalize=opts.get("normalize", True))
+
+
 def voice_cache_key(engine: str, voice: str, text: str, opts: dict) -> str:
-    keys = ("rate", "pitch", "volume", "model", "style", "lang_code", "xtts_ref", "xtts_model_dir")
-    payload = json.dumps([engine, voice, text, {k: opts.get(k) for k in keys}], ensure_ascii=False, sort_keys=True)
+    keys = ("rate", "pitch", "volume", "model", "style", "lang_code", "xtts_ref", "xtts_model_dir", "normalize",
+            "ai_pron", "transliterate")
+    payload = json.dumps([engine, voice, text, {k: opts.get(k) for k in keys}, textnorm.load_dict()],
+                         ensure_ascii=False, sort_keys=True)
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]

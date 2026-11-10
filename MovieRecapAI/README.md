@@ -8,7 +8,7 @@ hoặc **dọc (TikTok/Reels/Shorts)**.
 Phim dài ──► ① Nhận dạng lời thoại ──► ② Dò chuyển cảnh ──► ③ AI viết kịch bản + chọn cảnh
         (Whisper / phụ đề có sẵn)      (PySceneDetect)       (Gemini, Claude, GPT, Groq, Ollama…)
                                                                         │
-     Video ngắn ◄── ⑤ Dựng video (FFmpeg) ◄── ④ Lồng tiếng (11 công cụ, hơn 1000 giọng)
+     Video ngắn ◄── ⑤ Dựng video (FFmpeg) ◄── ④ Lồng tiếng (12 công cụ, phát âm chuẩn)
      + phụ đề .srt     cắt cảnh, ghép giọng, phụ đề, nhạc nền, logo, khung 16:9 / 9:16 / 1:1
 ```
 
@@ -21,8 +21,9 @@ Phim dài ──► ① Nhận dạng lời thoại ──► ② Dò chuyển c
 | **AI viết kịch bản** | Google Gemini, Anthropic Claude, OpenAI, Groq, DeepSeek, OpenRouter, xAI Grok, Mistral, Qwen, **Ollama/LM Studio (offline)**, mọi API dạng OpenAI-compatible, hoặc chế độ **không dùng AI** |
 | **Kiểu video** | Thuyết minh AI · Cắt highlight giữ thoại gốc · Kết hợp (thuyết minh + câu thoại đắt giá) |
 | **Phong cách** | Review TikTok kịch tính, tóm tắt nghiêm túc, hài hước, cảm xúc, kinh dị, phân tích ý nghĩa, thiếu nhi + yêu cầu riêng |
-| **Giọng đọc** | Edge TTS (400+ giọng miễn phí, có Hoài My/Nam Minh), gTTS, OpenAI TTS (có chỉnh cảm xúc), ElevenLabs, Gemini TTS (30 giọng), Google Cloud TTS, Azure (500+ giọng, nhiều phong cách), FPT.AI (giọng Việt Bắc/Trung/Nam), **Piper offline**, giọng Windows (SAPI), **XTTS-v2 / viXTTS nhân bản giọng** |
+| **Giọng đọc** | ⭐ VieNeu-TTS (giọng Việt AI offline), Edge TTS (400+ giọng miễn phí, có Hoài My/Nam Minh), gTTS, OpenAI TTS (có chỉnh cảm xúc), ElevenLabs, Gemini TTS (30 giọng), Google Cloud TTS, Azure (500+ giọng, nhiều phong cách), FPT.AI (giọng Việt Bắc/Trung/Nam), **Piper offline**, giọng Windows (SAPI), **XTTS-v2 / viXTTS nhân bản giọng** |
 | **Tinh chỉnh giọng** | Tốc độ, cao độ (nửa cung), âm lượng, cảm xúc/phong cách, nghe thử ngay |
+| **🗣️ Phát âm chuẩn** | ⭐ **VieNeu-TTS**: AI giọng Việt offline, 25 giọng 3 miền, nhân bản giọng từ mẫu 3–8 giây · tự đọc đúng số, số thập phân, %, tiền tệ, ngày tháng, giờ, khoảng, tỷ số, đơn vị, số La Mã, chữ viết tắt · **từ điển phát âm** do bạn định nghĩa · **AI soát phát âm** (viết lại câu cho dễ đọc, phiên âm tên nước ngoài) · phụ đề vẫn giữ chữ gốc |
 | **Biên tập** | Bảng kịch bản sửa trực tiếp: lời thuyết minh, mốc thời gian, thêm/xóa/đổi thứ tự, xem trước cảnh, nghe thử từng đoạn, lưu/mở kịch bản JSON |
 | **Dựng video** | 16:9 / 9:16 / 1:1 / 4:5, nền mờ hoặc cắt cúp, 720p–4K, phụ đề tùy chỉnh (font, màu, viền, vị trí), tiêu đề mở đầu, logo, nhạc nền, giảm tiếng phim khi thuyết minh, GPU NVENC/QuickSync/AMF |
 | **Tốc độ** | Lưu tạm mọi bước: sửa 1 đoạn rồi xuất lại thì chỉ dựng lại đoạn đó |
@@ -79,6 +80,7 @@ python main.py --cli "https://www.youtube.com/watch?v=..." --subtitle phim.srt -
 - Phim có sẵn phụ đề `.srt` cùng tên thì app tự nhận ra. Dùng phụ đề nhanh và chuẩn hơn nhận dạng giọng nói.
 - Máy có GPU NVIDIA: Whisper `large-v3` cho độ chính xác cao nhất, bộ mã hóa `NVENC` cho tốc độ xuất nhanh (bấm *Kiểm tra GPU*).
 - Phim rất dài mà dùng model ngữ cảnh nhỏ (Groq, Ollama): app tự tóm tắt từng phần trước rồi mới viết kịch bản.
+- **Phát âm chuẩn nhất cho tiếng Việt:** chọn engine *⭐ VieNeu-TTS* (đã cài sẵn qua `install.bat`, lần đầu tự tải model), bật *Phát âm chuẩn*, bấm *🔎 Xem cách đọc* để xem câu sẽ được đọc ra sao. Tên riêng hay bị đọc sai thì thêm vào *📖 Từ điển phát âm* (vd `Thanos → Tha-nốt`). Nếu muốn kỹ hơn, bật *AI soát phát âm*.
 - Giọng Piper tiếng Việt: vào *Giọng đọc* → engine *Piper* → *Tải thêm giọng Piper* → lọc `vi_`.
 - Nhân bản giọng tiếng Việt: `pip install coqui-tts`, tải model **viXTTS** (<https://huggingface.co/capleaf/viXTTS>), rồi chọn engine *XTTS*, giọng *Nhân bản*, file mẫu và thư mục model.
 
@@ -90,6 +92,8 @@ python main.py --cli "https://www.youtube.com/watch?v=..." --subtitle phim.srt -
 | [faster-whisper](https://github.com/SYSTRAN/faster-whisper) / [OpenAI Whisper](https://github.com/openai/whisper) / [CTranslate2](https://github.com/OpenNMT/CTranslate2) | MIT | Nhận dạng lời thoại offline |
 | [PySceneDetect](https://github.com/Breakthrough/PySceneDetect) + [OpenCV](https://github.com/opencv/opencv) | BSD-3, Apache-2.0 | Dò chuyển cảnh |
 | [yt-dlp](https://github.com/yt-dlp/yt-dlp) | Unlicense | Tải phim + phụ đề từ link |
+| [VieNeu-TTS](https://github.com/pnnbao97/VieNeu-TTS) | Apache-2.0 | AI giọng Việt phát âm chuẩn, nhân bản giọng |
+| [num2words](https://github.com/savoirfairelinux/num2words) | LGPL-2.1 | Đọc số thành chữ cho ngôn ngữ khác |
 | [edge-tts](https://github.com/rany2/edge-tts) | LGPL-3.0 | 400+ giọng Microsoft miễn phí |
 | [gTTS](https://github.com/pndurette/gTTS) | MIT | Giọng Google Translate |
 | [Piper](https://github.com/rhasspy/piper) + [piper-voices](https://huggingface.co/rhasspy/piper-voices) | MIT/GPL | Giọng neural offline |
@@ -112,7 +116,8 @@ MovieRecapAI/
 │   ├── scenes.py           # dò chuyển cảnh
 │   ├── llm.py              # kết nối các AI
 │   ├── script_writer.py    # prompt + xử lý kịch bản
-│   ├── tts.py              # 11 công cụ giọng đọc
+│   ├── tts.py              # 12 công cụ giọng đọc
+│   ├── textnorm.py         # phát âm chuẩn: đọc số/ngày/đơn vị, từ điển, AI soát phát âm
 │   ├── subtitles.py        # đọc/ghi SRT, ASS
 │   ├── editor.py           # dựng video
 │   └── pipeline.py         # quản lý dự án, chuỗi xử lý, tải video
@@ -120,7 +125,7 @@ MovieRecapAI/
 └── tests/test_pipeline.py  # kiểm thử end-to-end offline
 ```
 
-Chạy kiểm thử: `python tests/test_pipeline.py`. Bài kiểm thử tạo phim giả lập, giả lập AI và giọng đọc, rồi dựng ra video 16:9, 9:16 và highlight.
+Chạy kiểm thử: `python tests/test_pipeline.py` và `python tests/test_textnorm.py`. Bài kiểm thử tạo phim giả lập, giả lập AI và giọng đọc, rồi dựng ra video 16:9, 9:16 và highlight.
 
 ## ⚖️ Lưu ý bản quyền
 

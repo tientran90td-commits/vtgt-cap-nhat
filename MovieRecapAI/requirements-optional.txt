@@ -1,3 +1,6 @@
+# ⭐ VieNeu-TTS: AI giọng Việt phát âm chuẩn, 25 giọng, nhân bản giọng (offline, CPU chạy được qua ONNX)
+#    GPU NVIDIA trên Windows: cài torch CUDA trước - xem https://github.com/pnnbao97/VieNeu-TTS
+vieneu>=3.8
 # Giọng đọc offline Piper (nhẹ, chạy CPU tốt)
 piper-tts>=1.2
 # Nhân bản giọng nói XTTS-v2 / viXTTS (nặng ~2GB, nên có GPU NVIDIA)

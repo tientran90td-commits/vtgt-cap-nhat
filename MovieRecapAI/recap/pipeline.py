@@ -7,7 +7,7 @@ import re
 import threading
 from pathlib import Path
 
-from . import editor, script_writer, transcribe, tts
+from . import editor, script_writer, textnorm, transcribe, tts
 from .config import Settings
 from .ffmpeg_utils import Cancelled, MediaInfo, probe, set_ffmpeg_path
 
@@ -109,21 +109,33 @@ class Project:
         vdir = self.dir / "voices"
         vdir.mkdir(exist_ok=True)
         segs = self.script["segments"]
+        texts = [(seg.get("narration") or "").strip() for seg in segs]
+        spoken = list(texts)
+        if v.get("ai_pron"):
+            idx = [i for i, t in enumerate(texts) if t]
+            log("AI đang soát phát âm lời thuyết minh...")
+            progress(0.02, "AI soát phát âm")
+            fixed = textnorm.ai_speakable([texts[i] for i in idx], self.settings.get("script", "language", "Tiếng Việt"),
+                                          self.settings, bool(v.get("transliterate")), log, cache_dir=self.dir)
+            for i, t in zip(idx, fixed):
+                spoken[i] = t
         files: list = []
         for i, seg in enumerate(segs):
             if cancel.is_set():
                 raise Cancelled()
-            text = (seg.get("narration") or "").strip()
+            text = texts[i]
             if not text:
                 files.append(None)
                 continue
-            key = tts.voice_cache_key(engine, voice, text, v)
+            key = tts.voice_cache_key(engine, voice, spoken[i], v)
             out = vdir / f"v{i:03d}_{key}.wav"
             if not out.exists():
                 progress(i / len(segs), f"Đọc giọng đoạn {i + 1}/{len(segs)}")
                 for old in vdir.glob(f"v{i:03d}_*.wav"):
                     old.unlink(missing_ok=True)
-                tts.synthesize(engine, text, voice, out, v, self.settings, cancel=cancel)
+                if spoken[i] != text:
+                    log(f"Đoạn {i + 1} đọc là: {tts.speak_text(spoken[i], v)}", level="debug")
+                tts.synthesize(engine, spoken[i], voice, out, v, self.settings, cancel=cancel)
             files.append(out)
         progress(1.0, "Xong giọng đọc")
         log(f"Giọng đọc: {sum(1 for f in files if f)} đoạn ({tts.ENGINES[engine]['name']} / {voice}).")
