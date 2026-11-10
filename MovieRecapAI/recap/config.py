@@ -40,6 +40,8 @@ DEFAULTS: dict = {
         "fpt_key": "",
         # Dữ liệu phim (tùy chọn) - themoviedb.org
         "tmdb_key": "",
+        # HuggingFace token (tùy chọn) - để tải giọng/model từ repo cần đăng nhập
+        "hf_token": "",
         # Mạng
         "proxy": "",
     },

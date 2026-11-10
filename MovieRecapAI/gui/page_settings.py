@@ -93,7 +93,11 @@ class SettingsPage(Page):
             row = hrow(*ws)
             row.layout().setStretch(0, 1)
             f2.addRow(name, row)
-        f2.addRow(muted("Edge TTS, gTTS, Piper, giọng Windows và XTTS không cần key."))
+        hf = hrow(KeyField(b, "hf_token", "(tùy chọn) HuggingFace token - chỉ cần cho repo giọng/model phải đăng nhập"),
+                  button("Lấy token ↗", lambda: self.open("https://huggingface.co/settings/tokens"), "link"))
+        hf.layout().setStretch(0, 1)
+        f2.addRow("HuggingFace", hf)
+        f2.addRow(muted("Edge TTS, gTTS, Piper, VieNeu, giọng Windows và XTTS không cần key."))
         v.addWidget(g2)
 
         gm = QGroupBox("🎬 Dữ liệu phim (tùy chọn - giúp nhận diện phim & tên nhân vật chính xác)")

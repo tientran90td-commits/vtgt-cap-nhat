@@ -23,7 +23,7 @@ Phim dài ──► 🔍 Nhận diện phim ──► ① Nhận dạng lời th
 | **Phong cách** | Review TikTok kịch tính, tóm tắt nghiêm túc, hài hước, cảm xúc, kinh dị, phân tích ý nghĩa, thiếu nhi + yêu cầu riêng |
 | **Giọng đọc** | ⭐ VieNeu-TTS (giọng Việt AI offline), Edge TTS (400+ giọng miễn phí, có Hoài My/Nam Minh), gTTS, OpenAI TTS (có chỉnh cảm xúc), ElevenLabs, Gemini TTS (30 giọng), Google Cloud TTS, Azure (500+ giọng, nhiều phong cách), FPT.AI (giọng Việt Bắc/Trung/Nam), **Piper offline**, giọng Windows (SAPI), **XTTS-v2 / viXTTS nhân bản giọng** |
 | **Tinh chỉnh giọng** | Tốc độ, cao độ (nửa cung), âm lượng, cảm xúc/phong cách, nghe thử ngay |
-| **🎭 Cách đọc** | Tự nhiên, hài hước, nghiêm túc/tin tức, kịch tính, kinh dị, buồn, sôi nổi, ấm áp, gay gắt, thiếu nhi hoặc tự mô tả · AI gán cách đọc **riêng cho từng đoạn** theo cảm xúc cảnh (sửa được trong bảng kịch bản) · OpenAI/Gemini/Azure/ElevenLabs đọc theo cảm xúc thật, các công cụ khác được chỉnh nhịp & cao độ cho hợp |
+| **🎭 Cách đọc** | Tự nhiên, hài hước, hoạt ngôn, nghiêm túc/tin tức, kịch tính, kinh dị, buồn, sôi nổi, ấm áp, gay gắt, thiếu nhi hoặc tự mô tả · AI gán cách đọc **riêng cho từng đoạn** theo cảm xúc cảnh (sửa được trong bảng kịch bản) · OpenAI/Gemini/Azure/ElevenLabs đọc theo cảm xúc thật, các công cụ khác được chỉnh nhịp & cao độ cho hợp |
 | **🔍 Nhận diện phim** | AI nhận ra phim từ tên file + 7 khung hình + lời thoại (tên phim, năm, nhân vật, nội dung) · đối chiếu **TMDB** (tùy chọn) để lấy tên nhân vật chuẩn · gợi ý tên riêng cho Whisper nghe đúng · **AI xem hình ảnh** các cảnh để chọn clip chính xác · bạn sửa/bổ sung được |
 | **🧩 Tự cài đặt** | Tự kiểm tra & tải những gì còn thiếu: thư viện, FFmpeg bản đầy đủ, model Whisper, model VieNeu, giọng Piper tiếng Việt · nút **🩺 Chẩn đoán giọng đọc** & **🔔 Thử loa** · file log để gửi khi gặp lỗi |
 | **🗣️ Phát âm chuẩn** | ⭐ **VieNeu-TTS**: AI giọng Việt offline, 25 giọng 3 miền, nhân bản giọng từ mẫu 3–8 giây · tự đọc đúng số, số thập phân, %, tiền tệ, ngày tháng, giờ, khoảng, tỷ số, đơn vị, số La Mã, chữ viết tắt · **từ điển phát âm** do bạn định nghĩa · **AI soát phát âm** (viết lại câu cho dễ đọc, phiên âm tên nước ngoài) · phụ đề vẫn giữ chữ gốc |
@@ -96,6 +96,8 @@ python main.py --cli "https://www.youtube.com/watch?v=..." --subtitle phim.srt -
 - Máy có GPU NVIDIA: Whisper `large-v3` cho độ chính xác cao nhất, bộ mã hóa `NVENC` cho tốc độ xuất nhanh (bấm *Kiểm tra GPU*).
 - Phim rất dài mà dùng model ngữ cảnh nhỏ (Groq, Ollama): app tự tóm tắt từng phần trước rồi mới viết kịch bản.
 - **Phát âm chuẩn nhất cho tiếng Việt:** chọn engine *⭐ VieNeu-TTS* (đã cài sẵn qua `install.bat`, lần đầu tự tải model), bật *Phát âm chuẩn*, bấm *🔎 Xem cách đọc* để xem câu sẽ được đọc ra sao. Tên riêng hay bị đọc sai thì thêm vào *📖 Từ điển phát âm* (vd `Thanos → Tha-nốt`). Nếu muốn kỹ hơn, bật *AI soát phát âm*.
+- **Tất cả giọng Piper offline:** engine *Piper* → *🔌 Kho giọng Piper*: tải **tất cả giọng chính thức** (hơn 100 giọng, khoảng chục GB) hoặc *Tất cả giọng tiếng Việt*; tải giọng cộng đồng từ **bất kỳ repo HuggingFace** nào; **nhập file** `.onnx` + `.onnx.json`; **đặt tên** cho giọng (vd "Ngọc Huyền - nữ hoạt ngôn"). Cách đọc (hoạt ngôn, nghiêm túc...) chỉnh cả độ biểu cảm của Piper.
+- **⭐ Giọng gợi ý:** chọn nhanh ở đầu trang Giọng đọc, vd *Ngọc Huyền · nữ hoạt ngôn* (VieNeu, offline).
 - Giọng Piper tiếng Việt: vào *Giọng đọc* → engine *Piper* → *Tải thêm giọng Piper* → lọc `vi_`.
 - Nhân bản giọng tiếng Việt: `pip install coqui-tts`, tải model **viXTTS** (<https://huggingface.co/capleaf/viXTTS>), rồi chọn engine *XTTS*, giọng *Nhân bản*, file mẫu và thư mục model.
 
@@ -142,7 +144,7 @@ MovieRecapAI/
 └── tests/test_pipeline.py  # kiểm thử end-to-end offline
 ```
 
-Chạy kiểm thử: `python tests/test_pipeline.py`, `python tests/test_textnorm.py`, `python tests/test_features.py`. Bài kiểm thử tạo phim giả lập, giả lập AI và giọng đọc, rồi dựng ra video 16:9, 9:16 và highlight.
+Chạy kiểm thử: `python tests/test_pipeline.py`, `python tests/test_textnorm.py`, `python tests/test_features.py`, `python tests/test_piper.py`. Bài kiểm thử tạo phim giả lập, giả lập AI và giọng đọc, rồi dựng ra video 16:9, 9:16 và highlight.
 
 ## ⚖️ Lưu ý bản quyền
 

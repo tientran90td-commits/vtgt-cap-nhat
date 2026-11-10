@@ -56,6 +56,12 @@ class VoicePage(Page):
         self.list.currentItemChanged.connect(self._pick)
         self.list.itemDoubleClicked.connect(lambda _i: self.listen())
         self.lb_count = muted("")
+        self.preset = QComboBox()
+        self.preset.addItem("⭐ Giọng gợi ý - chọn nhanh...", None)
+        for i, pr in enumerate(tts.VOICE_PRESETS):
+            self.preset.addItem(pr["name"], i)
+        self.preset.activated.connect(self.apply_preset)
+        left.addWidget(self.preset)
         left.addWidget(self.engine)
         left.addWidget(hrow(self.lb_engine, self.btn_install, "stretch"))
         left.addLayout(flt)
@@ -99,7 +105,8 @@ class VoicePage(Page):
 
         self.g_extra = QGroupBox("Tùy chọn riêng")
         fe = QFormLayout(self.g_extra)
-        self.btn_piper = button("⬇ Tải thêm giọng Piper (offline, 40+ ngôn ngữ)", self.piper_dialog, "primary")
+        self.btn_piper = button("🔌 Kho giọng Piper: tải tất cả giọng / nhập giọng / đặt tên", self.piper_dialog,
+                                "primary")
         self.xtts_ref = PathPicker("file", "Âm thanh (*.wav *.mp3 *.flac *.m4a)", "File giọng mẫu (VieNeu: 3-8 giây, XTTS: 6-30 giây)")
         self.xtts_ref.setText(app.settings.get("voice", "xtts_ref", ""))
         self.xtts_ref.changed.connect(lambda v: b._set("voice", "xtts_ref", v))
@@ -216,7 +223,12 @@ class VoicePage(Page):
         self.list.clear()
         self.lb_count.setText("Đang tải danh sách giọng...")
 
+        self._load_seq = getattr(self, "_load_seq", 0) + 1
+        seq = self._load_seq
+
         def done(voices):
+            if seq != self._load_seq or eng != self.engine.currentData():
+                return  # kết quả của lần tải cũ (người dùng đã đổi công cụ) - bỏ qua
             self._loaded_engine = eng
             self.voices = voices
             langs = sorted({v.lang for v in voices if v.lang})
@@ -240,7 +252,8 @@ class VoicePage(Page):
                     eng, "Không có giọng nào."))
 
         def fail(msg):
-            self.lb_count.setText("❌ " + msg)
+            if seq == self._load_seq:
+                self.lb_count.setText("❌ " + msg)
         self.app.run_task(lambda log, progress, cancel: tts.list_voices(eng, self.app.settings, refresh),
                           on_done=done, on_fail=fail, title="Tải danh sách giọng", quiet=True)
 
@@ -309,6 +322,28 @@ class VoicePage(Page):
                     how += f" Giọng VieNeu hợp: {hint}."
         self.lb_style.setText(how)
 
+    def apply_preset(self, idx):
+        i = self.preset.itemData(idx)
+        if i is None:
+            return
+        pr = tts.VOICE_PRESETS[i]
+        b = self.app.binder
+        b._set("voice", "voice", pr["voice"])
+        if pr["engine"] == "vieneu":
+            b._set("voice", "model", "v3turbo")
+        self.rate.setValue(pr.get("rate", 0))
+        self.pitch.setValue(pr.get("pitch", 0))
+        self.read_style.setCurrentIndex(max(0, self.read_style.findData(pr.get("read_style", "natural"))))
+        j = self.engine.findData(pr["engine"])
+        if self.engine.currentIndex() != j:
+            self.engine.setCurrentIndex(j)  # tự nạp lại danh sách giọng và chọn giọng ở trên
+        else:
+            self.load_voices()
+        self.preset.setCurrentIndex(0)
+        self.app.log(f"Đã chọn giọng gợi ý: {pr['name']}")
+        if pr["engine"] == "piper" and not (tts.piper_dir(self.app.settings) / pr["voice"]).exists():
+            self.app.log("Giọng Piper này chưa tải - bấm '🔌 Kho giọng Piper' để tải.", "warn")
+
     def install_engine(self):
         eng = self.engine.currentData()
         self.app.ensure(eng, then=lambda: (self.load_voices(refresh=True), self.app.log("Đã sẵn sàng - bấm Nghe thử.")))
@@ -353,33 +388,59 @@ class VoicePage(Page):
 
     # ------------------------------------------------ Piper
     def piper_dialog(self):
-        dlg = PiperDialog(self.app, self)
-        dlg.exec()
-        self.load_voices()
+        # không chặn cửa sổ chính để còn bấm ⏹ Hủy khi đang tải nhiều giọng
+        self._piper_dlg = PiperDialog(self.app, self)
+        self._piper_dlg.finished.connect(lambda _r: self.load_voices())
+        self._piper_dlg.show()
 
 
 class PiperDialog(QDialog):
+    """Kho giọng Piper offline: tải tất cả giọng chính thức, giọng cộng đồng trên HuggingFace, nhập file."""
+
     def __init__(self, app, parent=None):
         super().__init__(parent)
+        from PySide6.QtWidgets import QTabWidget
+
         self.app = app
-        self.setWindowTitle("Tải giọng Piper (rhasspy/piper-voices)")
-        self.resize(640, 560)
+        self.setWindowTitle("🔌 Kho giọng Piper (offline)")
+        self.resize(860, 640)
         lay = QVBoxLayout(self)
+        lay.addWidget(muted("Giọng Piper chạy hoàn toàn offline sau khi tải. Tiến trình tải hiện ở thanh dưới cửa sổ "
+                            "chính (bấm ⏹ Hủy ở đó để dừng). Giọng đã tải sẽ không tải lại."))
+        tabs = QTabWidget()
+        lay.addWidget(tabs, 1)
+        tabs.addTab(self._tab_official(), "📚 Kho chính thức (rhasspy)")
+        tabs.addTab(self._tab_hf(), "🤗 Repo HuggingFace (cộng đồng)")
+        tabs.addTab(self._tab_file(), "📁 Nhập từ file")
+        tabs.addTab(self._tab_installed(), "✅ Giọng đã có")
+        lay.addWidget(hrow("stretch", button("Đóng", self.accept)))
+        self.catalog: dict = {}
+        self.hf_items: list[dict] = []
+        app.run_task(lambda log, progress, cancel: tts.piper_catalog(app.settings), on_done=self._loaded,
+                     on_fail=lambda m: self.lb.setText("❌ Không tải được danh mục: " + m),
+                     title="Tải danh mục Piper", quiet=True)
+
+    # ---------------- kho chính thức
+    def _tab_official(self):
+        w = QWidget()
+        v = QVBoxLayout(w)
         self.q = QLineEdit()
-        self.q.setPlaceholderText("Lọc: vi_VN, en_US, ja, medium, high...")
+        self.q.setPlaceholderText("Lọc: vi_VN, en_US, ja, medium, high... (để trống = tất cả)")
         self.q.setText("vi_")
         self.q.textChanged.connect(self.fill)
         self.list = QListWidget()
         self.list.setSelectionMode(QListWidget.ExtendedSelection)
-        self.lb = muted("Đang tải danh sách...")
-        lay.addWidget(self.q)
-        lay.addWidget(self.list, 1)
-        lay.addWidget(self.lb)
-        lay.addWidget(hrow("stretch", button("⬇ Tải giọng đã chọn", self.download, "primary"),
-                           button("Đóng", self.accept)))
-        self.catalog = {}
-        app.run_task(lambda log, progress, cancel: tts.piper_catalog(app.settings), on_done=self._loaded,
-                     title="Tải danh mục Piper", quiet=True)
+        self.lb = muted("Đang tải danh mục...")
+        v.addWidget(self.q)
+        v.addWidget(self.list, 1)
+        v.addWidget(self.lb)
+        v.addWidget(hrow(button("Chọn hết đang lọc", self.list.selectAll),
+                         button("⬇ Tải đã chọn", self.download_selected, "primary"),
+                         button("⬇ Tải tất cả đang lọc", self.download_filtered),
+                         "stretch",
+                         button("🇻🇳 Tải tất cả giọng tiếng Việt", lambda: self.download_prefix("vi_")),
+                         button("🌍 Tải TẤT CẢ giọng Piper", self.download_all, "big")))
+        return w
 
     def _loaded(self, cat):
         self.catalog = cat
@@ -387,31 +448,190 @@ class PiperDialog(QDialog):
 
     def fill(self):
         q = self.q.text().strip().lower()
-        have = {p.stem for p in tts.piper_dir(self.app.settings).glob("*.onnx")}
+        have = tts.piper_installed(self.app.settings)
         self.list.clear()
+        n = size = 0
         for key, e in sorted(self.catalog.items()):
             lang = e.get("language", {})
-            label = f"{key} · {lang.get('name_native', '')} ({lang.get('country_english', '')}) · " \
-                    f"{e.get('quality')} · {e.get('num_speakers', 1)} giọng"
+            label = (f"{key} · {lang.get('name_native', '')} ({lang.get('country_english', '')}) · "
+                     f"{e.get('quality')} · {e.get('num_speakers', 1)} giọng")
             if q and q not in label.lower():
                 continue
-            size = sum(f.get("size_bytes", 0) for p, f in e.get("files", {}).items() if p.endswith(".onnx"))
-            it = QListWidgetItem(("✅ " if key in have else "") + label + f" · {size / 1e6:.0f} MB")
+            sz = tts.piper_entry_size(e)
+            it = QListWidgetItem(("✅ " if key in have else "⬜ ") + label + f" · {sz / 1e6:.0f} MB")
             it.setData(Qt.UserRole, key)
             self.list.addItem(it)
-        self.lb.setText(f"{self.list.count()} giọng. Chọn (giữ Ctrl để chọn nhiều) rồi bấm Tải.")
+            n += 1
+            size += 0 if key in have else sz
+        total = len(self.catalog)
+        self.lb.setText(f"{n} giọng (tổng kho: {total} giọng · {len(have & set(self.catalog))} đã tải) · "
+                        f"cần tải thêm cho danh sách này ≈ {size / 1e9:.2f} GB")
 
-    def download(self):
-        keys = [i.data(Qt.UserRole) for i in self.list.selectedItems()]
-        if not keys:
+    def _start(self, keys: list[str], label: str):
+        have = tts.piper_installed(self.app.settings)
+        todo = [k for k in keys if k not in have]
+        if not todo:
+            QMessageBox.information(self, "Piper", "Các giọng này đã có đủ trên máy.")
+            return
+        size = sum(tts.piper_entry_size(self.catalog[k]) for k in todo)
+        if size > 2e9 and QMessageBox.question(
+                self, "Tải nhiều giọng", f"Sẽ tải {len(todo)} giọng, khoảng {size / 1e9:.1f} GB. "
+                                         "Cần ổ cứng trống và có thể mất khá lâu. Tiếp tục?") != QMessageBox.Yes:
             return
 
         def job(log, progress, cancel):
-            for k in keys:
-                log(f"Tải giọng Piper {k}...")
-                tts.piper_download(k, self.catalog[k], self.app.settings, progress)
+            return tts.piper_download_many(todo, self.catalog, self.app.settings, log, progress, cancel)
+
+        def done(errors):
+            self.fill()
+            self.refresh_installed()
+            if errors:
+                QMessageBox.warning(self, "Một số giọng lỗi", "\n".join(errors)[:3000])
+            else:
+                self.app.log(f"✅ Đã tải xong {len(todo)} giọng Piper.")
+        self.app.run_task(job, on_done=done, title=label)
+
+    def download_selected(self):
+        self._start([i.data(Qt.UserRole) for i in self.list.selectedItems()], "Tải giọng Piper")
+
+    def download_filtered(self):
+        self._start([self.list.item(i).data(Qt.UserRole) for i in range(self.list.count())], "Tải giọng Piper")
+
+    def download_prefix(self, prefix):
+        self._start([k for k in self.catalog if k.startswith(prefix)], "Tải giọng Piper tiếng Việt")
+
+    def download_all(self):
+        self._start(list(self.catalog), "Tải tất cả giọng Piper")
+
+    # ---------------- repo HuggingFace
+    def _tab_hf(self):
+        w = QWidget()
+        v = QVBoxLayout(w)
+        v.addWidget(muted("Dán tên repo HuggingFace chứa giọng Piper (file .onnx + .onnx.json), ví dụ giọng tiếng Việt "
+                          "cộng đồng chia sẻ. Repo cần đăng nhập: vào trang repo bấm 'Agree' rồi dán HuggingFace token "
+                          "ở mục 🔑 API & Cài đặt."))
+        self.repo = QLineEdit()
+        self.repo.setPlaceholderText("vd: rhasspy/piper-voices  hoặc  https://huggingface.co/<tên>/<repo>")
+        self.hf_list = QListWidget()
+        self.hf_list.setSelectionMode(QListWidget.ExtendedSelection)
+        self.hf_lb = muted("")
+        v.addWidget(hrow(self.repo, button("🔍 Liệt kê giọng", self.hf_scan, "primary"), stretch_last=False))
+        v.addWidget(self.hf_list, 1)
+        v.addWidget(self.hf_lb)
+        v.addWidget(hrow(button("Chọn hết", self.hf_list.selectAll),
+                         button("⬇ Tải đã chọn", self.hf_download, "primary"), "stretch"))
+        return w
+
+    def hf_scan(self):
+        repo = self.repo.text().strip()
+        if not repo:
+            return
+        self.hf_lb.setText("Đang đọc repo...")
+
+        def done(items):
+            self.hf_items = items
+            self.hf_list.clear()
+            have = tts.piper_installed(self.app.settings)
+            for it in items:
+                li = QListWidgetItem(("✅ " if it["local"] in have else "⬜ ") + f"{it['onnx']}  →  {it['local']}")
+                li.setData(Qt.UserRole, it)
+                self.hf_list.addItem(li)
+            self.hf_lb.setText(f"{len(items)} giọng Piper trong repo" + (" (repo cần đăng nhập)" if items and
+                                                                         items[0]["gated"] else ""))
+        self.app.run_task(lambda log, progress, cancel: tts.hf_list_piper(repo, self.app.settings), on_done=done,
+                          on_fail=lambda m: self.hf_lb.setText("❌ " + m), title="Đọc repo", quiet=True)
+
+    def hf_download(self):
+        items = [i.data(Qt.UserRole) for i in self.hf_list.selectedItems()]
+        if not items:
+            return
+
+        def job(log, progress, cancel):
+            for n, it in enumerate(items):
+                log(f"⬇ [{n + 1}/{len(items)}] {it['repo']}/{it['onnx']}")
+                tts.hf_download_piper(it, self.app.settings,
+                                      lambda p, m="", n=n: progress((n + p) / len(items), m), cancel)
             return True
-        self.app.run_task(job, on_done=lambda _r: self.fill(), title="Tải giọng Piper")
+        self.app.run_task(job, on_done=lambda _r: (self.hf_scan(), self.refresh_installed()),
+                          title="Tải giọng Piper từ HuggingFace")
+
+    # ---------------- nhập file
+    def _tab_file(self):
+        w = QWidget()
+        f = QFormLayout(w)
+        self.f_onnx = PathPicker("file", "Model Piper (*.onnx)", "File model .onnx")
+        self.f_json = PathPicker("file", "Cấu hình (*.json)", "(tự tìm) file .onnx.json đi kèm")
+        self.f_name = QLineEdit()
+        self.f_name.setPlaceholderText("Tên hiển thị, vd: Ngọc Huyền")
+        self.f_gender = fill_combo(QComboBox(), {"Female": "Nữ", "Male": "Nam", "": "Không rõ"})
+        self.f_desc = QLineEdit()
+        self.f_desc.setPlaceholderText("Mô tả, vd: nữ hoạt ngôn, miền Bắc")
+        f.addRow(muted("Có sẵn file giọng Piper (do bạn tải hoặc tự huấn luyện)? Nhập vào đây để dùng offline."))
+        f.addRow("Model .onnx", self.f_onnx)
+        f.addRow("Cấu hình .json", self.f_json)
+        f.addRow("Tên giọng", self.f_name)
+        f.addRow("Giới tính", self.f_gender)
+        f.addRow("Mô tả", self.f_desc)
+        f.addRow(hrow(button("📥 Nhập giọng", self.do_import, "primary"), "stretch"))
+        return w
+
+    def do_import(self):
+        try:
+            out = tts.piper_import(self.f_onnx.text(), self.f_json.text() or None, self.app.settings,
+                                   self.f_name.text(), self.f_gender.currentData(), self.f_desc.text())
+        except Exception as e:  # noqa: BLE001
+            QMessageBox.warning(self, "Nhập giọng", str(e))
+            return
+        self.app.log(f"✅ Đã nhập giọng Piper: {out.name}")
+        self.refresh_installed()
+
+    # ---------------- giọng đã có
+    def _tab_installed(self):
+        w = QWidget()
+        v = QVBoxLayout(w)
+        self.inst = QListWidget()
+        v.addWidget(self.inst, 1)
+        self.e_name = QLineEdit()
+        self.e_name.setPlaceholderText("Tên hiển thị (vd: Ngọc Huyền)")
+        self.e_gender = fill_combo(QComboBox(), {"Female": "Nữ", "Male": "Nam", "": "Không rõ"})
+        self.e_desc = QLineEdit()
+        self.e_desc.setPlaceholderText("Mô tả (vd: nữ hoạt ngôn)")
+        v.addWidget(hrow(self.e_name, self.e_gender, self.e_desc, button("💾 Đặt tên", self.save_meta, "primary"),
+                         button("🗑 Xóa giọng", self.delete_voice, "danger")))
+        self.inst.currentItemChanged.connect(self._pick_inst)
+        self.refresh_installed()
+        return w
+
+    def refresh_installed(self):
+        self.inst.clear()
+        for vo in tts.list_voices("piper", self.app.settings):
+            it = QListWidgetItem(vo.label())
+            it.setData(Qt.UserRole, vo)
+            self.inst.addItem(it)
+
+    def _pick_inst(self, it, _prev=None):
+        if not it:
+            return
+        vo = it.data(Qt.UserRole)
+        m = tts.piper_meta(self.app.settings).get(vo.id, {})
+        self.e_name.setText(m.get("name", ""))
+        self.e_gender.setCurrentIndex(max(0, self.e_gender.findData(m.get("gender", ""))))
+        self.e_desc.setText(m.get("desc", ""))
+
+    def save_meta(self):
+        it = self.inst.currentItem()
+        if it:
+            vo = it.data(Qt.UserRole)
+            tts.piper_set_meta(self.app.settings, vo.id, self.e_name.text(), self.e_gender.currentData(),
+                               self.e_desc.text())
+            self.refresh_installed()
+
+    def delete_voice(self):
+        it = self.inst.currentItem()
+        if it and QMessageBox.question(self, "Xóa giọng", f"Xóa giọng {it.text()}?") == QMessageBox.Yes:
+            tts.piper_delete(it.data(Qt.UserRole).id, self.app.settings)
+            self.refresh_installed()
+            self.fill()
 
 
 class PronDictDialog(QDialog):

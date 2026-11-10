@@ -42,7 +42,7 @@ STYLES: dict[str, dict] = {
     },
 }
 
-TONES = ["natural", "funny", "serious", "dramatic", "horror", "sad", "excited", "warm", "angry", "kids"]
+TONES = ["natural", "funny", "lively", "serious", "dramatic", "horror", "sad", "excited", "warm", "angry", "kids"]
 # phong cách kịch bản -> cách đọc mặc định
 STYLE_TONE = {"review": "dramatic", "summary": "serious", "funny": "funny", "emotional": "warm", "horror": "horror",
               "analysis": "serious", "kids": "kids"}
@@ -69,7 +69,7 @@ Return ONLY a JSON object with this exact schema:
   "description": "1-2 sentence description for the video post",
   "segments": [
     {"start": "HH:MM:SS", "end": "HH:MM:SS", "narration": "text read by the voice-over", "scene": "short note of what is on screen",
-     "tone": "how this line should be read: one of natural|funny|serious|dramatic|horror|sad|excited|warm|angry|kids"}
+     "tone": "how this line should be read: one of natural|funny|lively|serious|dramatic|horror|sad|excited|warm|angry|kids"}
   ]
 }
 Rules:

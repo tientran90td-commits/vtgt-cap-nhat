@@ -119,6 +119,9 @@ READ_STYLES: dict[str, dict] = {
     "excited": {"name": "🔥 Sôi nổi, hào hứng", "vi": "sôi nổi, hào hứng, năng lượng cao",
                 "en": "excited and energetic, high energy", "rate": 15, "pitch": 2,
                 "azure": "excited", "el": (0.3, 0.65), "tag": "[excited]"},
+    "lively": {"name": "💬 Hoạt ngôn, lanh lợi", "vi": "hoạt ngôn, nhanh nhảu, lanh lợi, duyên dáng như MC dẫn chương trình",
+               "en": "talkative, lively, witty and charming like a charismatic TV host", "rate": 9, "pitch": 1,
+               "azure": "chat", "el": (0.35, 0.55), "tag": "[cheerfully]"},
     "warm": {"name": "☕ Kể chuyện ấm áp", "vi": "ấm áp, thân mật, chậm rãi như kể chuyện bên tách trà",
              "en": "warm, intimate, relaxed storytelling", "rate": -5, "pitch": 0,
              "azure": "narration-relaxed", "el": (0.55, 0.3), "tag": ""},
@@ -132,6 +135,30 @@ READ_STYLES: dict[str, dict] = {
                "tag": ""},
 }
 TONE_KEYS = [k for k in READ_STYLES if k != "custom"]
+# Piper: (noise_scale, noise_w) - cao hơn = ngữ điệu bay bổng, thấp hơn = đều đều nghiêm túc
+PIPER_NOISE = {"funny": (0.8, 0.95), "lively": (0.8, 0.95), "excited": (0.85, 1.0), "angry": (0.85, 1.0),
+               "dramatic": (0.75, 0.9), "kids": (0.75, 0.9), "warm": (0.62, 0.8), "sad": (0.55, 0.6),
+               "horror": (0.55, 0.5), "serious": (0.5, 0.6)}
+
+# Giọng gợi ý dựng sẵn (engine + giọng + cách đọc)
+VOICE_PRESETS = [
+    {"name": "💬 Ngọc Huyền · nữ hoạt ngôn (VieNeu, offline)", "engine": "vieneu", "voice": "Ngọc Huyền",
+     "read_style": "lively", "rate": 5, "pitch": 0},
+    {"name": "🎬 Thiện Minh · nam kể chuyện kịch tính (VieNeu, offline)", "engine": "vieneu", "voice": "Thiện Minh",
+     "read_style": "dramatic", "rate": 0, "pitch": 0},
+    {"name": "🎙️ Mai Anh · nữ tin tức nghiêm túc (VieNeu, offline)", "engine": "vieneu", "voice": "Mai Anh",
+     "read_style": "serious", "rate": 0, "pitch": 0},
+    {"name": "😂 Adam bựa · nam hài hước (VieNeu, offline)", "engine": "vieneu", "voice": "Adam bựa",
+     "read_style": "funny", "rate": 5, "pitch": 0},
+    {"name": "☕ Thục Đoan · nữ miền Nam kể chuyện (VieNeu, offline)", "engine": "vieneu", "voice": "Thục Đoan",
+     "read_style": "warm", "rate": 0, "pitch": 0},
+    {"name": "🌸 Hoài My · nữ review phim (Edge, miễn phí)", "engine": "edge", "voice": "vi-VN-HoaiMyNeural",
+     "read_style": "dramatic", "rate": 10, "pitch": 0},
+    {"name": "🎧 Nam Minh · nam review phim (Edge, miễn phí)", "engine": "edge", "voice": "vi-VN-NamMinhNeural",
+     "read_style": "dramatic", "rate": 10, "pitch": 0},
+    {"name": "🔌 Piper vais1000 · nữ (Piper, offline nhẹ)", "engine": "piper", "voice": "vi_VN-vais1000-medium.onnx",
+     "read_style": "lively", "rate": 5, "pitch": 0},
+]
 # engine điều khiển cảm xúc bằng lời/SSML (không cần chỉnh nhịp-cao độ để "giả" cảm xúc)
 EXPRESSIVE = {"openai", "gemini", "azure", "elevenlabs"}
 
@@ -158,6 +185,8 @@ def apply_read_style(engine: str, opts: dict) -> dict:
     elif engine == "elevenlabs":
         o["el_settings"] = st["el"]
         o["el_tag"] = st["tag"]
+    if engine == "piper":
+        o["piper_noise"] = PIPER_NOISE.get(key)
     if engine not in EXPRESSIVE and key != "custom":
         o["rate"] = float(o.get("rate", 0) or 0) + st["rate"]
         o["pitch"] = float(o.get("pitch", 0) or 0) + st["pitch"]
@@ -429,31 +458,52 @@ def piper_dir(settings: Settings) -> Path:
     return d
 
 
+# ---- Tên hiển thị / giới tính / mô tả do người dùng đặt cho giọng Piper (vd "Ngọc Huyền - nữ hoạt ngôn")
+def _meta_file(settings: Settings) -> Path:
+    return piper_dir(settings) / "voices_meta.json"
+
+
+def piper_meta(settings: Settings) -> dict:
+    f = _meta_file(settings)
+    try:
+        return json.loads(f.read_text(encoding="utf-8")) if f.exists() else {}
+    except Exception:
+        return {}
+
+
+def piper_set_meta(settings: Settings, voice_id: str, name: str = "", gender: str = "", desc: str = "") -> None:
+    m = piper_meta(settings)
+    m[voice_id] = {"name": name.strip(), "gender": gender, "desc": desc.strip()}
+    _meta_file(settings).write_text(json.dumps(m, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
 def _voices_piper(settings, refresh):
     out = []
+    meta = piper_meta(settings)
     for onnx in sorted(piper_dir(settings).glob("*.onnx")):
         cfg = onnx.with_suffix(".onnx.json")
         lang, n_spk, spk_map = "", 1, {}
         if cfg.exists():
             try:
                 c = json.loads(cfg.read_text(encoding="utf-8"))
-                lang = (c.get("language") or {}).get("code", "")
+                lang = (c.get("language") or {}).get("code", "") or c.get("espeak", {}).get("voice", "")
                 n_spk = int(c.get("num_speakers", 1))
                 spk_map = c.get("speaker_id_map") or {}
             except Exception:
                 pass
-        if n_spk > 1:
-            names = {v: k for k, v in spk_map.items()} if spk_map else {}
-            for sid in range(n_spk):
-                out.append(Voice(id=f"{onnx.name}#{sid}", name=f"{onnx.stem} · {names.get(sid, sid)}",
-                                 lang=lang, engine="piper"))
-        else:
-            out.append(Voice(id=onnx.name, name=onnx.stem, lang=lang, engine="piper"))
+        ids = [(f"{onnx.name}#{sid}", sid) for sid in range(n_spk)] if n_spk > 1 else [(onnx.name, None)]
+        names = {v: k for k, v in spk_map.items()} if spk_map else {}
+        for vid, sid in ids:
+            m = meta.get(vid) or (meta.get(onnx.name) if sid is None else None) or {}
+            default = onnx.stem if sid is None else f"{onnx.stem} · {names.get(sid, sid)}"
+            out.append(Voice(id=vid, name=m.get("name") or default, lang=lang, gender=m.get("gender", ""),
+                             engine="piper", desc=m.get("desc") or (onnx.stem if m.get("name") else "")))
+    out.sort(key=lambda v: (not v.lang.lower().startswith("vi"), v.lang, v.name))
     return out
 
 
 def piper_catalog(settings: Settings, refresh: bool = False) -> dict:
-    """Danh sách tất cả giọng Piper trên HuggingFace (rhasspy/piper-voices)."""
+    """Danh sách tất cả giọng Piper chính thức trên HuggingFace (rhasspy/piper-voices)."""
     f = _cache_file("piper_voices.json")
     if f.exists() and not refresh:
         return json.loads(f.read_text(encoding="utf-8"))
@@ -463,26 +513,151 @@ def piper_catalog(settings: Settings, refresh: bool = False) -> dict:
     return r.json()
 
 
-def piper_download(key: str, entry: dict, settings: Settings, progress=None) -> Path:
+def piper_entry_size(entry: dict) -> int:
+    return sum(int(v.get("size_bytes", 0)) for k, v in (entry.get("files") or {}).items()
+               if k.endswith((".onnx", ".onnx.json")))
+
+
+def piper_installed(settings: Settings) -> set[str]:
+    return {p.stem for p in piper_dir(settings).glob("*.onnx")}
+
+
+def _hf_headers(settings: Settings) -> dict:
+    tok = (settings.get("api", "hf_token") or "").strip()
+    return {"Authorization": f"Bearer {tok}"} if tok else {}
+
+
+def _download_file(url: str, target: Path, settings: Settings, progress=None, cancel=None, label: str = "") -> None:
+    """Tải 1 file (ghi vào .part rồi đổi tên - không để lại file dở dang)."""
+    s = _session(settings)
+    with s.get(url, stream=True, timeout=120, headers=_hf_headers(settings)) as r:
+        if r.status_code in (401, 403):
+            raise TTSError("Repo này cần đăng nhập/chấp nhận điều khoản trên HuggingFace: vào trang repo bấm "
+                           "'Agree', rồi dán HuggingFace token ở mục 🔑 API & Cài đặt.")
+        r.raise_for_status()
+        total = int(r.headers.get("content-length") or 0)
+        done = 0
+        tmp = target.with_suffix(target.suffix + ".part")
+        with open(tmp, "wb") as fh:
+            for chunk in r.iter_content(1 << 16):
+                if cancel is not None and cancel.is_set():
+                    fh.close()
+                    tmp.unlink(missing_ok=True)
+                    from .ffmpeg_utils import Cancelled
+
+                    raise Cancelled()
+                fh.write(chunk)
+                done += len(chunk)
+                if progress and total:
+                    progress(done / total, f"{label or target.name} {done / 1e6:.0f}/{total / 1e6:.0f} MB")
+        os.replace(tmp, target)
+
+
+def piper_download(key: str, entry: dict, settings: Settings, progress=None, cancel=None) -> Path:
     base = "https://huggingface.co/rhasspy/piper-voices/resolve/main/"
     dest = piper_dir(settings)
-    s = _session(settings)
-    files = [p for p in entry.get("files", {}) if p.endswith((".onnx", ".onnx.json"))]
+    files = sorted((p for p in entry.get("files", {}) if p.endswith((".onnx", ".onnx.json"))),
+                   key=lambda p: not p.endswith(".json"))  # tải .json trước (nhỏ)
     for path in files:
         target = dest / Path(path).name
-        with s.get(base + path, stream=True, timeout=120) as r:
-            r.raise_for_status()
-            total = int(r.headers.get("content-length") or 0)
-            done = 0
-            tmp = target.with_suffix(target.suffix + ".part")
-            with open(tmp, "wb") as fh:
-                for chunk in r.iter_content(1 << 16):
-                    fh.write(chunk)
-                    done += len(chunk)
-                    if progress and total:
-                        progress(done / total, f"Tải {target.name}")
-            os.replace(tmp, target)
+        if target.exists() and target.stat().st_size > 0:
+            continue
+        _download_file(base + path, target, settings, progress, cancel, key)
     return dest / f"{key}.onnx"
+
+
+def piper_download_many(keys: list[str], catalog: dict, settings: Settings, log=None, progress=None,
+                        cancel=None) -> list[str]:
+    """Tải nhiều giọng (bỏ qua giọng đã có). Trả danh sách lỗi."""
+    have = piper_installed(settings)
+    todo = [k for k in keys if k not in have]
+    errors = []
+    for i, k in enumerate(todo):
+        if log:
+            log(f"⬇ [{i + 1}/{len(todo)}] Giọng Piper {k} ({piper_entry_size(catalog[k]) / 1e6:.0f} MB)")
+        sub = (lambda p, m="", i=i: progress((i + p) / max(1, len(todo)), f"[{i + 1}/{len(todo)}] {m}")) \
+            if progress else None
+        try:
+            piper_download(k, catalog[k], settings, sub, cancel)
+        except TTSError as e:
+            errors.append(f"{k}: {e}")
+        except Exception as e:  # noqa: BLE001
+            if e.__class__.__name__ == "Cancelled":
+                raise
+            errors.append(f"{k}: {e}")
+    return errors
+
+
+# ---- Giọng Piper cộng đồng: tải từ bất kỳ repo HuggingFace nào, hoặc nhập file có sẵn
+def hf_list_piper(repo: str, settings: Settings) -> list[dict]:
+    """Liệt kê các cặp model .onnx + config trong 1 repo HuggingFace (vd 'rhasspy/piper-voices')."""
+    repo = repo.strip().strip("/")
+    repo = re.sub(r"^https?://huggingface\.co/", "", repo).split("/tree/")[0].split("/blob/")[0]
+    r = _session(settings).get(f"https://huggingface.co/api/models/{repo}", timeout=60, headers=_hf_headers(settings))
+    if r.status_code == 404:
+        raise TTSError(f"Không tìm thấy repo '{repo}' (hoặc repo riêng tư - cần token).")
+    r.raise_for_status()
+    data = r.json()
+    files = [x.get("rfilename", "") for x in data.get("siblings", [])]
+    fset = set(files)
+    out = []
+    for f in files:
+        if not f.endswith(".onnx"):
+            continue
+        folder = f.rsplit("/", 1)[0] if "/" in f else ""
+        cfg = f + ".json" if f + ".json" in fset else (
+            (folder + "/config.json") if folder and folder + "/config.json" in fset else
+            ("config.json" if not folder and "config.json" in fset else None))
+        if not cfg:
+            continue
+        stem = Path(f).stem
+        if stem.lower() in ("model", "best", "last", "final") or stem.lower().startswith("epoch"):
+            stem = (folder.replace("/", "-") or repo.split("/")[-1]) + "-" + stem
+        out.append({"repo": repo, "onnx": f, "config": cfg, "local": re.sub(r"[^\w.\-]+", "_", stem),
+                    "gated": bool(data.get("gated"))})
+    return out
+
+
+def hf_download_piper(item: dict, settings: Settings, progress=None, cancel=None) -> Path:
+    dest = piper_dir(settings)
+    base = f"https://huggingface.co/{item['repo']}/resolve/main/"
+    onnx = dest / f"{item['local']}.onnx"
+    cfg = dest / f"{item['local']}.onnx.json"
+    if not cfg.exists():
+        _download_file(base + item["config"], cfg, settings, progress, cancel, item["local"])
+    if not onnx.exists():
+        _download_file(base + item["onnx"], onnx, settings, progress, cancel, item["local"])
+    return onnx
+
+
+def piper_import(onnx_src: str, json_src: str | None, settings: Settings, name: str = "", gender: str = "",
+                 desc: str = "") -> Path:
+    """Nhập giọng Piper có sẵn trên máy (.onnx + .onnx.json)."""
+    import shutil
+
+    src = Path(onnx_src)
+    if src.suffix.lower() != ".onnx" or not src.exists():
+        raise TTSError("Hãy chọn file model .onnx của Piper.")
+    js = Path(json_src) if json_src else src.with_suffix(".onnx.json")
+    if not js.exists():
+        alt = src.parent / "config.json"
+        js = alt if alt.exists() else js
+    if not js.exists():
+        raise TTSError("Thiếu file cấu hình .onnx.json đi kèm model.")
+    local = re.sub(r"[^\w.\-]+", "_", src.stem)
+    dest = piper_dir(settings)
+    shutil.copyfile(src, dest / f"{local}.onnx")
+    shutil.copyfile(js, dest / f"{local}.onnx.json")
+    if name or gender or desc:
+        piper_set_meta(settings, f"{local}.onnx", name, gender, desc)
+    return dest / f"{local}.onnx"
+
+
+def piper_delete(voice_id: str, settings: Settings) -> None:
+    name = voice_id.partition("#")[0]
+    for f in (piper_dir(settings) / name, piper_dir(settings) / (name + ".json")):
+        f.unlink(missing_ok=True)
+    _PIPER_CACHE.pop(str(piper_dir(settings) / name), None)
 
 
 def _voices_sapi(settings, refresh):
@@ -860,16 +1035,20 @@ def _synth_piper(text, voice, base: Path, opts, settings):
         pv = PiperVoice.load(str(model))
         _PIPER_CACHE[str(model)] = pv
     length_scale = 1.0 / max(0.3, 1 + float(opts.get("rate", 0) or 0) / 100.0)
+    # độ biểu cảm theo cách đọc: noise_scale (ngữ điệu), noise_w (nhịp) - None = mặc định của model
+    noise, noise_w = opts.get("piper_noise") or (None, None)
     out = base.with_suffix(".wav")
     speaker = int(sid) if sid else None
     with wave.open(str(out), "wb") as wf:
         if hasattr(pv, "synthesize_wav"):  # piper-tts >= 1.3
             from piper import SynthesisConfig
 
-            cfg = SynthesisConfig(speaker_id=speaker, length_scale=length_scale)
+            cfg = SynthesisConfig(speaker_id=speaker, length_scale=length_scale, noise_scale=noise,
+                                  noise_w_scale=noise_w)
             pv.synthesize_wav(text, wf, syn_config=cfg)
         else:  # piper-tts 1.2
-            pv.synthesize(text, wf, speaker_id=speaker, length_scale=length_scale)
+            pv.synthesize(text, wf, speaker_id=speaker, length_scale=length_scale, noise_scale=noise,
+                          noise_w=noise_w)
     return out
 
 
