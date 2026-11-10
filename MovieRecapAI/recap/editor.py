@@ -18,6 +18,7 @@ ASPECTS = {
 }
 FILLS = {"blur": "Nền mờ (blur) lấp khoảng trống", "crop": "Cắt cúp cho đầy khung", "pad": "Viền đen"}
 ENCODERS = {
+    "auto": "Tự động (dùng GPU nếu có: NVIDIA/AMD/Intel)",
     "libx264": "CPU - H.264 (tương thích nhất)",
     "h264_nvenc": "GPU NVIDIA - NVENC",
     "h264_qsv": "GPU Intel - QuickSync",
@@ -46,7 +47,28 @@ def output_size(info: MediaInfo, aspect: str, res: int) -> tuple[int, int]:
     return res, even(h * res / w)
 
 
+_BEST_ENCODER: str | None = None
+
+
+def best_encoder(log=None) -> str:
+    """Thử lần lượt NVENC (NVIDIA) -> AMF (AMD) -> QuickSync (Intel); không được thì dùng CPU."""
+    global _BEST_ENCODER
+    if _BEST_ENCODER is None:
+        from .ffmpeg_utils import encoder_works
+
+        _BEST_ENCODER = "libx264"
+        for e in ("h264_nvenc", "h264_amf", "h264_qsv"):
+            if encoder_works(e):
+                _BEST_ENCODER = e
+                break
+        if log:
+            log(f"Bộ mã hóa video: {ENCODERS.get(_BEST_ENCODER, _BEST_ENCODER)}")
+    return _BEST_ENCODER
+
+
 def encoder_args(enc: str, quality: int) -> list[str]:
+    if enc == "auto":
+        enc = best_encoder()
     q = str(int(quality))
     if enc == "h264_nvenc":
         return ["-c:v", "h264_nvenc", "-preset", "p5", "-rc", "vbr", "-cq", q, "-b:v", "0"]
@@ -91,7 +113,9 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
     segs = script["segments"]
     W, H = output_size(info, opts.get("aspect", "16:9"), int(opts.get("height", 1080)))
     fps = int(opts.get("fps", 30))
-    enc = encoder_args(opts.get("encoder", "libx264"), int(opts.get("quality", 21)))
+    if opts.get("encoder", "auto") == "auto":
+        best_encoder(log)
+    enc = encoder_args(opts.get("encoder", "auto"), int(opts.get("quality", 21)))
     parts_dir = work_dir / "render_parts"
     parts_dir.mkdir(parents=True, exist_ok=True)
     style = {

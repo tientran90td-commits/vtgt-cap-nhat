@@ -42,6 +42,11 @@ STYLES: dict[str, dict] = {
     },
 }
 
+TONES = ["natural", "funny", "serious", "dramatic", "horror", "sad", "excited", "warm", "angry", "kids"]
+# phong cách kịch bản -> cách đọc mặc định
+STYLE_TONE = {"review": "dramatic", "summary": "serious", "funny": "funny", "emotional": "warm", "horror": "horror",
+              "analysis": "serious", "kids": "kids"}
+
 MODES = {
     "narrate": "Thuyết minh AI (lồng tiếng đọc tóm tắt)",
     "highlight": "Cắt highlight giữ thoại gốc (không lồng tiếng)",
@@ -63,7 +68,8 @@ Return ONLY a JSON object with this exact schema:
   "title": "catchy video title",
   "description": "1-2 sentence description for the video post",
   "segments": [
-    {"start": "HH:MM:SS", "end": "HH:MM:SS", "narration": "text read by the voice-over", "scene": "short note of what is on screen"}
+    {"start": "HH:MM:SS", "end": "HH:MM:SS", "narration": "text read by the voice-over", "scene": "short note of what is on screen",
+     "tone": "how this line should be read: one of natural|funny|serious|dramatic|horror|sad|excited|warm|angry|kids"}
   ]
 }
 Rules:
@@ -74,6 +80,9 @@ Rules:
 - Narration must be fluent, natural spoken language for a voice-over (no emojis, no markdown, no stage directions,
   no timestamps inside the narration). Write numbers as words when natural.
 - Each narration should take about as long to read as its clip (around 2.5-3 words per second).
+- If FILM INFO is given, use the exact character names and facts from it; never invent names.
+- Choose "tone" per segment to match the emotion of that moment and the requested style
+  (e.g. a funny recap mostly "funny", but a death scene can be "sad", a chase "dramatic").
 """
 
 
@@ -88,7 +97,8 @@ def _mode_rules(mode: str) -> str:
     return "MODE: VOICE-OVER NARRATION for every segment."
 
 
-def build_user_prompt(transcript_text: str, duration: float, opts: dict, notes: bool = False) -> str:
+def build_user_prompt(transcript_text: str, duration: float, opts: dict, notes: bool = False,
+                      film_ctx: str = "", visual: str = "") -> str:
     target = float(opts.get("target_minutes", 5)) * 60
     lang = opts.get("language", "Tiếng Việt")
     wps = _WPS.get(lang, 2.6)
@@ -106,8 +116,11 @@ Style: {style}
 {_mode_rules(opts.get('mode', 'narrate'))}
 {('Extra instructions from the user: ' + custom) if custom else ''}
 
+{film_ctx}
+
 === {src} (timestamps refer to the original film) ===
 {transcript_text}
+{('=== VISUAL NOTES (what is on screen at these times; use them to pick accurate clips) ===' + chr(10) + visual) if visual else ''}
 """
 
 
@@ -118,7 +131,8 @@ Keep timestamps from the transcript. Write in English. Max 40 lines. Return plai
 
 
 def write_script(transcript: list[dict], duration: float, settings: Settings, opts: dict, log, progress, cancel,
-                 scene_cuts: list[float] | None = None) -> dict:
+                 scene_cuts: list[float] | None = None, film: dict | None = None,
+                 visual: list[dict] | None = None) -> dict:
     pid = opts.get("provider", "gemini")
     model = opts.get("model") or (PROVIDERS[pid]["models"] or [""])[0]
     if pid == "none":
@@ -138,14 +152,21 @@ def write_script(transcript: list[dict], duration: float, settings: Settings, op
             if cancel.is_set():
                 raise Cancelled()
             progress(0.7 * i / len(parts), f"AI đọc phần {i + 1}/{len(parts)}")
-            summaries.append(chat(pid, model, CHUNK_SYSTEM, part, settings, json_mode=False, max_tokens=4000, log=log))
+            from .film_id import film_context
+
+            summaries.append(chat(pid, model, CHUNK_SYSTEM, film_context(film) + "\n\n" + part, settings,
+                                  json_mode=False, max_tokens=4000, log=log))
         text = "\n".join(summaries)
         notes = True
     if cancel.is_set():
         raise Cancelled()
     progress(0.75, f"AI ({PROVIDERS[pid]['name']} / {model}) đang viết kịch bản...")
     log(f"Gửi {len(text):,} ký tự cho AI {model}...")
-    raw = chat(pid, model, SYSTEM, build_user_prompt(text, duration, opts, notes), settings, json_mode=True, log=log)
+    from .film_id import film_context
+
+    vis = "\n".join(f"[{fmt_ts(v['t'])}] {v['desc']}" for v in (visual or []))
+    raw = chat(pid, model, SYSTEM, build_user_prompt(text, duration, opts, notes, film_context(film), vis), settings,
+               json_mode=True, log=log)
     data = extract_json(raw)
     script = normalize_script(data, duration, scene_cuts, opts.get("mode", "narrate"))
     progress(1.0, "Đã có kịch bản")
@@ -185,11 +206,13 @@ def normalize_script(data: dict, duration: float, scene_cuts=None, mode: str = "
         narr = str(s.get("narration") or s.get("text") or "").strip()
         if mode == "highlight":
             narr = ""
+        tone = str(s.get("tone") or "").strip().lower()
         out.append({
             "start": round(st, 2),
             "end": round(en, 2),
             "narration": narr,
             "scene": str(s.get("scene") or s.get("note") or "").strip(),
+            "tone": tone if tone in TONES else "",
         })
     if not out:
         raise RuntimeError("AI không trả về đoạn nào. Thử lại hoặc đổi model.")

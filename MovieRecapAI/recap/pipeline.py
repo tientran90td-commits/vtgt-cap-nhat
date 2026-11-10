@@ -7,7 +7,7 @@ import re
 import threading
 from pathlib import Path
 
-from . import editor, script_writer, textnorm, transcribe, tts
+from . import editor, film_id, script_writer, textnorm, transcribe, tts
 from .config import Settings
 from .ffmpeg_utils import Cancelled, MediaInfo, probe, set_ffmpeg_path
 
@@ -40,6 +40,8 @@ class Project:
         self.transcript: list[dict] = []
         self.scenes: list[float] | None = None  # None = chưa dò
         self.script: dict | None = None
+        self.film: dict | None = None        # thông tin phim đã nhận diện
+        self.visual: list[dict] | None = None  # mô tả khung hình do AI xem
         self.load()
 
     # ---------------------------------------------------------------- lưu / nạp
@@ -47,7 +49,8 @@ class Project:
         return self.dir / name
 
     def load(self) -> None:
-        for attr, name in (("transcript", "transcript.json"), ("scenes", "scenes.json"), ("script", "script.json")):
+        for attr, name in (("transcript", "transcript.json"), ("scenes", "scenes.json"), ("script", "script.json"),
+                           ("film", "film.json"), ("visual", "visual.json")):
             f = self._p(name)
             if f.exists():
                 try:
@@ -61,6 +64,10 @@ class Project:
             self._p("scenes.json").write_text(json.dumps(self.scenes), encoding="utf-8")
         if self.script is not None:
             script_writer.save_script(self.script, self._p("script.json"))
+        if self.film is not None:
+            film_id.save(self._p("film.json"), self.film)
+        if self.visual is not None:
+            film_id.save(self._p("visual.json"), self.visual)
 
     # ---------------------------------------------------------------- các bước
     def run_transcribe(self, log=_noop_log, progress=_noop_progress, cancel=None, subtitle_file=None,
@@ -70,8 +77,8 @@ class Project:
         engine = engine or t.get("engine", "faster_whisper")
         self.transcript = transcribe.transcribe(
             self.video, self.dir, self.settings, engine, log, progress, cancel,
-            subtitle_file=subtitle_file, model=t.get("model", "small"), language=t.get("language", "auto"),
-            device=t.get("device", "auto"))
+            subtitle_file=subtitle_file, model=t.get("model", "auto"), language=t.get("language", "auto"),
+            device=t.get("device", "auto"), prompt=film_id.whisper_hint(self.film))
         self.save()
         log(f"Lời thoại: {len(self.transcript)} câu.")
         return self.transcript
@@ -84,11 +91,29 @@ class Project:
         self.save()
         return self.scenes
 
+    def run_identify(self, log=_noop_log, progress=_noop_progress, cancel=None) -> dict:
+        """Nhận diện phim (tên, năm, nhân vật). Giữ lại ghi chú người dùng đã nhập."""
+        cancel = cancel or threading.Event()
+        notes = (self.film or {}).get("notes", "")
+        self.film = film_id.identify(self.video, self.info.duration, self.transcript, self.settings, self.dir,
+                                     log, progress, cancel)
+        if notes:
+            self.film["notes"] = notes
+        self.save()
+        return self.film
+
+    def run_visual(self, log=_noop_log, progress=_noop_progress, cancel=None) -> list[dict]:
+        cancel = cancel or threading.Event()
+        self.visual = film_id.visual_notes(self.video, self.info.duration, self.film, self.settings, self.dir,
+                                           log, progress, cancel)
+        self.save()
+        return self.visual
+
     def run_script(self, log=_noop_log, progress=_noop_progress, cancel=None) -> dict:
         cancel = cancel or threading.Event()
         opts = self.settings.section("script")
         self.script = script_writer.write_script(self.transcript, self.info.duration, self.settings, opts,
-                                                 log, progress, cancel, self.scenes or [])
+                                                 log, progress, cancel, self.scenes or [], self.film, self.visual)
         self.save()
         return self.script
 
@@ -97,6 +122,13 @@ class Project:
         lang = self.settings.get("script", "language", "Tiếng Việt")
         v["lang_code"] = tts.LANG_CODES.get(lang, "en")
         return v
+
+    @staticmethod
+    def segment_tone(seg: dict, v: dict) -> str:
+        """Cách đọc của 1 đoạn: cách đọc AI/người dùng gán cho đoạn (nếu bật) > cách đọc chung."""
+        if v.get("tone_auto", True) and seg.get("tone") in tts.READ_STYLES:
+            return seg["tone"]
+        return v.get("read_style") or "natural"
 
     def run_voices(self, log=_noop_log, progress=_noop_progress, cancel=None) -> list:
         cancel = cancel or threading.Event()
@@ -127,15 +159,16 @@ class Project:
             if not text:
                 files.append(None)
                 continue
-            key = tts.voice_cache_key(engine, voice, spoken[i], v)
+            vo = dict(v, tone=self.segment_tone(seg, v))
+            key = tts.voice_cache_key(engine, voice, spoken[i], vo)
             out = vdir / f"v{i:03d}_{key}.wav"
-            if not out.exists():
+            if not out.exists() or out.stat().st_size < 1000:
                 progress(i / len(segs), f"Đọc giọng đoạn {i + 1}/{len(segs)}")
                 for old in vdir.glob(f"v{i:03d}_*.wav"):
                     old.unlink(missing_ok=True)
                 if spoken[i] != text:
                     log(f"Đoạn {i + 1} đọc là: {tts.speak_text(spoken[i], v)}", level="debug")
-                tts.synthesize(engine, spoken[i], voice, out, v, self.settings, cancel=cancel)
+                tts.synthesize(engine, spoken[i], voice, out, vo, self.settings, cancel=cancel)
             files.append(out)
         progress(1.0, "Xong giọng đọc")
         log(f"Giọng đọc: {sum(1 for f in files if f)} đoạn ({tts.ENGINES[engine]['name']} / {voice}).")
@@ -174,16 +207,42 @@ class Project:
     def run_all(self, log=_noop_log, progress=_noop_progress, cancel=None, subtitle_file=None,
                 out_path=None) -> Path:
         cancel = cancel or threading.Event()
+        sc = self.settings.section("script")
+        ai = sc.get("provider") != "none"
+        if ai and sc.get("identify", True) and not self.film:
+            log("Bước 1/6: Nhận diện phim")
+            try:
+                self.run_identify(log, lambda p, m="": progress(p * 0.04, m), cancel)
+            except Cancelled:
+                raise
+            except Exception as e:  # noqa: BLE001
+                log(f"Không nhận diện được phim ({e}) - tiếp tục.", level="warn")
         if not self.transcript:
-            log("Bước 1/4: Nhận dạng lời thoại")
-            self.run_transcribe(log, lambda p, m="": progress(p * 0.35, m), cancel, subtitle_file)
+            log("Bước 2/6: Nhận dạng lời thoại")
+            self.run_transcribe(log, lambda p, m="": progress(0.04 + p * 0.32, m), cancel, subtitle_file)
+            # Nhận diện lại bằng lời thoại nếu lần đầu chưa chắc chắn
+            if ai and sc.get("identify", True) and float((self.film or {}).get("confidence") or 0) < 0.6:
+                try:
+                    self.run_identify(log, lambda p, m="": progress(0.36 + p * 0.02, m), cancel)
+                except Cancelled:
+                    raise
+                except Exception as e:  # noqa: BLE001
+                    log(f"Nhận diện lại lỗi ({e}).", level="warn")
         if self.settings.get("transcribe", "use_scenes", True) and self.scenes is None:
-            log("Bước 2/4: Dò chuyển cảnh")
-            self.run_scenes(log, lambda p, m="": progress(0.35 + p * 0.15, m), cancel)
-        log("Bước 3/4: AI viết kịch bản")
-        self.run_script(log, lambda p, m="": progress(0.5 + p * 0.1, m), cancel)
-        log("Bước 4/4: Lồng tiếng & dựng video")
-        return self.run_render(out_path, log, lambda p, m="": progress(0.6 + p * 0.4, m), cancel)
+            log("Bước 3/6: Dò chuyển cảnh")
+            self.run_scenes(log, lambda p, m="": progress(0.38 + p * 0.1, m), cancel)
+        if ai and sc.get("visual") and not self.visual:
+            log("Bước 4/6: AI xem hình ảnh các cảnh")
+            try:
+                self.run_visual(log, lambda p, m="": progress(0.48 + p * 0.07, m), cancel)
+            except Cancelled:
+                raise
+            except Exception as e:  # noqa: BLE001
+                log(f"AI xem cảnh lỗi ({e}) - bỏ qua.", level="warn")
+        log("Bước 5/6: AI viết kịch bản")
+        self.run_script(log, lambda p, m="": progress(0.55 + p * 0.07, m), cancel)
+        log("Bước 6/6: Lồng tiếng & dựng video")
+        return self.run_render(out_path, log, lambda p, m="": progress(0.62 + p * 0.38, m), cancel)
 
 
 def download_video(url: str, settings: Settings, log=_noop_log, progress=_noop_progress, cancel=None) -> tuple[str, str | None]:

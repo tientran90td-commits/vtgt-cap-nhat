@@ -32,6 +32,7 @@ OSS = [
     ("Requests", "https://github.com/psf/requests", "Apache-2.0", "Kết nối các API AI"),
     ("imageio-ffmpeg", "https://github.com/imageio/imageio-ffmpeg", "BSD-2", "FFmpeg dự phòng đóng gói sẵn"),
     ("Ollama", "https://github.com/ollama/ollama", "MIT", "Chạy LLM offline (Llama, Qwen, Gemma...)"),
+    ("TMDB API", "https://developer.themoviedb.org", "dịch vụ miễn phí", "Dữ liệu phim, tên nhân vật (tùy chọn)"),
 ]
 
 
@@ -58,6 +59,9 @@ class AboutPage(Page):
 <li>Kiểu <i>Cắt highlight giữ thoại gốc</i> không cần giọng đọc; để trống lời thuyết minh 1 dòng để giữ câu thoại đắt giá.</li>
 <li>Phát âm chuẩn: dùng giọng <i>⭐ VieNeu-TTS</i>, bật <i>Phát âm chuẩn</i> ở bước 3 (số, ngày, tiền, đơn vị
     được đọc thành chữ), thêm tên riêng vào <i>📖 Từ điển phát âm</i>, hoặc bật <i>AI soát phát âm</i>.</li>
+<li>Đọc hài hước/nghiêm túc...: chọn <i>🎭 Cách đọc</i> ở bước 3. AI tự gán cảm xúc cho từng đoạn (cột <i>Cách đọc</i> ở bước 2).</li>
+<li>Nhận diện phim đúng tên nhân vật: bấm <i>🔍 Nhận diện bằng AI</i> ở bước 1, nhập thêm TMDB key (miễn phí) để chính xác hơn.</li>
+<li>Không nghe được giọng: mục <i>🧩 Thành phần & sửa lỗi</i> → <i>🔔 Thử loa</i> → <i>🩺 Chẩn đoán giọng đọc</i>.</li>
 <li>Video TikTok: bấm mẫu <i>📱 TikTok / Reels / Shorts</i> ở bước 4.</li>
 </ul>
 <h3>⚖️ Lưu ý bản quyền</h3>

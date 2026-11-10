@@ -5,7 +5,7 @@
 hoặc **dọc (TikTok/Reels/Shorts)**.
 
 ```
-Phim dài ──► ① Nhận dạng lời thoại ──► ② Dò chuyển cảnh ──► ③ AI viết kịch bản + chọn cảnh
+Phim dài ──► 🔍 Nhận diện phim ──► ① Nhận dạng lời thoại ──► ② Dò cảnh ──► ③ AI viết kịch bản + chọn cảnh
         (Whisper / phụ đề có sẵn)      (PySceneDetect)       (Gemini, Claude, GPT, Groq, Ollama…)
                                                                         │
      Video ngắn ◄── ⑤ Dựng video (FFmpeg) ◄── ④ Lồng tiếng (12 công cụ, phát âm chuẩn)
@@ -23,6 +23,9 @@ Phim dài ──► ① Nhận dạng lời thoại ──► ② Dò chuyển c
 | **Phong cách** | Review TikTok kịch tính, tóm tắt nghiêm túc, hài hước, cảm xúc, kinh dị, phân tích ý nghĩa, thiếu nhi + yêu cầu riêng |
 | **Giọng đọc** | ⭐ VieNeu-TTS (giọng Việt AI offline), Edge TTS (400+ giọng miễn phí, có Hoài My/Nam Minh), gTTS, OpenAI TTS (có chỉnh cảm xúc), ElevenLabs, Gemini TTS (30 giọng), Google Cloud TTS, Azure (500+ giọng, nhiều phong cách), FPT.AI (giọng Việt Bắc/Trung/Nam), **Piper offline**, giọng Windows (SAPI), **XTTS-v2 / viXTTS nhân bản giọng** |
 | **Tinh chỉnh giọng** | Tốc độ, cao độ (nửa cung), âm lượng, cảm xúc/phong cách, nghe thử ngay |
+| **🎭 Cách đọc** | Tự nhiên, hài hước, nghiêm túc/tin tức, kịch tính, kinh dị, buồn, sôi nổi, ấm áp, gay gắt, thiếu nhi hoặc tự mô tả · AI gán cách đọc **riêng cho từng đoạn** theo cảm xúc cảnh (sửa được trong bảng kịch bản) · OpenAI/Gemini/Azure/ElevenLabs đọc theo cảm xúc thật, các công cụ khác được chỉnh nhịp & cao độ cho hợp |
+| **🔍 Nhận diện phim** | AI nhận ra phim từ tên file + 7 khung hình + lời thoại (tên phim, năm, nhân vật, nội dung) · đối chiếu **TMDB** (tùy chọn) để lấy tên nhân vật chuẩn · gợi ý tên riêng cho Whisper nghe đúng · **AI xem hình ảnh** các cảnh để chọn clip chính xác · bạn sửa/bổ sung được |
+| **🧩 Tự cài đặt** | Tự kiểm tra & tải những gì còn thiếu: thư viện, FFmpeg bản đầy đủ, model Whisper, model VieNeu, giọng Piper tiếng Việt · nút **🩺 Chẩn đoán giọng đọc** & **🔔 Thử loa** · file log để gửi khi gặp lỗi |
 | **🗣️ Phát âm chuẩn** | ⭐ **VieNeu-TTS**: AI giọng Việt offline, 25 giọng 3 miền, nhân bản giọng từ mẫu 3–8 giây · tự đọc đúng số, số thập phân, %, tiền tệ, ngày tháng, giờ, khoảng, tỷ số, đơn vị, số La Mã, chữ viết tắt · **từ điển phát âm** do bạn định nghĩa · **AI soát phát âm** (viết lại câu cho dễ đọc, phiên âm tên nước ngoài) · phụ đề vẫn giữ chữ gốc |
 | **Biên tập** | Bảng kịch bản sửa trực tiếp: lời thuyết minh, mốc thời gian, thêm/xóa/đổi thứ tự, xem trước cảnh, nghe thử từng đoạn, lưu/mở kịch bản JSON |
 | **Dựng video** | 16:9 / 9:16 / 1:1 / 4:5, nền mờ hoặc cắt cúp, 720p–4K, phụ đề tùy chỉnh (font, màu, viền, vị trí), tiêu đề mở đầu, logo, nhạc nền, giảm tiếng phim khi thuyết minh, GPU NVENC/QuickSync/AMF |
@@ -32,11 +35,22 @@ Phim dài ──► ① Nhận dạng lời thoại ──► ② Dò chuyển c
 
 1. Cài **Python 3.10–3.12** từ <https://www.python.org/downloads/>. Khi cài nhớ tick ✅ *Add python.exe to PATH*.
 2. Tải thư mục `MovieRecapAI` về máy, bấm đúp **`install.bat`**. Script tự tạo môi trường, cài thư viện, Piper và FFmpeg (qua winget).
-3. Bấm đúp **`run.bat`** để mở app.
+3. Bấm đúp **`run.bat`** để mở app. Lần đầu mở, app sẽ hỏi để **tự tải những thứ còn thiếu** (hoặc vào mục **🧩 Thành phần & sửa lỗi**, bấm *Cài tất cả còn thiếu*).
+4. Không nghe được giọng đọc: vào **🧩 Thành phần & sửa lỗi**, bấm **🔔 Thử loa** rồi **🩺 Chẩn đoán giọng đọc**. App tự sửa những lỗi thường gặp. File log nằm ở `%APPDATA%\MovieRecapAI\logs\app.log`.
 
 > Linux/macOS: `./run.sh` (cần `ffmpeg` có sẵn: `sudo apt install ffmpeg` / `brew install ffmpeg`).
 >
 > Muốn đóng gói thành file `.exe` gửi người khác: chạy `build_exe.bat`, kết quả nằm ở `dist\MovieRecapAI\`.
+
+## 💻 Gợi ý theo cấu hình máy
+
+| Máy | Nhận dạng thoại | Giọng đọc | Xuất video |
+|---|---|---|---|
+| **Card AMD (vd RX 5700 XT) / Intel, CPU 12 luồng (vd i5-12400F), RAM 16GB** | Whisper *Tự chọn* (large-v3-turbo chạy CPU, phim 2 tiếng mất khoảng 40-70 phút) hoặc **Groq Whisper API** (miễn phí, vài phút) | VieNeu-TTS v3turbo (CPU) hoặc Edge TTS | Bộ mã hóa *Tự động* → **AMD AMF** |
+| Card NVIDIA | Whisper large-v3-turbo trên GPU (rất nhanh) | VieNeu-TTS / XTTS dùng GPU | NVENC |
+| Máy yếu / laptop cũ | Groq Whisper API hoặc model `small` | Edge TTS hoặc VieNeu v3nano | CPU |
+
+Card AMD không dùng được CUDA, nên Whisper và VieNeu sẽ chạy bằng CPU (vẫn ổn với CPU 12 luồng). XTTS và Ollama không nên dùng trên card AMD.
 
 ## 🔑 Nhập API (mục *API & Cài đặt* trong app)
 
@@ -52,6 +66,7 @@ Không cần nhập hết, chỉ cần dịch vụ bạn dùng. Bấm **Kiểm t
 | Ollama / LM Studio | Viết kịch bản **offline** | <https://ollama.com> | Không cần key, ví dụ `ollama pull qwen2.5:14b` |
 | ElevenLabs | Giọng siêu thật, giọng nhân bản | <https://elevenlabs.io/app/settings/api-keys> | |
 | Google Cloud TTS | Giọng WaveNet/Neural2/Chirp | <https://console.cloud.google.com/apis/credentials> | Bật *Cloud Text-to-Speech API* |
+| TMDB (tùy chọn) | Nhận diện phim, tên nhân vật chuẩn | <https://www.themoviedb.org/settings/api> | Miễn phí |
 | Azure Speech | 500+ giọng, có cảm xúc | Azure Portal → Speech service | Nhập cả **vùng** (vd `southeastasia`) |
 | FPT.AI | Giọng Việt 3 miền | <https://console.fpt.ai> | |
 
@@ -118,6 +133,8 @@ MovieRecapAI/
 │   ├── script_writer.py    # prompt + xử lý kịch bản
 │   ├── tts.py              # 12 công cụ giọng đọc
 │   ├── textnorm.py         # phát âm chuẩn: đọc số/ngày/đơn vị, từ điển, AI soát phát âm
+│   ├── film_id.py          # nhận diện phim, TMDB, AI xem hình ảnh cảnh phim
+│   ├── components.py       # tự kiểm tra & cài thư viện, FFmpeg, model
 │   ├── subtitles.py        # đọc/ghi SRT, ASS
 │   ├── editor.py           # dựng video
 │   └── pipeline.py         # quản lý dự án, chuỗi xử lý, tải video
@@ -125,7 +142,7 @@ MovieRecapAI/
 └── tests/test_pipeline.py  # kiểm thử end-to-end offline
 ```
 
-Chạy kiểm thử: `python tests/test_pipeline.py` và `python tests/test_textnorm.py`. Bài kiểm thử tạo phim giả lập, giả lập AI và giọng đọc, rồi dựng ra video 16:9, 9:16 và highlight.
+Chạy kiểm thử: `python tests/test_pipeline.py`, `python tests/test_textnorm.py`, `python tests/test_features.py`. Bài kiểm thử tạo phim giả lập, giả lập AI và giọng đọc, rồi dựng ra video 16:9, 9:16 và highlight.
 
 ## ⚖️ Lưu ý bản quyền
 

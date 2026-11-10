@@ -11,9 +11,41 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 
+def _setup_streams() -> Path | None:
+    """Chạy bằng pythonw.exe (run.bat) thì sys.stdout/stderr = None: mọi thanh tiến trình tải model
+    (HuggingFace/tqdm) sẽ làm sập tác vụ. Ghi chúng ra file log thay thế."""
+    try:
+        from recap.config import app_home
+
+        log_dir = app_home() / "logs"
+        log_dir.mkdir(parents=True, exist_ok=True)
+        log_file = log_dir / "app.log"
+        if log_file.exists() and log_file.stat().st_size > 5_000_000:
+            log_file.replace(log_dir / "app.old.log")
+    except Exception:
+        return None
+    if sys.stdout is None or sys.stderr is None:
+        fh = open(log_file, "a", encoding="utf-8", errors="replace", buffering=1)
+        if sys.stdout is None:
+            sys.stdout = fh
+        if sys.stderr is None:
+            sys.stderr = fh
+    import logging
+
+    logging.basicConfig(filename=str(log_file), level=logging.INFO, encoding="utf-8",
+                        format="%(asctime)s %(levelname)s %(name)s: %(message)s")
+
+    def hook(exc_type, exc, tb):
+        logging.getLogger("crash").error("Lỗi không bắt được", exc_info=(exc_type, exc, tb))
+        sys.__excepthook__(exc_type, exc, tb)
+    sys.excepthook = hook
+    return log_file
+
+
 def run_gui() -> int:
     import os
 
+    _setup_streams()
     os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication

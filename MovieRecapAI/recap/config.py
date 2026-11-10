@@ -38,6 +38,8 @@ DEFAULTS: dict = {
         "azure_region": "southeastasia",
         "google_tts_key": "",
         "fpt_key": "",
+        # Dữ liệu phim (tùy chọn) - themoviedb.org
+        "tmdb_key": "",
         # Mạng
         "proxy": "",
     },
@@ -49,7 +51,7 @@ DEFAULTS: dict = {
     },
     "transcribe": {
         "engine": "faster_whisper",
-        "model": "small",
+        "model": "auto",
         "language": "auto",
         "device": "auto",
         "use_scenes": True,
@@ -63,6 +65,8 @@ DEFAULTS: dict = {
         "spoiler": True,
         "custom": "",
         "max_chars": 150000,
+        "identify": True,        # tự nhận diện phim (tên, nhân vật) trước khi viết kịch bản
+        "visual": False,         # AI xem hình ảnh các cảnh để chọn cảnh chính xác hơn
         "mode": "narrate",
     },
     "voice": {
@@ -75,6 +79,9 @@ DEFAULTS: dict = {
         "style": "",
         "xtts_ref": "",
         "xtts_model_dir": "",
+        "read_style": "natural",  # cách đọc chung
+        "read_custom": "",        # mô tả cách đọc tự viết
+        "tone_auto": True,        # mỗi đoạn đổi cách đọc theo cảm xúc AI gán
         "normalize": True,       # chuẩn hóa số, ngày, đơn vị, viết tắt trước khi đọc
         "ai_pron": False,        # nhờ AI soát lại câu cho dễ đọc
         "transliterate": False,  # phiên âm tên nước ngoài sang tiếng Việt
@@ -84,7 +91,7 @@ DEFAULTS: dict = {
         "fill": "blur",
         "height": 1080,
         "fps": 30,
-        "encoder": "libx264",
+        "encoder": "auto",
         "quality": 21,
         "orig_volume_voice": 0.12,
         "orig_volume_clip": 1.0,
@@ -110,6 +117,7 @@ DEFAULTS: dict = {
         "gap": 0.25,
     },
     "ui": {"last_dir": ""},
+    "config_version": 2,
 }
 
 
@@ -150,7 +158,14 @@ class Settings:
         if self.path.exists():
             try:
                 with open(self.path, "r", encoding="utf-8") as f:
-                    self.data = _merge(DEFAULTS, json.load(f))
+                    raw = json.load(f)
+                self.data = _merge(DEFAULTS, raw)
+                if int(raw.get("config_version", 1)) < 2:  # bản 1.0 -> 1.1: dùng chế độ tự động mới
+                    if self.data["render"].get("encoder") == "libx264":
+                        self.data["render"]["encoder"] = "auto"
+                    if self.data["transcribe"].get("model") == "small":
+                        self.data["transcribe"]["model"] = "auto"
+                    self.data["config_version"] = 2
             except Exception:
                 self.data = copy.deepcopy(DEFAULTS)
 

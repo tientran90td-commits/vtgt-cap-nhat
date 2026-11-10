@@ -14,6 +14,7 @@ from recap.ffmpeg_utils import set_ffmpeg_path
 from recap.pipeline import Project
 
 from .page_about import AboutPage
+from .page_components import ComponentsPage
 from .page_render import RenderPage
 from .page_script import ScriptPage
 from .page_settings import SettingsPage
@@ -22,7 +23,8 @@ from .page_voice import VoicePage
 from .widgets import Binder, Worker, button
 
 NAV = ["🎬   1. Video nguồn", "📝   2. Kịch bản AI", "🎙️   3. Giọng đọc", "🎞️   4. Xuất video",
-       "🔑   API & Cài đặt", "ℹ️   Hướng dẫn & mã nguồn"]
+       "🔑   API & Cài đặt", "🧩   Thành phần & sửa lỗi", "ℹ️   Hướng dẫn & mã nguồn"]
+PAGE_COMPONENTS = 5
 
 
 class MainWindow(QMainWindow):
@@ -72,7 +74,7 @@ class MainWindow(QMainWindow):
         right.setSpacing(0)
         self.stack = QStackedWidget()
         self.pages = [SourcePage(self), ScriptPage(self), VoicePage(self), RenderPage(self), SettingsPage(self),
-                      AboutPage(self)]
+                      ComponentsPage(self), AboutPage(self)]
         for p in self.pages:
             self.stack.addWidget(p)
         self.nav.currentRowChanged.connect(self._nav)
@@ -115,6 +117,45 @@ class MainWindow(QMainWindow):
         if not any(self.settings.get("api", k) for k in ("gemini_key", "anthropic_key", "openai_key", "groq_key",
                                                          "deepseek_key", "openrouter_key")):
             self.log("👉 Mẹo: vào '🔑 API & Cài đặt' nhập Gemini API key miễn phí để AI viết kịch bản.", "warn")
+        from PySide6.QtCore import QTimer
+
+        QTimer.singleShot(800, self.startup_check)
+
+    # ------------------------------------------------------------ thành phần
+    def startup_check(self):
+        """Lần đầu mở app: kiểm tra thành phần bắt buộc, hỏi tự cài nếu thiếu."""
+        from recap import components
+
+        s = self.settings
+
+        def job(log, progress, cancel):
+            return components.missing_for(s, s.get("voice", "engine"), s.get("transcribe", "engine"))
+
+        def done(missing):
+            if not missing:
+                return
+            names = "\n• ".join(components.COMPONENTS[k]["name"] for k in missing)
+            if QMessageBox.question(self, "Thiếu thành phần",
+                                    f"App cần thêm:\n• {names}\n\nTự tải & cài ngay bây giờ?") == QMessageBox.Yes:
+                self.goto(PAGE_COMPONENTS)
+                self.pages[PAGE_COMPONENTS].install(missing)
+        self.run_task(job, on_done=done, title="Kiểm tra thành phần", quiet=True)
+
+    def ensure(self, engine=None, stt=None, then=None, include_models=False) -> bool:
+        """Kiểm tra thành phần cho engine; nếu thiếu thì hỏi để tự cài rồi chạy tiếp `then`.
+        Trả True nếu đã đủ (gọi `then` ngay)."""
+        from recap import components
+
+        missing = components.missing_for(self.settings, engine, stt, include_models)
+        if not missing:
+            if then:
+                then()
+            return True
+        names = "\n• ".join(components.COMPONENTS[k]["name"] for k in missing)
+        if QMessageBox.question(self, "Cần tải thêm",
+                                f"Để dùng chức năng này cần:\n• {names}\n\nTự tải & cài ngay?") == QMessageBox.Yes:
+            self.pages[PAGE_COMPONENTS].install(missing, then=then)
+        return False
 
     # ------------------------------------------------------------ điều hướng
     def _nav(self, i):
@@ -190,9 +231,14 @@ class MainWindow(QMainWindow):
 
         def done(path):
             sp.load_script()
+            self.pages[0].load_film()
             self.refresh()
             self.pages[3].finished(path)
-        self.run_task(p.run_all, on_done=done, title="Tự động làm tất cả", subtitle_file=sub)
+
+        def go():
+            self.run_task(p.run_all, on_done=done, title="Tự động làm tất cả", subtitle_file=sub)
+        need_stt = None if p.transcript else engine
+        self.ensure(self.settings.get("voice", "engine"), need_stt, then=go)
 
     # ------------------------------------------------------------ tác vụ nền
     def run_task(self, fn, *args, on_done=None, on_fail=None, title="", quiet=False, **kwargs):

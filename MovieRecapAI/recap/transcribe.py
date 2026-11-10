@@ -28,7 +28,34 @@ ENGINES = {
     "embedded": "Lấy phụ đề nhúng trong video",
 }
 
-WHISPER_MODELS = ["tiny", "base", "small", "medium", "large-v3", "large-v3-turbo", "distil-large-v3"]
+WHISPER_MODELS = {
+    "auto": "Tự chọn theo máy (khuyên dùng)",
+    "large-v3-turbo": "large-v3-turbo - chính xác cao, nhanh",
+    "large-v3": "large-v3 - chính xác nhất (chậm trên CPU)",
+    "medium": "medium",
+    "small": "small - nhanh",
+    "base": "base",
+    "tiny": "tiny - siêu nhanh, kém chính xác",
+    "distil-large-v3": "distil-large-v3 (chỉ tiếng Anh)",
+}
+
+
+def has_cuda() -> bool:
+    try:
+        import ctranslate2
+
+        return ctranslate2.get_cuda_device_count() > 0
+    except Exception:
+        return False
+
+
+def resolve_model(model: str, device: str = "auto") -> str:
+    """'auto': GPU NVIDIA -> large-v3-turbo; CPU >= 8 luồng -> large-v3-turbo (int8); máy yếu -> small."""
+    if model and model != "auto":
+        return model
+    if device != "cpu" and has_cuda():
+        return "large-v3-turbo"
+    return "large-v3-turbo" if (os.cpu_count() or 4) >= 8 else "small"
 
 LANGUAGES = {
     "auto": "Tự nhận diện", "vi": "Tiếng Việt", "en": "English", "zh": "中文", "ja": "日本語",
@@ -38,8 +65,9 @@ LANGUAGES = {
 
 
 def transcribe(video: str, work_dir: Path, settings: Settings, engine: str, log, progress, cancel,
-               subtitle_file: str | None = None, model: str = "small", language: str = "auto",
-               device: str = "auto") -> list[dict]:
+               subtitle_file: str | None = None, model: str = "auto", language: str = "auto",
+               device: str = "auto", prompt: str = "") -> list[dict]:
+    """prompt: gợi ý cho Whisper (tên phim, tên nhân vật) để nghe đúng tên riêng."""
     work_dir.mkdir(parents=True, exist_ok=True)
     lang = None if language in ("", "auto", None) else language
     if engine == "subtitle":
@@ -58,9 +86,10 @@ def transcribe(video: str, work_dir: Path, settings: Settings, engine: str, log,
             log("Đang tách âm thanh...")
             extract_audio(video, str(wav), cancel=cancel, total=duration,
                           on_progress=lambda p: progress(p * 0.1, "Tách âm thanh"))
-        return _faster_whisper(str(wav), duration, settings, model, lang, device, log, progress, cancel)
+        return _faster_whisper(str(wav), duration, settings, resolve_model(model, device), lang, device, log,
+                               progress, cancel, prompt)
     if engine in ("openai", "groq"):
-        return _api_whisper(video, work_dir, duration, settings, engine, lang, log, progress, cancel)
+        return _api_whisper(video, work_dir, duration, settings, engine, lang, log, progress, cancel, prompt)
     raise RuntimeError(f"Engine không hợp lệ: {engine}")
 
 
@@ -89,7 +118,7 @@ def _embedded(video, work_dir, log, cancel) -> list[dict]:
     return parse_subtitle_file(out)
 
 
-def _faster_whisper(wav, duration, settings, model, lang, device, log, progress, cancel) -> list[dict]:
+def _faster_whisper(wav, duration, settings, model, lang, device, log, progress, cancel, prompt="") -> list[dict]:
     try:
         from faster_whisper import WhisperModel
     except ImportError as e:
@@ -104,21 +133,27 @@ def _faster_whisper(wav, duration, settings, model, lang, device, log, progress,
         except Exception:
             pass
         if device == "cuda" and dev != "cuda":
-            log("Không thấy GPU CUDA, chuyển sang CPU.", level="warn")
-    log(f"Tải model Whisper '{model}' ({dev}). Lần đầu sẽ tải về vài trăm MB...")
+            log("Không thấy GPU NVIDIA (CUDA) - chạy bằng CPU. Card AMD/Intel không dùng được cho Whisper.",
+                level="warn")
+    threads = os.cpu_count() or 4
+    log(f"Nạp model Whisper '{model}' ({dev}{'' if dev == 'cuda' else f', {threads} luồng CPU'}). "
+        "Lần đầu sẽ tải về vài trăm MB...")
     progress(0.1, f"Tải model Whisper {model}")
     try:
-        wm = WhisperModel(model, device=dev, compute_type=ctype,
+        wm = WhisperModel(model, device=dev, compute_type=ctype, cpu_threads=0 if dev == "cuda" else threads,
                           download_root=str(settings.models_dir() / "whisper"))
     except Exception as e:
         if dev == "cuda":
             log(f"GPU lỗi ({e}) - chuyển sang CPU.", level="warn")
-            wm = WhisperModel(model, device="cpu", compute_type="int8",
+            wm = WhisperModel(model, device="cpu", compute_type="int8", cpu_threads=threads,
                               download_root=str(settings.models_dir() / "whisper"))
         else:
             raise RuntimeError(f"Không tải được model Whisper '{model}' (lần đầu cần Internet tới huggingface.co). "
                                f"Có thể dùng engine Groq/OpenAI Whisper API thay thế.\nChi tiết: {e}") from e
+    if prompt:
+        log(f"Gợi ý cho Whisper: {prompt[:120]}")
     segments, info = wm.transcribe(wav, language=lang, vad_filter=True, beam_size=5,
+                                   initial_prompt=prompt or None,
                                    condition_on_previous_text=False)
     log(f"Ngôn ngữ nhận diện: {info.language} ({info.language_probability:.0%})")
     out = []
@@ -132,7 +167,7 @@ def _faster_whisper(wav, duration, settings, model, lang, device, log, progress,
     return out
 
 
-def _api_whisper(video, work_dir, duration, settings, engine, lang, log, progress, cancel) -> list[dict]:
+def _api_whisper(video, work_dir, duration, settings, engine, lang, log, progress, cancel, prompt="") -> list[dict]:
     if engine == "openai":
         key = settings.get("api", "openai_key")
         base = (settings.get("api", "openai_base") or "https://api.openai.com/v1").rstrip("/")
@@ -166,6 +201,8 @@ def _api_whisper(video, work_dir, duration, settings, engine, lang, log, progres
                     "-c:a", "libmp3lame", "-b:a", "48k", str(mp3)], cancel=cancel)
         progress(i / n, f"Gửi đoạn âm thanh {i + 1}/{n} lên {engine}")
         data = {"model": model, "response_format": "verbose_json", "timestamp_granularities[]": "segment"}
+        if prompt:
+            data["prompt"] = prompt[:800]
         if lang:
             data["language"] = lang
         for attempt in range(4):

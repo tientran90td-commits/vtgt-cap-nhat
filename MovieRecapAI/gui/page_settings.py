@@ -96,6 +96,19 @@ class SettingsPage(Page):
         f2.addRow(muted("Edge TTS, gTTS, Piper, giọng Windows và XTTS không cần key."))
         v.addWidget(g2)
 
+        gm = QGroupBox("🎬 Dữ liệu phim (tùy chọn - giúp nhận diện phim & tên nhân vật chính xác)")
+        fm = QFormLayout(gm)
+        st = QLabel("")
+        self.status["tmdb"] = st
+        row = hrow(KeyField(b, "tmdb_key", "TMDB API Key (v3) hoặc API Read Access Token"),
+                   button("Kiểm tra", self.test_tmdb),
+                   button("Lấy key ↗", lambda: self.open("https://www.themoviedb.org/settings/api"), "link"), st)
+        row.layout().setStretch(0, 1)
+        fm.addRow("TMDB", row)
+        fm.addRow(muted("Miễn phí: tạo tài khoản themoviedb.org → Settings → API. Có key thì app lấy đúng tên phim, "
+                        "năm, nội dung và tên nhân vật (tiếng Việt nếu có)."))
+        v.addWidget(gm)
+
         g3 = QGroupBox("⚙️ Hệ thống")
         f3 = QFormLayout(g3)
         self.ff = PathPicker("file", "ffmpeg (ffmpeg.exe ffmpeg)", "Để trống = tự tìm (khuyên dùng)")
@@ -149,6 +162,17 @@ class SettingsPage(Page):
             return f"OK · {len(voices)} giọng"
         self.app.run_task(job, on_done=lambda r: self._mark("tts_" + eng, True, r),
                           on_fail=lambda m: self._mark("tts_" + eng, False, m), title=f"Kiểm tra {eng}", quiet=True)
+
+    def test_tmdb(self):
+        from recap.film_id import tmdb_lookup
+
+        self.status["tmdb"].setText("⏳ ...")
+
+        def job(log, progress, cancel):
+            r = tmdb_lookup("Inception", "2010", self.app.settings)
+            return f"OK · {r['title']} ({r['year']})" if r else "OK"
+        self.app.run_task(job, on_done=lambda r: self._mark("tmdb", True, r),
+                          on_fail=lambda m: self._mark("tmdb", False, m), title="Kiểm tra TMDB", quiet=True)
 
     def test_ffmpeg(self):
         try:

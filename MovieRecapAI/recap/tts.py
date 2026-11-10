@@ -94,6 +94,76 @@ LANG_CODES = {"Tiếng Việt": "vi", "English": "en", "中文": "zh-cn", "日�
               "Русский": "ru", "हिन्दी": "hi"}
 
 
+# ======================================================================= CÁCH ĐỌC (cảm xúc)
+# rate/pitch: chỉnh nhịp & cao độ cho các engine không điều khiển được cảm xúc bằng lời
+# azure: style SSML · el: (stability, style) cho ElevenLabs · tag: thẻ cảm xúc ElevenLabs v3
+READ_STYLES: dict[str, dict] = {
+    "natural": {"name": "🙂 Tự nhiên", "vi": "tự nhiên, rõ ràng, truyền cảm",
+                "en": "natural, clear and engaging storyteller", "rate": 0, "pitch": 0,
+                "azure": "", "el": (0.45, 0.25), "tag": ""},
+    "funny": {"name": "😂 Hài hước, vui nhộn", "vi": "hài hước, tinh nghịch, vui nhộn, nhấn nhá như đang kể chuyện cười",
+              "en": "funny, playful and witty, with comedic timing", "rate": 10, "pitch": 1,
+              "azure": "cheerful", "el": (0.3, 0.7), "tag": "[playfully]"},
+    "serious": {"name": "🎙️ Nghiêm túc, tin tức", "vi": "nghiêm túc, điềm tĩnh, rõ ràng như phát thanh viên thời sự",
+                "en": "serious, calm and authoritative like a news anchor", "rate": -4, "pitch": -1,
+                "azure": "newscast", "el": (0.8, 0.0), "tag": ""},
+    "dramatic": {"name": "🎬 Kịch tính, hồi hộp", "vi": "kịch tính, hồi hộp, nhấn mạnh, ngắt nghỉ như lồng tiếng trailer phim",
+                 "en": "dramatic and suspenseful, like a movie trailer narrator", "rate": 3, "pitch": -2,
+                 "azure": "serious", "el": (0.35, 0.6), "tag": "[dramatically]"},
+    "horror": {"name": "👻 Kinh dị, rùng rợn", "vi": "trầm, chậm, thì thầm rùng rợn, đầy bí ẩn",
+               "en": "dark, slow, creepy and whispery", "rate": -10, "pitch": -3,
+               "azure": "whispering", "el": (0.5, 0.5), "tag": "[whispers]"},
+    "sad": {"name": "😢 Buồn, cảm động", "vi": "buồn, xúc động, nhẹ nhàng và chậm rãi",
+            "en": "sad, emotional, soft and slow", "rate": -8, "pitch": -1,
+            "azure": "sad", "el": (0.5, 0.45), "tag": "[sad]"},
+    "excited": {"name": "🔥 Sôi nổi, hào hứng", "vi": "sôi nổi, hào hứng, năng lượng cao",
+                "en": "excited and energetic, high energy", "rate": 15, "pitch": 2,
+                "azure": "excited", "el": (0.3, 0.65), "tag": "[excited]"},
+    "warm": {"name": "☕ Kể chuyện ấm áp", "vi": "ấm áp, thân mật, chậm rãi như kể chuyện bên tách trà",
+             "en": "warm, intimate, relaxed storytelling", "rate": -5, "pitch": 0,
+             "azure": "narration-relaxed", "el": (0.55, 0.3), "tag": ""},
+    "angry": {"name": "😠 Gay gắt, phẫn nộ", "vi": "gay gắt, phẫn nộ, dồn dập",
+              "en": "angry, intense and forceful", "rate": 8, "pitch": 0,
+              "azure": "angry", "el": (0.3, 0.6), "tag": "[angry]"},
+    "kids": {"name": "🧸 Dễ thương (thiếu nhi)", "vi": "dễ thương, vui tươi, đơn giản như kể chuyện cho trẻ em",
+             "en": "cute, cheerful and simple, for children", "rate": -3, "pitch": 2,
+             "azure": "cheerful", "el": (0.45, 0.5), "tag": "[cheerfully]"},
+    "custom": {"name": "✏️ Tự mô tả...", "vi": "", "en": "", "rate": 0, "pitch": 0, "azure": "", "el": (0.45, 0.3),
+               "tag": ""},
+}
+TONE_KEYS = [k for k in READ_STYLES if k != "custom"]
+# engine điều khiển cảm xúc bằng lời/SSML (không cần chỉnh nhịp-cao độ để "giả" cảm xúc)
+EXPRESSIVE = {"openai", "gemini", "azure", "elevenlabs"}
+
+
+def apply_read_style(engine: str, opts: dict) -> dict:
+    """Áp cách đọc (opts['tone'] của đoạn, hoặc opts['read_style'] chung) cho từng engine."""
+    o = dict(opts)
+    key = o.get("tone") or o.get("read_style") or "natural"
+    st = READ_STYLES.get(key, READ_STYLES["natural"])
+    custom = (o.get("read_custom") or "").strip() if key == "custom" else ""
+    desc_vi = custom or st["vi"]
+    desc_en = custom or st["en"]
+    if engine == "openai":
+        if desc_en:
+            o["style"] = f"Voice and tone: {desc_en}. Speak with correct, native pronunciation."
+    elif engine == "gemini":
+        if desc_vi and key != "natural":
+            o["style"] = f"Đọc với giọng {desc_vi}"
+    elif engine == "azure":
+        if key == "custom" and custom and " " not in custom:
+            o["style"] = custom
+        else:
+            o["style"] = st["azure"]
+    elif engine == "elevenlabs":
+        o["el_settings"] = st["el"]
+        o["el_tag"] = st["tag"]
+    if engine not in EXPRESSIVE and key != "custom":
+        o["rate"] = float(o.get("rate", 0) or 0) + st["rate"]
+        o["pitch"] = float(o.get("pitch", 0) or 0) + st["pitch"]
+    return o
+
+
 class TTSError(RuntimeError):
     pass
 
@@ -447,13 +517,16 @@ def synthesize(engine: str, text: str, voice: str, out_wav: str | Path, opts: di
                cancel=None, log=None) -> Path:
     """Đọc `text` bằng giọng `voice`, lưu WAV 48kHz stereo đã xử lý tốc độ/cao độ/âm lượng.
 
-    opts: rate (%), pitch (nửa cung), volume (%), model, style, lang_code, xtts_ref, xtts_model_dir
+    opts: rate (%), pitch (nửa cung), volume (%), model, read_style, read_custom, tone (cách đọc của đoạn),
+          lang_code, xtts_ref, xtts_model_dir, normalize
+    File chỉ được ghi khi tạo thành công và có âm thanh thật (không để lại file rỗng/hỏng trong cache).
     """
     text = (text or "").strip()
     if not opts.get("raw"):
         text = speak_text(text, opts)
     if not text:
         raise TTSError("Văn bản rỗng")
+    opts = apply_read_style(engine, opts)
     out_wav = Path(out_wav)
     out_wav.parent.mkdir(parents=True, exist_ok=True)
     info = ENGINES[engine]
@@ -464,10 +537,52 @@ def synthesize(engine: str, text: str, voice: str, out_wav: str | Path, opts: di
     tmp_dir = out_wav.parent / (out_wav.stem + "_parts")
     tmp_dir.mkdir(exist_ok=True)
     raw_files = []
-    for i, piece in enumerate(pieces):
-        base = tmp_dir / f"p{i:03d}"
-        raw_files.append(Path(fn(piece, voice, base, opts, settings)))
-    # Ghép + xử lý hậu kỳ bằng FFmpeg
+    try:
+        for i, piece in enumerate(pieces):
+            if cancel is not None and cancel.is_set():
+                from .ffmpeg_utils import Cancelled
+
+                raise Cancelled()
+            base = tmp_dir / f"p{i:03d}"
+            f = Path(fn(piece, voice, base, opts, settings))
+            if not f.exists() or f.stat().st_size < 200:
+                raise TTSError(f"{info['name']}: không nhận được âm thanh (file rỗng). "
+                               "Kiểm tra mạng/API key hoặc thử giọng khác.")
+            raw_files.append(f)
+        tmp_out = out_wav.with_name(out_wav.stem + ".tmp.wav")
+        _post_process(raw_files, tmp_out, info, opts, cancel, log, trim=True)
+        if _duration_or_zero(tmp_out) < 0.25:
+            # Lọc khoảng lặng cắt mất cả câu (giọng quá nhỏ) -> làm lại không cắt
+            _post_process(raw_files, tmp_out, info, opts, cancel, log, trim=False)
+        if _duration_or_zero(tmp_out) < 0.1:
+            raise TTSError(f"{info['name']}: âm thanh tạo ra bị rỗng. Thử giọng hoặc công cụ khác.")
+        os.replace(tmp_out, out_wav)
+    finally:
+        for f in raw_files:
+            try:
+                f.unlink()
+            except OSError:
+                pass
+        try:
+            tmp_dir.rmdir()
+        except OSError:
+            pass
+    return out_wav
+
+
+def _duration_or_zero(path: Path) -> float:
+    try:
+        if not path.exists() or path.stat().st_size < 1000:
+            return 0.0
+        from .ffmpeg_utils import media_duration
+
+        return media_duration(path)
+    except Exception:
+        return 0.0
+
+
+def _post_process(raw_files, out, info, opts, cancel, log, trim=True):
+    """Ghép các mảnh + chỉnh tốc độ/cao độ/âm lượng + cắt khoảng lặng đầu/cuối."""
     rate = float(opts.get("rate", 0) or 0)
     pitch = float(opts.get("pitch", 0) or 0)
     vol = float(opts.get("volume", 0) or 0)
@@ -481,9 +596,9 @@ def synthesize(engine: str, text: str, voice: str, out_wav: str | Path, opts: di
         filters += _atempo_chain(tempo)
     if vol:
         filters.append(f"volume={max(0.05, 1 + vol / 100.0):.3f}")
-    # cắt khoảng lặng đầu/cuối cho nhịp dựng gọn
-    filters.append("silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.05")
-    filters.append("areverse,silenceremove=start_periods=1:start_threshold=-45dB:start_silence=0.08,areverse")
+    if trim:
+        filters.append("silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.05")
+        filters.append("areverse,silenceremove=start_periods=1:start_threshold=-50dB:start_silence=0.08,areverse")
     args = []
     if len(raw_files) == 1:
         args += ["-i", str(raw_files[0])]
@@ -493,19 +608,9 @@ def synthesize(engine: str, text: str, voice: str, out_wav: str | Path, opts: di
             args += ["-i", str(f)]
         pre = "".join(f"[{i}:a]aresample=48000,aformat=channel_layouts=stereo[a{i}];" for i in range(len(raw_files)))
         pre += "".join(f"[a{i}]" for i in range(len(raw_files))) + f"concat=n={len(raw_files)}:v=0:a=1"
-    fc = pre + "," + ",".join(filters) + ",aformat=sample_rates=48000:channel_layouts=stereo[out]"
-    args += ["-filter_complex", fc, "-map", "[out]", "-c:a", "pcm_s16le", str(out_wav)]
+    chain = ",".join(filters + ["aformat=sample_rates=48000:channel_layouts=stereo"])
+    args += ["-filter_complex", pre + "," + chain + "[out]", "-map", "[out]", "-c:a", "pcm_s16le", "-f", "wav", str(out)]
     run_ffmpeg(args, cancel=cancel, log=log)
-    for f in raw_files:
-        try:
-            f.unlink()
-        except OSError:
-            pass
-    try:
-        tmp_dir.rmdir()
-    except OSError:
-        pass
-    return out_wav
 
 
 def _atempo_chain(f: float) -> list[str]:
@@ -595,8 +700,11 @@ def _synth_openai(text, voice, base: Path, opts, settings):
 def _synth_elevenlabs(text, voice, base: Path, opts, settings):
     key = _key("elevenlabs", settings)
     model = opts.get("model") or "eleven_multilingual_v2"
+    stab, sty = opts.get("el_settings") or (0.45, 0.25)
+    if model == "eleven_v3" and opts.get("el_tag"):
+        text = f"{opts['el_tag']} {text}"
     body = {"text": text, "model_id": model,
-            "voice_settings": {"stability": 0.45, "similarity_boost": 0.8, "style": 0.2, "use_speaker_boost": True}}
+            "voice_settings": {"stability": stab, "similarity_boost": 0.8, "style": sty, "use_speaker_boost": True}}
     r = _session(settings).post(f"https://api.elevenlabs.io/v1/text-to-speech/{voice}",
                                 params={"output_format": "mp3_44100_128"},
                                 headers={"xi-api-key": key, "Accept": "audio/mpeg"}, json=body, timeout=180)
@@ -844,8 +952,10 @@ def worker_cmd(*args: str) -> list[str]:
     """Chạy pyttsx3 ở tiến trình riêng (tránh treo COM/SAPI trong luồng giao diện)."""
     if getattr(sys, "frozen", False):
         return [sys.executable, "--sapi-worker", *args]
+    from .components import python_exe
+
     main = Path(__file__).resolve().parent.parent / "main.py"
-    return [sys.executable, str(main), "--sapi-worker", *args]
+    return [python_exe(), str(main), "--sapi-worker", *args]
 
 
 def sapi_worker(argv: list[str]) -> int:
@@ -879,7 +989,7 @@ def speak_text(text: str, opts: dict) -> str:
 
 def voice_cache_key(engine: str, voice: str, text: str, opts: dict) -> str:
     keys = ("rate", "pitch", "volume", "model", "style", "lang_code", "xtts_ref", "xtts_model_dir", "normalize",
-            "ai_pron", "transliterate")
+            "ai_pron", "transliterate", "read_style", "read_custom", "tone")
     payload = json.dumps([engine, voice, text, {k: opts.get(k) for k in keys}, textnorm.load_dict()],
                          ensure_ascii=False, sort_keys=True)
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]

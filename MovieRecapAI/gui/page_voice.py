@@ -20,11 +20,6 @@ SAMPLE = {
     "en": "Welcome back to the channel. Today we're recapping an incredible movie with an ending nobody saw coming.",
 }
 
-STYLE_HINT = {
-    "openai": "Chỉ dẫn giọng (gpt-4o-mini-tts), vd: Giọng trầm, kịch tính như người kể chuyện phim kinh dị",
-    "gemini": "Cách đọc, vd: Đọc một cách hồi hộp và bí ẩn",
-    "azure": "Phong cách Azure (1 từ), vd: cheerful, sad, angry, excited, narration-professional",
-}
 
 
 class VoicePage(Page):
@@ -42,6 +37,8 @@ class VoicePage(Page):
                                                         for k, v in tts.ENGINES.items()}), "voice", "engine")
         self.engine.currentIndexChanged.connect(lambda _i: self.load_voices())
         self.lb_engine = muted("")
+        self.btn_install = button("⬇ Cài ngay", self.install_engine, "primary")
+        self.btn_install.setVisible(False)
         flt = QHBoxLayout()
         self.f_lang = fill_combo(QComboBox(), [])
         self.f_lang.setMinimumWidth(150)
@@ -60,7 +57,7 @@ class VoicePage(Page):
         self.list.itemDoubleClicked.connect(lambda _i: self.listen())
         self.lb_count = muted("")
         left.addWidget(self.engine)
-        left.addWidget(self.lb_engine)
+        left.addWidget(hrow(self.lb_engine, self.btn_install, "stretch"))
         left.addLayout(flt)
         left.addWidget(self.list, 1)
         left.addWidget(self.lb_count)
@@ -80,10 +77,24 @@ class VoicePage(Page):
                        "Review phim thường để tốc độ +10% → +20%."))
         self.model = fill_combo(QComboBox(), [])
         self.app.binder.edit_combo(self.model, "voice", "model")
-        self.style = b.line(QLineEdit(), "voice", "style")
-        self.row_model = ("Model", self.model)
         f.addRow("Model", self.model)
-        f.addRow("Cảm xúc / phong cách", self.style)
+        right.addWidget(g)
+
+        gs = QGroupBox("🎭 Cách đọc")
+        fs = QFormLayout(gs)
+        self.read_style = b.combo(fill_combo(QComboBox(), {k: v["name"] for k, v in tts.READ_STYLES.items()}),
+                                  "voice", "read_style")
+        self.read_custom = b.line(QLineEdit(), "voice", "read_custom")
+        self.read_custom.setPlaceholderText("Tự mô tả, vd: giọng bựa, chém gió như dân chơi; hoặc trầm buồn sâu lắng")
+        self.tone_auto = b.check(QCheckBox("Mỗi đoạn tự đổi cách đọc theo cảm xúc cảnh (AI gán ở bước 2)"),
+                                 "voice", "tone_auto")
+        self.lb_style = muted("")
+        fs.addRow("Cách đọc chung", self.read_style)
+        fs.addRow("Mô tả riêng", self.read_custom)
+        fs.addRow(self.tone_auto)
+        fs.addRow(self.lb_style)
+        self.read_style.currentIndexChanged.connect(lambda _i: self._style_ui())
+        g = gs
         right.addWidget(g)
 
         self.g_extra = QGroupBox("Tùy chọn riêng")
@@ -135,7 +146,7 @@ class VoicePage(Page):
         rs.setMinimumWidth(470)
         body.addWidget(rs, 4)
         self.root.addLayout(body, 1)
-        self.audio = AudioPlayer(self)
+        self.audio = AudioPlayer(self, on_error=lambda m: app.log(m, "warn"), on_info=app.log)
         self._loaded_engine = None
         self._busy_ui = False
         self.model.currentTextChanged.connect(self._model_changed)
@@ -173,8 +184,13 @@ class VoicePage(Page):
         self.model.setEnabled(bool(info.get("models")))
         if info.get("models"):
             self.model.setCurrentText(cur if cur in info["models"] else info["models"][0])
-        self.style.setEnabled(bool(info.get("style")))
-        self.style.setPlaceholderText(STYLE_HINT.get(eng, "(engine này không hỗ trợ)"))
+        self._style_ui()
+        from recap import components
+
+        missing = [m for m in components.ENGINE_NEEDS.get(eng, []) if not components.status(m, self.app.settings)[0]]
+        self.btn_install.setVisible(bool(missing))
+        if missing:
+            self.lb_engine.setText(txt + "  ⚠️ Chưa cài công cụ này.")
         self._busy_ui = False
         self.g_extra.setVisible(eng in ("piper", "xtts", "vieneu"))
         self.btn_piper.setVisible(eng == "piper")
@@ -270,8 +286,39 @@ class VoicePage(Page):
             self.app.binder._set("voice", "voice", it.data(Qt.UserRole))
             self.lb_count.setText(f"Đang chọn: {it.data(Qt.UserRole)}")
 
+    def _style_ui(self):
+        eng = self.engine.currentData()
+        key = self.read_style.currentData()
+        self.read_custom.setVisible(key == "custom")
+        lb = self.read_style.parentWidget().layout().labelForField(self.read_custom)
+        if lb:
+            lb.setVisible(key == "custom")
+        if eng in tts.EXPRESSIVE:
+            how = {"openai": "OpenAI đọc theo mô tả cảm xúc", "gemini": "Gemini đọc theo mô tả cảm xúc",
+                   "azure": "Azure dùng phong cách cảm xúc của giọng (giọng có hỗ trợ)",
+                   "elevenlabs": "ElevenLabs chỉnh độ biểu cảm (model eleven_v3 có thêm thẻ cảm xúc)"}[eng]
+        else:
+            how = ("Công cụ này không điều khiển cảm xúc bằng lời - app tự chỉnh nhịp đọc & cao độ cho hợp "
+                   "cách đọc. Muốn cảm xúc rõ hơn: dùng OpenAI (gpt-4o-mini-tts), Gemini TTS hoặc Azure.")
+            if eng == "vieneu":
+                hint = {"serious": "Mai Anh, Minh Đức (tin tức)", "warm": "Thiện Minh, Ngọc Linh (kể chuyện)",
+                        "horror": "Thái Sơn, Thiền Tâm Đức (kể chuyện)", "funny": "Adam bựa",
+                        "sad": "Mỹ Duyên, Quỳnh Anh (đọc truyện)", "dramatic": "Thiện Minh, Thanh Bình",
+                        "kids": "Trúc Ly, Ngọc Huyền"}.get(key)
+                if hint:
+                    how += f" Giọng VieNeu hợp: {hint}."
+        self.lb_style.setText(how)
+
+    def install_engine(self):
+        eng = self.engine.currentData()
+        self.app.ensure(eng, then=lambda: (self.load_voices(refresh=True), self.app.log("Đã sẵn sàng - bấm Nghe thử.")))
+
     # ------------------------------------------------ nghe thử
     def listen(self):
+        eng = self.engine.currentData()
+        self.app.ensure(eng, then=self._listen)
+
+    def _listen(self):
         text = self.sample.toPlainText().strip()
         if not text:
             return
@@ -284,7 +331,8 @@ class VoicePage(Page):
         out = Path(tempfile.gettempdir()) / f"recap_sample_{tts.voice_cache_key(eng, voice, text, opts)}.wav"
 
         def job(log, progress, cancel):
-            if not out.exists():
+            if not out.exists() or out.stat().st_size < 1000:
+                log(f"Đọc: {tts.speak_text(text, opts)[:160]}")
                 tts.synthesize(eng, text, voice, out, opts, self.app.settings, cancel)
             return str(out)
         self.app.run_task(job, on_done=self.audio.play, title="Đọc thử giọng")

@@ -15,7 +15,9 @@ from recap.ffmpeg_utils import fmt_ts, parse_ts
 from .player import AudioPlayer, VideoPlayer
 from .widgets import Page, PathPicker, button, fill_combo, hrow, muted, scroll, spin
 
-COLS = ["#", "Bắt đầu", "Kết thúc", "Lời thuyết minh (sửa trực tiếp · trống = giữ thoại gốc)", "Ghi chú cảnh"]
+COLS = ["#", "Bắt đầu", "Kết thúc", "Lời thuyết minh (sửa trực tiếp · trống = giữ thoại gốc)", "Cách đọc",
+        "Ghi chú cảnh"]
+TONE_COL = 4
 
 
 class ScriptPage(Page):
@@ -46,8 +48,9 @@ class ScriptPage(Page):
         f1.addRow("Thiết bị", self.stt_dev)
         f1.addRow("File phụ đề", self.sub_file)
         f1.addRow(self.scenes)
-        f1.addRow(muted("Mẹo: small = nhanh/khá chính xác; large-v3 = chính xác nhất (cần GPU). "
-                        "Phim có sẵn phụ đề thì dùng phụ đề sẽ nhanh và chuẩn nhất."))
+        f1.addRow(muted("Mẹo: 'Tự chọn' dùng large-v3-turbo (chính xác cao) nếu máy có GPU NVIDIA hoặc CPU từ 8 luồng. "
+                        "Máy không có card NVIDIA mà muốn nhanh: dùng Groq Whisper API (miễn phí). "
+                        "Phim có sẵn phụ đề thì dùng phụ đề là nhanh và chuẩn nhất."))
         self.lb_tr = muted("")
         f1.addRow(hrow(button("① Nhận dạng thoại", self.do_transcribe, "primary"),
                        button("👁 Xem lời thoại", self.show_transcript), "stretch"))
@@ -112,7 +115,9 @@ class ScriptPage(Page):
         hh.setSectionResizeMode(2, QHeaderView.ResizeToContents)
         hh.setSectionResizeMode(3, QHeaderView.Stretch)
         hh.setSectionResizeMode(4, QHeaderView.Interactive)
-        self.table.setColumnWidth(4, 150)
+        hh.setSectionResizeMode(5, QHeaderView.Interactive)
+        self.table.setColumnWidth(4, 140)
+        self.table.setColumnWidth(5, 110)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.itemChanged.connect(self._item_changed)
         self.table.cellDoubleClicked.connect(lambda r, c: self.preview() if c in (0, 1, 2) else None)
@@ -136,7 +141,7 @@ class ScriptPage(Page):
 
         self.root.addWidget(split, 1)
         self._loading = False
-        self.audio = AudioPlayer(self)
+        self.audio = AudioPlayer(self, on_error=lambda m: app.log(m, "warn"), on_info=app.log)
         self._provider_changed(init=True)
         self._stt_ui()
 
@@ -198,12 +203,22 @@ class ScriptPage(Page):
         sub = self.sub_file.text() or self.app.pending_subtitle
 
         def job(log, progress, cancel):
+            sc = self.app.settings.section("script")
+            if sc.get("identify", True) and sc.get("provider") != "none" and not p.film:
+                try:
+                    p.run_identify(log, lambda x, m="": progress(x * 0.05, m), cancel)
+                except Exception as e:  # noqa: BLE001
+                    log(f"Không nhận diện được phim ({e}) - tiếp tục.", level="warn")
             p.run_transcribe(log, progress, cancel, subtitle_file=sub, engine=engine)
             if self.app.settings.get("transcribe", "use_scenes", True) and p.scenes is None:
                 p.run_scenes(log, progress, cancel)
             return True
-        self.app.run_task(job, on_done=lambda _r: (self.refresh_transcript_label(), self.app.refresh()),
-                          title="Nhận dạng lời thoại")
+
+        def go():
+            self.app.run_task(job, on_done=lambda _r: (self.refresh_transcript_label(), self.app.refresh(),
+                                                       self.app.pages[0].load_film()),
+                              title="Nhận dạng lời thoại")
+        self.app.ensure(stt=engine, then=go, include_models=False)
 
     def show_transcript(self):
         p = self.app.project
@@ -246,13 +261,21 @@ class ScriptPage(Page):
     def _append(self, s, row=None):
         r = self.table.rowCount() if row is None else row
         self.table.insertRow(r)
-        vals = [str(r + 1), fmt_ts(s["start"]), fmt_ts(s["end"]), s.get("narration", ""), s.get("scene", "")]
+        vals = [str(r + 1), fmt_ts(s["start"]), fmt_ts(s["end"]), s.get("narration", ""), "", s.get("scene", "")]
         for c, v in enumerate(vals):
             it = QTableWidgetItem(v)
             if c == 0:
                 it.setFlags(it.flags() & ~Qt.ItemIsEditable)
                 it.setTextAlignment(Qt.AlignCenter)
             self.table.setItem(r, c, it)
+        cb = QComboBox()
+        cb.addItem("— cách đọc chung —", "")
+        for k in tts.TONE_KEYS:
+            cb.addItem(tts.READ_STYLES[k]["name"], k)
+        i = cb.findData(s.get("tone") or "")
+        cb.setCurrentIndex(max(0, i))
+        cb.currentIndexChanged.connect(lambda _i: self._commit())
+        self.table.setCellWidget(r, TONE_COL, cb)
 
     def collect(self) -> dict:
         segs = []
@@ -261,7 +284,9 @@ class ScriptPage(Page):
             st, en = parse_ts(g(1)), parse_ts(g(2))
             if en <= st:
                 en = st + 8
-            segs.append({"start": st, "end": en, "narration": g(3).strip(), "scene": g(4).strip()})
+            cb = self.table.cellWidget(r, TONE_COL)
+            segs.append({"start": st, "end": en, "narration": g(3).strip(), "scene": g(5).strip(),
+                         "tone": (cb.currentData() if cb else "") or ""})
         return {"title": self.title.text().strip(), "description": self.desc.text().strip(), "segments": segs}
 
     def _commit(self):
@@ -361,13 +386,17 @@ class ScriptPage(Page):
             QMessageBox.information(self, "Nghe thử", "Chọn 1 dòng có lời thuyết minh.")
             return
         opts = p.voice_opts() if p else dict(self.app.settings.section("voice"))
-        out = Path(tempfile.gettempdir()) / f"recap_listen_{tts.voice_cache_key(opts['engine'], opts['voice'], s['narration'], opts)}.wav"
+        from recap.pipeline import Project
+
+        opts["tone"] = Project.segment_tone(s, opts)
+        key = tts.voice_cache_key(opts["engine"], opts["voice"], s["narration"], opts)
+        out = Path(tempfile.gettempdir()) / f"recap_listen_{key}.wav"
 
         def job(log, progress, cancel):
-            if not out.exists():
+            if not out.exists() or out.stat().st_size < 1000:
                 tts.synthesize(opts["engine"], s["narration"], opts["voice"], out, opts, self.app.settings, cancel)
             return str(out)
-        self.app.run_task(job, on_done=self.audio.play, title="Đọc thử")
+        self.app.ensure(opts["engine"], then=lambda: self.app.run_task(job, on_done=self.audio.play, title="Đọc thử"))
 
     def open_script(self):
         p = self.app.require_project()

@@ -164,18 +164,18 @@ def _require_key(pid: str, settings: Settings) -> str:
 
 
 def chat(pid: str, model: str, system: str, user: str, settings: Settings, json_mode: bool = True,
-         max_tokens: int = 32000, log=None) -> str:
+         max_tokens: int = 32000, log=None, images: list[tuple[str, bytes]] | None = None) -> str:
     """Gửi 1 yêu cầu, trả về văn bản trả lời. Tự thử lại khi lỗi mạng/quá tải."""
     kind = PROVIDERS[pid]["kind"]
     last_err: Exception | None = None
     for attempt in range(4):
         try:
             if kind == "anthropic":
-                return _chat_anthropic(model, system, user, settings, max_tokens, log)
+                return _chat_anthropic(model, system, user, settings, max_tokens, log, images)
             if kind == "gemini":
-                return _chat_gemini(model, system, user, settings, json_mode, max_tokens)
+                return _chat_gemini(model, system, user, settings, json_mode, max_tokens, images)
             if kind == "openai":
-                return _chat_openai(pid, model, system, user, settings, json_mode, max_tokens)
+                return _chat_openai(pid, model, system, user, settings, json_mode, max_tokens, images)
             raise LLMError("Nhà cung cấp không hỗ trợ chat")
         except LLMError:
             raise
@@ -212,7 +212,13 @@ def _check(resp: requests.Response, name: str) -> dict:
     return resp.json()
 
 
-def _chat_openai(pid, model, system, user, settings, json_mode, max_tokens) -> str:
+def _b64(data: bytes) -> str:
+    import base64
+
+    return base64.b64encode(data).decode("ascii")
+
+
+def _chat_openai(pid, model, system, user, settings, json_mode, max_tokens, images=None) -> str:
     base = _base(pid, settings)
     if not base:
         raise LLMError("Chưa nhập Base URL cho nhà cung cấp tùy chỉnh.")
@@ -226,6 +232,13 @@ def _chat_openai(pid, model, system, user, settings, json_mode, max_tokens) -> s
         "model": model,
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
     }
+    if images:
+        parts = []
+        for label, data in images:
+            parts.append({"type": "text", "text": label})
+            parts.append({"type": "image_url", "image_url": {"url": "data:image/jpeg;base64," + _b64(data)}})
+        parts.append({"type": "text", "text": user})
+        body["messages"][1]["content"] = parts
     if json_mode and pid not in ("ollama", "lmstudio", "custom"):
         body["response_format"] = {"type": "json_object"}
     timeout = 900 if pid in ("ollama", "lmstudio") else 600
@@ -241,12 +254,15 @@ def _chat_openai(pid, model, system, user, settings, json_mode, max_tokens) -> s
         raise LLMError(f"Phản hồi lạ: {str(data)[:400]}")
 
 
-def _chat_gemini(model, system, user, settings, json_mode, max_tokens) -> str:
+def _chat_gemini(model, system, user, settings, json_mode, max_tokens, images=None) -> str:
     key = _require_key("gemini", settings)
     url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
     body = {
         "systemInstruction": {"parts": [{"text": system}]},
-        "contents": [{"role": "user", "parts": [{"text": user}]}],
+        "contents": [{"role": "user", "parts": [
+            *[p for label, data in (images or []) for p in
+              ({"text": label}, {"inlineData": {"mimeType": "image/jpeg", "data": _b64(data)}})],
+            {"text": user}]}],
         "generationConfig": {"maxOutputTokens": min(max_tokens, 65536), "temperature": 0.8},
         "safetySettings": [
             {"category": c, "threshold": "BLOCK_ONLY_HIGH"}
@@ -272,7 +288,7 @@ def _chat_gemini(model, system, user, settings, json_mode, max_tokens) -> str:
 _CLAUDE_FALLBACK_MODELS = ("claude-opus-5-5", "claude-opus-5", "claude-sonnet-5-5", "claude-fable-5-2", "claude-fable-5-1")
 
 
-def _chat_anthropic(model, system, user, settings, max_tokens, log) -> str:
+def _chat_anthropic(model, system, user, settings, max_tokens, log, images=None) -> str:
     try:
         import anthropic
     except ImportError as e:
@@ -287,7 +303,11 @@ def _chat_anthropic(model, system, user, settings, max_tokens, log) -> str:
         model=model,
         max_tokens=max_tokens,
         system=system,
-        messages=[{"role": "user", "content": user}],
+        messages=[{"role": "user", "content": user if not images else [
+            *[b for label, data in images for b in
+              ({"type": "text", "text": label},
+               {"type": "image", "source": {"type": "base64", "media_type": "image/jpeg", "data": _b64(data)}})],
+            {"type": "text", "text": user}]}],
     )
     try:
         if model.startswith(_CLAUDE_FALLBACK_MODELS):
