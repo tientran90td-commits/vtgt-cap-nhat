@@ -1,0 +1,5 @@
+# Giọng đọc offline Piper (nhẹ, chạy CPU tốt)
+piper-tts>=1.2
+# Nhân bản giọng nói XTTS-v2 / viXTTS (nặng ~2GB, nên có GPU NVIDIA)
+# Cài torch bản CUDA trước nếu có GPU: https://pytorch.org/get-started/locally/
+coqui-tts>=0.24
