@@ -42,7 +42,17 @@ class Project:
         self.script: dict | None = None
         self.film: dict | None = None        # thông tin phim đã nhận diện
         self.visual: list[dict] | None = None  # mô tả khung hình do AI xem
+        self.overlays: dict | None = None      # quảng cáo chèn cứng + logo cố định (None = chưa dò)
+        self.exclusions: list[list] = []       # đoạn người dùng muốn bỏ: [[start, end], ...]
+        self.episodes: list[dict] = []         # recap season: mốc từng tập trên dòng thời gian gộp
+        self.season_exclusions: list[list] = []  # OP/ED từng tập
         self.load()
+        from .season import load_season_meta
+
+        meta = load_season_meta(self.video)
+        if meta:
+            self.episodes = meta.get("episodes", [])
+            self.season_exclusions = meta.get("exclusions", [])
 
     # ---------------------------------------------------------------- lưu / nạp
     def _p(self, name: str) -> Path:
@@ -50,7 +60,8 @@ class Project:
 
     def load(self) -> None:
         for attr, name in (("transcript", "transcript.json"), ("scenes", "scenes.json"), ("script", "script.json"),
-                           ("film", "film.json"), ("visual", "visual.json")):
+                           ("film", "film.json"), ("visual", "visual.json"), ("overlays", "overlays.json"),
+                           ("exclusions", "exclusions.json")):
             f = self._p(name)
             if f.exists():
                 try:
@@ -68,6 +79,34 @@ class Project:
             film_id.save(self._p("film.json"), self.film)
         if self.visual is not None:
             film_id.save(self._p("visual.json"), self.visual)
+        if self.overlays is not None:
+            film_id.save(self._p("overlays.json"), self.overlays)
+        film_id.save(self._p("exclusions.json"), self.exclusions or [])
+
+    def blocked(self) -> list[list]:
+        """Mọi khoảng không nên dùng làm cảnh: [start, end, loại]."""
+        out = [[a, b, "user"] for a, b, *_ in (self.exclusions or [])]
+        for a, b, *_ in self.season_exclusions or []:
+            ep = next((e for e in self.episodes if abs(e["start"] - a) < 0.5), None)
+            out.append([a, b, "opening" if ep else "ending"])
+        for a, b in (self.overlays or {}).get("ranges", []):
+            out.append([a, b, "overlay"])
+        return out
+
+    def run_overlays(self, log=_noop_log, progress=_noop_progress, cancel=None) -> dict:
+        from .overlays import detect
+
+        cancel = cancel or threading.Event()
+        try:
+            self.overlays = detect(self.video, self.info.duration, self.info.width, self.info.height,
+                                   log, progress, cancel)
+        except Cancelled:
+            raise
+        except Exception as e:  # noqa: BLE001 - chỉ để chọn cảnh sạch hơn, lỗi thì bỏ qua
+            log(f"Lọc quảng cáo chèn lỗi ({e}) - bỏ qua.", level="warn")
+            self.overlays = {"ranges": [], "watermark": None}
+        self.save()
+        return self.overlays
 
     # ---------------------------------------------------------------- các bước
     def run_transcribe(self, log=_noop_log, progress=_noop_progress, cancel=None, subtitle_file=None,
@@ -119,7 +158,8 @@ class Project:
         cancel = cancel or threading.Event()
         opts = self.settings.section("script")
         self.script = script_writer.write_script(self.transcript, self.info.duration, self.settings, opts,
-                                                 log, progress, cancel, self.scenes or [], self.film, self.visual)
+                                                 log, progress, cancel, self.scenes or [], self.film, self.visual,
+                                                 self.episodes, self.blocked())
         self.save()
         return self.script
 
@@ -203,9 +243,14 @@ class Project:
         out_path = Path(out_path) if out_path else self.default_output()
         log("② Dựng video...")
         opts = self.settings.section("render")
+        opts["_target_seconds"] = float(self.settings.get("script", "target_minutes", 5) or 5) * 60
+        if opts.get("avoid_overlays", True) or opts.get("delogo", True):
+            if self.overlays is None:
+                log("Lọc quảng cáo chèn & logo của nguồn...")
+                self.run_overlays(log, lambda p, m="": progress((0.4 if has_narr else 0) + p * 0.05, m), cancel)
         res = editor.render(self.script, self.video, self.info, voices, opts, out_path, self.dir, self.transcript,
                             log, lambda p, m="": progress((0.4 if has_narr else 0) + p * (0.6 if has_narr else 1), m),
-                            cancel)
+                            cancel, blocked=self.blocked(), watermark=(self.overlays or {}).get("watermark"))
         txt = out_path.with_suffix(".txt")
         txt.write_text(script_writer.script_to_text(self.script), encoding="utf-8")
         return res
@@ -238,6 +283,10 @@ class Project:
         if self.settings.get("transcribe", "use_scenes", True) and self.scenes is None:
             log("Bước 3/6: Dò chuyển cảnh")
             self.run_scenes(log, lambda p, m="": progress(0.38 + p * 0.1, m), cancel)
+        ro = self.settings.section("render")
+        if (ro.get("avoid_overlays", True) or ro.get("delogo", True)) and self.overlays is None:
+            log("Lọc quảng cáo chèn & logo của nguồn")
+            self.run_overlays(log, lambda p, m="": progress(0.47 + p * 0.03, m), cancel)
         if ai and not web and sc.get("visual") and not self.visual:
             log("Bước 4/6: AI xem hình ảnh các cảnh")
             try:

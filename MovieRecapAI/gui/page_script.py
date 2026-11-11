@@ -6,7 +6,7 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QDialog, QFileDialog, QFormLayout,
-                               QGroupBox, QHeaderView, QLineEdit, QMessageBox,
+                               QHeaderView, QLineEdit, QMessageBox,
                                QPlainTextEdit, QSplitter, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
 from recap import llm, script_writer, transcribe, tts
@@ -28,11 +28,10 @@ class ScriptPage(Page):
         b = app.binder
         split = QSplitter(Qt.Horizontal)
         # ------------------------------------------------ cột trái: thiết lập
-        left = QWidget()
-        ll = QVBoxLayout(left)
-        ll.setContentsMargins(0, 0, 8, 0)
+        from PySide6.QtWidgets import QTabWidget
 
-        g1 = QGroupBox("① Nhận dạng lời thoại (Speech-to-Text)")
+        self.tabs = QTabWidget()
+        g1 = QWidget()
         f1 = QFormLayout(g1)
         self.stt_engine = b.combo(fill_combo(QComboBox(), transcribe.ENGINES), "transcribe", "engine")
         self.stt_model = b.combo(fill_combo(QComboBox(), transcribe.WHISPER_MODELS), "transcribe", "model")
@@ -56,9 +55,8 @@ class ScriptPage(Page):
                        button("👁 Xem lời thoại", self.show_transcript), "stretch"))
         f1.addRow(self.lb_tr)
         self.stt_engine.currentIndexChanged.connect(self._stt_ui)
-        ll.addWidget(g1)
 
-        g2 = QGroupBox("② AI viết kịch bản")
+        g2 = QWidget()
         f2 = QFormLayout(g2)
         self.provider = b.combo(fill_combo(QComboBox(), {k: v["name"] for k, v in llm.PROVIDERS.items()}),
                                 "script", "provider")
@@ -81,28 +79,56 @@ class ScriptPage(Page):
         f2.addRow("Model", hrow(self.model, button("🔄", self.refresh_models, tip="Lấy danh sách model"),
                                 stretch_last=False))
         f2.addRow(self.lb_prov)
+        f2.addRow(hrow(button("⚡ Lấy key miễn phí → tự động hoàn toàn", self.key_wizard,
+                              tip="Mở trang lấy key Gemini miễn phí, bấm Copy là app tự lưu & dùng"), "stretch"))
+        self.web_inapp = b.check(QCheckBox("Mở trang AI ngay trong app"), "script", "web_inapp")
+        self.btn_login = button("🔐 Đăng nhập AI web", self.web_login, "primary")
+        self.web_row = hrow(self.btn_login, self.web_inapp, "stretch")
+        f2.addRow(self.web_row)
         f2.addRow("Kiểu video", self.mode)
         f2.addRow("Phong cách", self.style)
         f2.addRow("Ngôn ngữ kể", self.lang)
         f2.addRow("Độ dài video", hrow(self.minutes, self.spoiler, "stretch"))
         f2.addRow("Yêu cầu thêm", self.custom)
+        f2.addRow(hrow(button("② AI viết kịch bản", self.do_script, "primary"),
+                       button("⚡ Làm hết + xuất video", self.app.run_all), "stretch"))
+
+        # ---- thẻ Nâng cao
+        g3 = QWidget()
+        f3 = QFormLayout(g3)
+        self.persp = b.combo(fill_combo(QComboBox(), script_writer.PERSPECTIVES), "script", "perspective")
+        self.focus = b.line(QLineEdit(), "script", "focus_character")
+        self.focus.setPlaceholderText("Tên nhân vật (khi kể qua góc nhìn nhân vật)")
+        self.cands = b.spin(spin(1, 3, 1, " phương án"), "script", "candidates")
+        self.cands.setToolTip("AI viết 2-3 kịch bản khác nhau rồi tự chấm điểm & chọn bản hay nhất (tốn thêm lượt AI)")
+        self.lb_ref = muted("")
         self.fallback = b.check(QCheckBox("AI này hết tiền/quá tải → tự chuyển sang AI khác đã nhập key"),
                                 "script", "auto_fallback")
-        f2.addRow(self.fallback)
         self.web_max = b.spin(spin(5000, 1000000, 5000, " ký tự/lần dán"), "script", "web_max_chars")
         self.web_max.setToolTip("Phim dài hơn mức này sẽ được chia thành nhiều lần copy-dán. "
                                 "ChatGPT/Gemini web: 30.000-60.000 · Google AI Studio: 300.000+")
-        f2.addRow("Bản web", self.web_max)
-        self.web_inapp = b.check(QCheckBox("Mở trang AI ngay trong app"), "script", "web_inapp")
-        self.btn_login = button("🔐 Đăng nhập AI web", self.web_login, "primary")
-        self.web_row = hrow(self.btn_login, self.web_inapp, "stretch")
-        f2.addRow(self.web_row)
-        f2.addRow(hrow(button("⚡ Lấy key miễn phí → tự động hoàn toàn", self.key_wizard,
-                              tip="Mở trang lấy key Gemini miễn phí, bấm Copy là app tự lưu & dùng"), "stretch"))
-        f2.addRow(hrow(button("② AI viết kịch bản", self.do_script, "primary"),
-                       button("⚡ Làm hết + xuất video", self.app.run_all), "stretch"))
-        ll.addWidget(g2)
-        ll.addStretch(1)
+        f3.addRow("Góc nhìn người kể", self.persp)
+        f3.addRow("Nhân vật", self.focus)
+        f3.addRow("Số phương án", self.cands)
+        f3.addRow(muted("2-3 phương án: AI viết nhiều bản (mở đầu gắt hơn / kể rõ ràng hơn), chấm điểm độ cuốn hút, "
+                        "độ chính xác, độ dài - rồi chọn bản hay nhất."))
+        f3.addRow("Học phong cách", hrow(button("🎯 Chọn video recap mẫu", self.pick_style_ref, "primary"),
+                                         button("✕ Bỏ", self.clear_style_ref), "stretch"))
+        f3.addRow(self.lb_ref)
+        f3.addRow(self.fallback)
+        f3.addRow("Bản web", self.web_max)
+
+        def top(w):  # dồn các ô lên trên, không giãn cách khi cửa sổ cao
+            box = QWidget()
+            v = QVBoxLayout(box)
+            v.setContentsMargins(8, 8, 8, 8)
+            v.addWidget(w)
+            v.addStretch(1)
+            return scroll(box)
+        self.tabs.addTab(top(g1), "① Lời thoại")
+        self.tabs.addTab(top(g2), "② AI viết kịch bản")
+        self.tabs.addTab(top(g3), "⚙️ Nâng cao")
+        self.tabs.setCurrentIndex(1)
         self.model.setMinimumWidth(220)
 
         # ------------------------------------------------ cột phải: kịch bản
@@ -145,9 +171,8 @@ class ScriptPage(Page):
         rl.addWidget(hrow(self.lb_est, "stretch", button("📂 Mở", self.open_script),
                           button("💾 Lưu", self.save_script), button("📄 TXT", self.export_txt),
                           button("Tiếp: Giọng đọc →", lambda: self.app.goto(2), "primary")))
-        sa = scroll(left)
-        sa.setMinimumWidth(450)
-        split.addWidget(sa)
+        self.tabs.setMinimumWidth(450)
+        split.addWidget(self.tabs)
         split.addWidget(right)
         split.setStretchFactor(0, 4)
         split.setStretchFactor(1, 7)
@@ -157,6 +182,7 @@ class ScriptPage(Page):
         self.audio = AudioPlayer(self, on_error=lambda m: app.log(m, "warn"), on_info=app.log)
         self._provider_changed(init=True)
         self._stt_ui()
+        self._ref_label()
 
     # ------------------------------------------------ UI helpers
     def _stt_ui(self):
@@ -191,6 +217,33 @@ class ScriptPage(Page):
             lb = self.web_max.parentWidget().layout().labelForField(self.web_max)
             if lb:
                 lb.setVisible(pid == "web")
+
+    def _ref_label(self):
+        ref = self.app.settings.get("script", "style_ref")
+        self.lb_ref.setText(f"🎯 Đang học theo: {ref['name']} · {ref['wps']} từ/giây · cảnh ~{ref['avg_cut']}s · "
+                            f"{ref['target_minutes']} phút" if ref else
+                            "Chọn 1 video recap bạn thích (vd video review đang viral): app đo nhịp đọc, độ dài cảnh, "
+                            "giọng văn để AI viết theo phong cách đó (không chép nội dung).")
+
+    def pick_style_ref(self):
+        f, _ = QFileDialog.getOpenFileName(self, "Video recap mẫu", "", "Video (*.mp4 *.mkv *.mov *.webm *.avi)")
+        if not f:
+            return
+        from recap import style_ref
+
+        def done(ref):
+            self.app.settings.set("script", "style_ref", ref)
+            self.app.settings.save()
+            self._ref_label()
+            if QMessageBox.question(self, "Độ dài video", f"Video mẫu dài {ref['target_minutes']} phút. Đặt độ dài recap "
+                                    "giống video mẫu?") == QMessageBox.Yes:
+                self.minutes.setValue(max(0.5, ref["target_minutes"]))
+        self.app.run_task(style_ref.analyze, f, self.app.settings, on_done=done, title="Học phong cách video mẫu")
+
+    def clear_style_ref(self):
+        self.app.settings.set("script", "style_ref", None)
+        self.app.settings.save()
+        self._ref_label()
 
     def web_login(self):
         from .web_chat import LoginDialog
@@ -305,6 +358,10 @@ class ScriptPage(Page):
             if c == 0:
                 it.setFlags(it.flags() & ~Qt.ItemIsEditable)
                 it.setTextAlignment(Qt.AlignCenter)
+            if c == 3 and s.get("sentences"):
+                it.setData(Qt.UserRole, s["sentences"])  # mốc phim từng câu (khớp tiếng-hình theo câu)
+                it.setToolTip("🎯 Khớp hình theo từng câu:\n" + "\n".join(
+                    f"{fmt_ts(x['start'])} · {x['text']}" for x in s["sentences"]))
             self.table.setItem(r, c, it)
         cb = QComboBox()
         cb.addItem("— cách đọc chung —", "")
@@ -323,8 +380,15 @@ class ScriptPage(Page):
             if en <= st:
                 en = st + 8
             cb = self.table.cellWidget(r, TONE_COL)
-            segs.append({"start": st, "end": en, "narration": g(3).strip(), "scene": g(5).strip(),
-                         "tone": (cb.currentData() if cb else "") or ""})
+            seg = {"start": st, "end": en, "narration": g(3).strip(), "scene": g(5).strip(),
+                   "tone": (cb.currentData() if cb else "") or ""}
+            sents = self.table.item(r, 3).data(Qt.UserRole) if self.table.item(r, 3) else None
+            if sents:
+                from recap.footage import valid_sentences
+
+                if valid_sentences(dict(seg, sentences=sents)):
+                    seg["sentences"] = sents
+            segs.append(seg)
         return {"title": self.title.text().strip(), "description": self.desc.text().strip(), "segments": segs}
 
     def _commit(self):

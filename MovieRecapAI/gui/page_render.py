@@ -8,7 +8,7 @@ from pathlib import Path
 
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices, QFont
-from PySide6.QtWidgets import (QCheckBox, QComboBox, QFontComboBox, QFormLayout, QGridLayout, QGroupBox,
+from PySide6.QtWidgets import (QTabWidget, QCheckBox, QComboBox, QFontComboBox, QFormLayout, QGridLayout, QGroupBox,
                                QLineEdit, QMessageBox, QVBoxLayout, QWidget)
 
 from recap import editor
@@ -33,14 +33,14 @@ class RenderPage(Page):
                          "các đoạn đã dựng được lưu lại nên sửa 1 đoạn rồi xuất lại sẽ rất nhanh.")
         b = app.binder
         s = app.settings
-        body = QWidget()
-        grid = QGridLayout(body)
-        grid.setContentsMargins(0, 0, 0, 0)
 
         pre = QGroupBox("⚡ Mẫu nhanh")
         pl = hrow(*[button(v[0], lambda _=False, k=k: self.apply_preset(k)) for k, v in PRESETS.items()], "stretch")
         QVBoxLayout(pre).addWidget(pl)
-        grid.addWidget(pre, 0, 0, 1, 2)
+        tabs = QTabWidget()
+        t1, t2, t3 = QWidget(), QWidget(), QWidget()
+        l1, l2, l3 = QGridLayout(t1), QGridLayout(t2), QVBoxLayout(t3)
+        l1.addWidget(pre, 0, 0, 1, 2)
 
         g1 = QGroupBox("🖼️ Khung hình")
         f1 = QFormLayout(g1)
@@ -49,7 +49,8 @@ class RenderPage(Page):
         self.height_ = b.combo(fill_combo(QComboBox(), {720: "720p (HD)", 1080: "1080p (Full HD)",
                                                          1440: "1440p (2K)", 2160: "2160p (4K)"}),
                                "render", "height", int)
-        self.fps = b.combo(fill_combo(QComboBox(), {24: "24 fps", 25: "25 fps", 30: "30 fps", 60: "60 fps"}),
+        self.fps = b.combo(fill_combo(QComboBox(), {"source": "Giống phim gốc", 24: "24 fps", 25: "25 fps",
+                                                     30: "30 fps", 60: "60 fps"}),
                            "render", "fps", int)
         self.encoder = b.combo(fill_combo(QComboBox(), editor.ENCODERS), "render", "encoder")
         self.quality = b.spin(spin(14, 32, 1), "render", "quality")
@@ -60,7 +61,7 @@ class RenderPage(Page):
         f1.addRow("Khung hình/giây", self.fps)
         f1.addRow("Bộ mã hóa", hrow(self.encoder, button("🔍 Kiểm tra GPU", self.check_gpu)))
         f1.addRow("Chất lượng (CRF)", self.quality)
-        grid.addWidget(g1, 1, 0)
+        l1.addWidget(g1, 1, 0)
 
         g2 = QGroupBox("🔊 Âm thanh")
         f2 = QFormLayout(g2)
@@ -80,7 +81,7 @@ class RenderPage(Page):
         f2.addRow("Âm lượng nhạc", self.mv)
         f2.addRow("Khớp cảnh", self.fit)
         f2.addRow("Nghỉ giữa các đoạn", self.gap)
-        grid.addWidget(g2, 1, 1)
+        l2.addWidget(g2, 0, 0)
 
         g3 = QGroupBox("💬 Phụ đề")
         f3 = QFormLayout(g3)
@@ -105,7 +106,7 @@ class RenderPage(Page):
         f3.addRow("Màu chữ / viền", hrow(self.color, self.ocolor, self.outline, "stretch"))
         f3.addRow("Vị trí", hrow(self.pos, self.maxc, "stretch"))
         f3.addRow(self.orig)
-        grid.addWidget(g3, 2, 0)
+        l1.addWidget(g3, 1, 1)
 
         g4 = QGroupBox("🏷️ Tiêu đề && logo")
         f4 = QFormLayout(g4)
@@ -124,7 +125,37 @@ class RenderPage(Page):
         f4.addRow("Hiện trong", self.tsec)
         f4.addRow("Logo", self.logo)
         f4.addRow("Vị trí / kích thước", hrow(self.lpos, self.lscale, "stretch"))
-        grid.addWidget(g4, 2, 1)
+        l2.addWidget(g4, 0, 1)
+        gfx = QGroupBox("✨ Hiệu ứng && âm lượng")
+        ffx = QFormLayout(gfx)
+        self.trans = b.combo(fill_combo(QComboBox(), {"fade": "Mờ dần nhẹ giữa các đoạn (mượt)", "cut": "Cắt thẳng"}),
+                             "render", "transition")
+        ffx.addRow("Chuyển cảnh", self.trans)
+        ffx.addRow(b.check(QCheckBox("Cân bằng âm lượng tổng (-16 LUFS, to đều như YouTube)"), "render", "loudnorm"))
+        l2.addWidget(gfx, 1, 0, 1, 2)
+        l2.setRowStretch(2, 1)
+        l2.setColumnStretch(0, 1)
+        l2.setColumnStretch(1, 1)
+
+        gs = QGroupBox("🎯 Chọn cảnh thông minh")
+        fs = QVBoxLayout(gs)
+        for key, text, tip in (
+                ("sentence_sync", "Khớp hình theo TỪNG CÂU thuyết minh (mỗi câu chiếu đúng khoảnh khắc nó kể)",
+                 "AI gán mốc phim cho từng câu; app chia giọng đọc theo khoảng lặng giữa các câu"),
+                ("no_reuse", "Không lặp lại cảnh đã chiếu (tự lấy cảnh mới gần đó)", ""),
+                ("avoid_overlays", "Tránh đoạn có quảng cáo / chữ chèn cứng của web phim", "Tự dò lớp chèn đứng yên"),
+                ("delogo", "Che mờ logo / watermark cố định của nguồn (tự phát hiện)", ""),
+                ("final_qa", "Kiểm tra video sau khi xuất: màn hình đen, đứng hình, âm lượng", "")):
+            cb = b.check(QCheckBox(text), "render", key)
+            cb.setToolTip(tip)
+            fs.addWidget(cb)
+        fs.addWidget(muted("Đoạn cần bỏ qua (intro, OP/ED, cảnh nhạy cảm...) nhập ở Bước 1 → ô 'Bỏ qua đoạn'. "
+                           "Sau khi xuất, kết quả kiểm tra nằm cạnh video (file .qa.json) và trong nhật ký."))
+        l3.addWidget(gs)
+        l3.addStretch(1)
+        tabs.addTab(scroll(t1), "🖼️ Khung hình && phụ đề")
+        tabs.addTab(scroll(t2), "🔊 Âm thanh, logo && hiệu ứng")
+        tabs.addTab(scroll(t3), "🎯 Chọn cảnh thông minh")
 
         g5 = QGroupBox("📦 Xuất file")
         f5 = QFormLayout(g5)
@@ -140,10 +171,11 @@ class RenderPage(Page):
         f5.addRow(hrow(self.btn_go, button("📂 Mở thư mục", self.open_dir), button("▶ Xem video", self.play_last),
                        button("🧹 Xóa bản dựng tạm", self.clear_cache), "stretch"))
         f5.addRow(self.lb_out)
-        grid.addWidget(g5, 3, 0, 1, 2)
-        grid.setColumnStretch(0, 1)
-        grid.setColumnStretch(1, 1)
-        self.root.addWidget(scroll(body), 1)
+        l1.setColumnStretch(0, 1)
+        l1.setColumnStretch(1, 1)
+        l1.setRowStretch(2, 1)
+        self.root.addWidget(tabs, 1)
+        self.root.addWidget(g5)
         self.last_output: Path | None = None
 
     def apply_preset(self, key):

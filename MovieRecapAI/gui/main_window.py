@@ -241,6 +241,7 @@ class MainWindow(QMainWindow):
 
     def refresh(self):
         self.pages[0].refresh_state()
+        self.pages[0].refresh_guard()
         if self.project:
             self.lb_proj.setText(f"Đang mở:\n{Path(self.project.video).name}")
 

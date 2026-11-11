@@ -69,7 +69,11 @@ DEFAULTS: dict = {
         "max_chars": 150000,
         "web_max_chars": 60000,
         "web_inapp": True,       # chế độ web: mở trang AI ngay trong app (đăng nhập 1 lần)  # chế độ bản web: số ký tự tối đa mỗi lần dán
-        "auto_fallback": True,   # AI chính hết tiền/quá tải -> tự chuyển sang AI khác đã nhập key
+        "auto_fallback": True,
+        "perspective": "omniscient",  # góc nhìn người kể
+        "focus_character": "",
+        "candidates": 1,          # số phương án kịch bản (AI chấm & chọn bản hay nhất)
+        "style_ref": None,        # phong cách học từ video mẫu   # AI chính hết tiền/quá tải -> tự chuyển sang AI khác đã nhập key
         "identify": True,        # tự nhận diện phim (tên, nhân vật) trước khi viết kịch bản
         "visual": False,         # AI xem hình ảnh các cảnh để chọn cảnh chính xác hơn
         "mode": "narrate",
@@ -120,6 +124,13 @@ DEFAULTS: dict = {
         "logo_position": "top-right",
         "logo_scale": 0.12,
         "gap": 0.25,
+        "sentence_sync": True,   # khớp tiếng-hình theo từng câu
+        "no_reuse": True,        # không lặp lại cảnh đã chiếu
+        "avoid_overlays": True,  # tránh đoạn có quảng cáo/chữ chèn cứng của web phim
+        "delogo": True,          # che mờ logo/watermark cố định của nguồn
+        "transition": "fade",    # cut | fade - chuyển cảnh mềm giữa các đoạn
+        "loudnorm": True,        # cân bằng âm lượng tổng (-16 LUFS)
+        "final_qa": True,        # kiểm tra màn hình đen / đứng hình / âm lượng sau khi xuất
     },
     "ui": {"last_dir": "", "auto_install": True, "preload": True},
     "config_version": 3,

@@ -233,11 +233,19 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     Path(path).write_text(header + "\n".join(events) + "\n", encoding="utf-8")
 
 
-def transcript_to_text(segments: list[dict], merge_seconds: float = 8.0) -> str:
-    """Gộp các câu thoại ngắn thành dòng có mốc thời gian để gửi cho AI."""
+def transcript_to_text(segments: list[dict], merge_seconds: float = 8.0, episodes: list | None = None) -> str:
+    """Gộp các câu thoại ngắn thành dòng có mốc thời gian để gửi cho AI (recap season: chèn tiêu đề từng tập)."""
     lines = []
     cur_start, cur_end, buf = None, 0.0, []
+    eps = sorted(episodes or [], key=lambda e: e["start"]) if episodes and len(episodes) > 1 else []
+    ep_i = 0
     for s in segments:
+        while ep_i < len(eps) and s["start"] >= eps[ep_i]["start"] - 0.01:
+            if buf and cur_start is not None:
+                lines.append(f"[{fmt_ts(cur_start)} - {fmt_ts(cur_end)}] {' '.join(buf)}")
+                cur_start, buf = None, []
+            lines.append(f"=== {eps[ep_i]['title']} ===")
+            ep_i += 1
         if cur_start is None:
             cur_start = s["start"]
         buf.append(s["text"])

@@ -25,6 +25,11 @@ Phim dài ──► 🔍 Nhận diện phim ──► ① Nhận dạng lời th
 | **Tinh chỉnh giọng** | Tốc độ, cao độ (nửa cung), âm lượng, cảm xúc/phong cách, nghe thử ngay |
 | **🎭 Cách đọc** | Tự nhiên, hài hước, hoạt ngôn, nghiêm túc/tin tức, kịch tính, kinh dị, buồn, sôi nổi, ấm áp, gay gắt, thiếu nhi hoặc tự mô tả · AI gán cách đọc **riêng cho từng đoạn** theo cảm xúc cảnh (sửa được trong bảng kịch bản) · OpenAI/Gemini/Azure/ElevenLabs đọc theo cảm xúc thật, các công cụ khác được chỉnh nhịp & cao độ cho hợp |
 | **🔍 Nhận diện phim** | AI nhận ra phim từ tên file + 7 khung hình + lời thoại (tên phim, năm, nhân vật, nội dung) · đối chiếu **TMDB** (tùy chọn) để lấy tên nhân vật chuẩn · gợi ý tên riêng cho Whisper nghe đúng · **AI xem hình ảnh** các cảnh để chọn clip chính xác · bạn sửa/bổ sung được |
+| **🎯 Khớp hình theo câu** | Mỗi câu thuyết minh chiếu đúng khoảnh khắc nó kể. AI gán mốc phim cho từng câu, app chia giọng đọc theo khoảng lặng thật giữa các câu, **không lặp lại cảnh đã chiếu**, tự lấy cảnh mới gần đó |
+| **🛡️ Nguồn từ web phim** | Tự dò **quảng cáo / chữ chèn cứng** (lớp đứng yên trong khi hình phim thay đổi) và tránh các đoạn đó; tự phát hiện **logo/watermark cố định** và che mờ; ô *Bỏ qua đoạn* cho intro, cảnh không muốn dùng |
+| **📚 Recap cả season** | Gộp nhiều tập (tự sắp theo số tập) thành 1 video recap, AI kể theo thứ tự tập, tự bỏ OP/ED của mỗi tập |
+| **🏁 Nhiều phương án** | AI viết 2–3 kịch bản (mở đầu gắt hơn / kể rõ ràng hơn), tự chấm điểm cuốn hút + độ chính xác + độ dài, rồi chọn bản hay nhất · **góc nhìn người kể** (toàn tri / qua mắt nhân vật / thám tử / reviewer) · **học phong cách từ video recap mẫu** (nhịp đọc, độ dài cảnh, giọng văn) |
+| **✅ Kiểm tra thành phẩm** | Sau khi xuất: phát hiện màn hình đen, cảnh đứng hình lâu (dễ bị coi là trình chiếu ảnh), âm lượng, độ dài so với mục tiêu · **cân bằng âm lượng** -16 LUFS · chuyển cảnh mờ dần nhẹ · khung hình/giây giống phim gốc |
 | **⚡ Mở là dùng ngay** | Màn hình khởi động · mở app là tự chạy nền: cài phần còn thiếu, tải model nhận dạng thoại, nạp sẵn model giọng đọc vào RAM, chọn model AI mới nhất, dò GPU (AMD AMF / NVIDIA / Intel) - không khóa giao diện, tiến độ hiện ở góc dưới · bật/tắt ở mục Cài đặt |
 | **🧩 Tự cài đặt** | Tự kiểm tra & tải những gì còn thiếu: thư viện, FFmpeg bản đầy đủ, model Whisper, model VieNeu, giọng Piper tiếng Việt · nút **🩺 Chẩn đoán giọng đọc** & **🔔 Thử loa** · file log để gửi khi gặp lỗi |
 | **🗣️ Phát âm chuẩn** | ⭐ **VieNeu-TTS**: AI giọng Việt offline, 25 giọng 3 miền, nhân bản giọng từ mẫu 3–8 giây · tự đọc đúng số, số thập phân, %, tiền tệ, ngày tháng, giờ, khoảng, tỷ số, đơn vị, số La Mã, chữ viết tắt · **từ điển phát âm** do bạn định nghĩa · **AI soát phát âm** (viết lại câu cho dễ đọc, phiên âm tên nước ngoài) · phụ đề vẫn giữ chữ gốc |
@@ -128,6 +133,14 @@ python main.py --cli "https://www.youtube.com/watch?v=..." --subtitle phim.srt -
 | [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg) | BSD-2 | FFmpeg dự phòng |
 | [Ollama](https://github.com/ollama/ollama) | MIT | Chạy LLM offline |
 
+## 💡 Tham khảo ý tưởng
+
+Một số cơ chế được **tự viết lại** dựa trên ý tưởng từ các dự án sau (không sao chép mã nguồn):
+
+- [hulkbetii/recap](https://github.com/hulkbetii/recap) (chưa có giấy phép): khớp tiếng–hình theo câu, không lặp cảnh, dò lớp chèn cứng, recap theo season, bỏ OP/ED.
+- [zcbacxc/movie-narrator](https://github.com/zcbacxc/movie-narrator) (AGPL-3.0): chạy nhiều phương án rồi chấm điểm, học phong cách từ video mẫu, góc nhìn người kể, kiểm tra video cuối.
+- [danberlyne/recap-video-generator](https://github.com/danberlyne/recap-video-generator) (MIT): chuyển cảnh mềm và chuẩn hóa âm lượng khi ghép clip.
+
 ## 🗂️ Cấu trúc mã nguồn
 
 ```
@@ -144,6 +157,12 @@ MovieRecapAI/
 │   ├── textnorm.py         # phát âm chuẩn: đọc số/ngày/đơn vị, từ điển, AI soát phát âm
 │   ├── film_id.py          # nhận diện phim, TMDB, AI xem hình ảnh cảnh phim
 │   ├── components.py       # tự kiểm tra & cài thư viện, FFmpeg, model
+│   ├── footage.py          # chọn cảnh theo câu, không lặp cảnh, né đoạn bị chặn
+│   ├── overlays.py         # dò quảng cáo chèn cứng & logo cố định
+│   ├── season.py           # gộp nhiều tập -> recap cả season
+│   ├── style_ref.py        # học phong cách từ video recap mẫu
+│   ├── qa.py               # kiểm tra video thành phẩm
+│   ├── warmup.py           # chuẩn bị nền khi mở app
 │   ├── subtitles.py        # đọc/ghi SRT, ASS
 │   ├── editor.py           # dựng video
 │   └── pipeline.py         # quản lý dự án, chuỗi xử lý, tải video
@@ -151,7 +170,7 @@ MovieRecapAI/
 └── tests/test_pipeline.py  # kiểm thử end-to-end offline
 ```
 
-Chạy kiểm thử: `python tests/test_pipeline.py`, `python tests/test_textnorm.py`, `python tests/test_features.py`, `python tests/test_piper.py`. Bài kiểm thử tạo phim giả lập, giả lập AI và giọng đọc, rồi dựng ra video 16:9, 9:16 và highlight.
+Chạy kiểm thử: `python tests/test_pipeline.py`, `python tests/test_textnorm.py`, `python tests/test_features.py`, `python tests/test_piper.py`, `python tests/test_recap_mech.py`. Bài kiểm thử tạo phim giả lập, giả lập AI và giọng đọc, rồi dựng ra video 16:9, 9:16 và highlight.
 
 ## ⚖️ Lưu ý bản quyền
 

@@ -81,16 +81,29 @@ def encoder_args(enc: str, quality: int) -> list[str]:
     return ["-c:v", "libx264", "-preset", "veryfast", "-crf", q]
 
 
-def _video_chain(W: int, H: int, fill: str, speed: float, fps: int) -> str:
-    pre = f"setpts=PTS/{speed:.4f}," if abs(speed - 1) > 0.001 else ""
+def _delogo(box, sw: int, sh: int) -> str:
+    """Che mờ logo/watermark cố định của nguồn (box = tỉ lệ x0,y0,x1,y1)."""
+    if not box or not sw or not sh:
+        return ""
+    x0, y0 = int(box[0] * sw), int(box[1] * sh)
+    x1, y1 = int(box[2] * sw), int(box[3] * sh)
+    x0, y0 = max(1, x0), max(1, y0)
+    x1, y1 = min(sw - 2, x1), min(sh - 2, y1)
+    if x1 - x0 < 4 or y1 - y0 < 4:
+        return ""
+    return f"delogo=x={x0}:y={y0}:w={x1 - x0}:h={y1 - y0},"
+
+
+def _video_chain(W: int, H: int, fill: str, speed: float, fps: int, src: str = "[0:v]", pre_filter: str = "") -> str:
+    pre = pre_filter + (f"setpts=PTS/{speed:.4f}," if abs(speed - 1) > 0.001 else "")
     if fill == "crop":
-        core = f"[0:v]{pre}scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}"
+        core = f"{src}{pre}scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}"
     elif fill == "pad":
-        core = (f"[0:v]{pre}scale={W}:{H}:force_original_aspect_ratio=decrease,"
+        core = (f"{src}{pre}scale={W}:{H}:force_original_aspect_ratio=decrease,"
                 f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:color=black")
     else:
         bw, bh = max(2, W // 4 // 2 * 2), max(2, H // 4 // 2 * 2)
-        core = (f"[0:v]{pre}split=2[bgs][fgs];"
+        core = (f"{src}{pre}split=2[bgs][fgs];"
                 f"[bgs]scale={bw}:{bh}:force_original_aspect_ratio=increase,crop={bw}:{bh},boxblur=8:2,"
                 f"scale={W}:{H},eq=brightness=-0.08[bg];"
                 f"[fgs]scale={W}:{H}:force_original_aspect_ratio=decrease[fg];"
@@ -108,11 +121,25 @@ def _logo_xy(pos: str) -> str:
 
 
 def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, out_path: Path, work_dir: Path,
-           transcript: list[dict] | None, log, progress, cancel) -> Path:
-    """voices[i] = đường dẫn WAV giọng đọc của đoạn i, hoặc None nếu đoạn giữ âm thanh gốc."""
+           transcript: list[dict] | None, log, progress, cancel, blocked=None, watermark=None) -> Path:
+    """voices[i] = đường dẫn WAV giọng đọc của đoạn i, hoặc None nếu đoạn giữ âm thanh gốc.
+    blocked: các khoảng không được dùng (quảng cáo chèn, OP/ED, đoạn người dùng bỏ).
+    watermark: {"box": [...]} logo cố định của nguồn để che mờ."""
+    from .footage import Footage, sentence_durations, valid_sentences
+
     segs = script["segments"]
+    # blocked: [[start, end, loại]] loại = overlay (quảng cáo chèn) | opening | ending | user
+    use_blocked = [r for r in (blocked or []) if opts.get("avoid_overlays", True) or (len(r) < 3 or r[2] != "overlay")]
+    footage = Footage(info.duration, use_blocked, no_reuse=opts.get("no_reuse", True))
+    pre_filter = _delogo((watermark or {}).get("box"), info.width, info.height) if opts.get("delogo", True) else ""
+    synced = 0
     W, H = output_size(info, opts.get("aspect", "16:9"), int(opts.get("height", 1080)))
-    fps = int(opts.get("fps", 30))
+    fps_opt = opts.get("fps", 30)
+    if str(fps_opt) == "source":  # giữ nhịp khung hình gốc (làm tròn về chuẩn gần nhất)
+        src_fps = info.fps or 30
+        fps = min((24, 25, 30, 50, 60), key=lambda f: abs(f - src_fps)) if src_fps else 30
+    else:
+        fps = int(fps_opt)
     if opts.get("encoder", "auto") == "auto":
         best_encoder(log)
     enc = encoder_args(opts.get("encoder", "auto"), int(opts.get("quality", 21)))
@@ -142,22 +169,43 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
         src_start = float(seg["start"])
         src_end = float(seg["end"])
         speed = 1.0
+        sents = valid_sentences(seg) if (voice and opts.get("sentence_sync", True)) else None
+        sent_durs = None
         if voice:
             vdur = media_duration(voice)
             dur = vdur + gap + 0.1
-            if opts.get("fit") == "speed":
-                speed = max(0.75, min(1.5, (src_end - src_start) / dur))
-            need = dur * speed
+            if sents:
+                # Khớp tiếng-hình theo câu: mỗi câu chiếu đúng khoảnh khắc nó kể
+                speech = sentence_durations(str(voice), [x["text"] for x in sents], vdur)
+                sent_durs = list(speech)
+                sent_durs[0] += 0.1   # giọng bắt đầu trễ 0.1s
+                sent_durs[-1] += gap  # khoảng nghỉ cuối đoạn
+                pieces = []
+                for sx, d in zip(sents, sent_durs):
+                    a = float(sx.get("start", src_start))
+                    b = float(sx.get("end", a + d))
+                    pieces.append((footage.place(a, d, b), d))
+                synced += 1
+            else:
+                if opts.get("fit") == "speed":
+                    speed = max(0.75, min(1.5, (src_end - src_start) / dur))
+                need = dur * speed
+                pieces = [(footage.place(src_start, need, src_end), need)]
         else:
             vdur = 0.0
             dur = max(1.0, min(90.0, src_end - src_start))
-            need = dur
-        if src_start + need > info.duration:
-            src_start = max(0.0, info.duration - need - 0.05)
+            pieces = [(footage.place(src_start, dur, src_end), dur)]
+        src_start = pieces[0][0]
+        need = sum(d for _a, d in pieces)
         # Phụ đề của đoạn (thời gian tính từ đầu đoạn)
         subs: list[dict] = []
         if opts.get("subtitles", True):
-            if voice and seg.get("narration"):
+            if voice and sents and sent_durs:
+                off = 0.1
+                for sx, d in zip(sents, speech):
+                    subs += timed_chunks(sx["text"], d, max_chars, offset=off)
+                    off += d
+            elif voice and seg.get("narration"):
                 subs = timed_chunks(seg["narration"], vdur, max_chars, offset=0.1)
             elif not voice and transcript and opts.get("sub_original", True):
                 for t in transcript:
@@ -171,11 +219,13 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
         for s in subs:
             all_subs.append({"start": s["start"] + t_global, "end": s["end"] + t_global, "text": s["text"]})
 
-        key = hashlib.sha1(json.dumps([seg, str(voice), voice and Path(voice).stat().st_size, src_start, need, dur,
+        key = hashlib.sha1(json.dumps([seg, str(voice), voice and Path(voice).stat().st_size, pieces, need, dur,
+                                       pre_filter,
                                        speed, W, H, fps, enc, opts.get("fill"), style, subs, title, logo,
                                        opts.get("logo_position"), opts.get("logo_scale"),
                                        opts.get("orig_volume_voice"), opts.get("orig_volume_clip"),
-                                       opts.get("voice_volume"), video], ensure_ascii=False,
+                                       opts.get("voice_volume"), opts.get("transition", "fade"), video],
+                                      ensure_ascii=False,
                                       default=str).encode()).hexdigest()[:12]
         part = parts_dir / f"seg_{i:03d}_{key}.mp4"
         part_files.append(part)
@@ -186,8 +236,10 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
         for old in parts_dir.glob(f"seg_{i:03d}_*.mp4"):
             old.unlink(missing_ok=True)
 
-        args = ["-ss", f"{src_start:.3f}", "-t", f"{need + 0.2:.3f}", "-i", video]
-        idx = 1
+        args = []
+        for a, d in pieces:
+            args += ["-ss", f"{a:.3f}", "-t", f"{d + 0.2:.3f}", "-i", video]
+        idx = len(pieces)
         voice_idx = logo_idx = None
         if voice:
             args += ["-i", str(voice)]
@@ -197,7 +249,21 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
             args += ["-i", logo]
             logo_idx = idx
             idx += 1
-        fc = _video_chain(W, H, opts.get("fill", "blur"), speed, fps)
+        if len(pieces) > 1:  # ghép các cảnh của từng câu thành 1 đoạn
+            fc = ""
+            for k, (_a, d) in enumerate(pieces):
+                fc += f"[{k}:v]trim=duration={d:.3f},setpts=PTS-STARTPTS,fps={fps},setsar=1[pv{k}];"
+                if info.has_audio:
+                    fc += f"[{k}:a]atrim=duration={d:.3f},asetpts=PTS-STARTPTS,aresample=48000[pa{k}];"
+            if info.has_audio:
+                fc += "".join(f"[pv{k}][pa{k}]" for k in range(len(pieces))) + \
+                    f"concat=n={len(pieces)}:v=1:a=1[cv][ca];"
+            else:
+                fc += "".join(f"[pv{k}]" for k in range(len(pieces))) + f"concat=n={len(pieces)}:v=1:a=0[cv];"
+            vsrc, asrc = "[cv]", "[ca]"
+        else:
+            fc, vsrc, asrc = "", "[0:v]", "[0:a]"
+        fc += _video_chain(W, H, opts.get("fill", "blur"), speed, fps, vsrc, pre_filter)
         ass_name = None
         if subs or title:
             ass_name = f"seg_{i:03d}.ass"
@@ -207,6 +273,9 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
             fc += f"[vb];[{logo_idx}:v]scale={lw}:-1,format=rgba[lg];[vb][lg]overlay={_logo_xy(opts.get('logo_position'))}"
         if ass_name:
             fc += f",subtitles=filename={ass_name}"
+        if opts.get("transition", "fade") == "fade" and dur > 1.0:  # chuyển cảnh mềm giữa các đoạn
+            fd = 0.12
+            fc += f",fade=t=in:st=0:d={fd},fade=t=out:st={max(0.0, dur - fd):.3f}:d={fd}"
         fc += ",format=yuv420p[v]"
         # Âm thanh
         ov_voice = float(opts.get("orig_volume_voice", 0.12))
@@ -218,13 +287,13 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
         if voice_idx is not None:
             vchain = f"[{voice_idx}:a]adelay=100|100,volume={vv:.3f},apad[va]"
             if info.has_audio and ov_voice > 0:
-                fc += (f";[0:a]{tempo}aresample=48000,volume={ov_voice:.3f},apad[oa];{vchain};"
+                fc += (f";{asrc}{tempo}aresample=48000,volume={ov_voice:.3f},apad[oa];{vchain};"
                        f"[oa][va]amix=inputs=2:normalize=0:duration=longest[a]")
             else:
                 fc += f";{vchain.replace('[va]', '[a]')}"
         else:
             if info.has_audio:
-                fc += f";[0:a]{tempo}aresample=48000,volume={ov_clip:.3f},afade=t=in:d=0.15,apad[a]"
+                fc += f";{asrc}{tempo}aresample=48000,volume={ov_clip:.3f},afade=t=in:d=0.15,apad[a]"
             else:
                 fc += ";anullsrc=r=48000:cl=stereo[a]"
         args += ["-filter_complex", fc, "-map", "[v]", "-map", "[a]", "-t", f"{dur:.3f}", *enc,
@@ -243,20 +312,50 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
     out_path = Path(out_path)
     out_path.parent.mkdir(parents=True, exist_ok=True)
     music = opts.get("music") or ""
+    # cân bằng âm lượng tổng về chuẩn -16 LUFS (to đều, không lúc to lúc nhỏ)
+    norm = ",loudnorm=I=-16:TP=-1.5:LRA=11,aresample=48000" if opts.get("loudnorm", True) else ""
     if music and Path(music).exists():
         progress(0.98, "Trộn nhạc nền")
         mv = float(opts.get("music_volume", 0.15))
         fade_st = max(0.0, t_global - 3)
         run_ffmpeg(["-i", str(joined), "-stream_loop", "-1", "-i", music, "-filter_complex",
                     f"[1:a]aresample=48000,volume={mv:.3f},afade=t=in:d=1.5,afade=t=out:st={fade_st:.2f}:d=3[m];"
-                    f"[0:a][m]amix=inputs=2:normalize=0:duration=first[a]",
+                    f"[0:a][m]amix=inputs=2:normalize=0:duration=first{norm}[a]",
                     "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "192k",
                     "-t", f"{t_global:.3f}", "-movflags", "+faststart", str(out_path)], cancel=cancel, log=log)
+    elif norm:
+        progress(0.98, "Cân bằng âm lượng")
+        run_ffmpeg(["-i", str(joined), "-map", "0:v", "-map", "0:a", "-c:v", "copy", "-af", norm.lstrip(","),
+                    "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out_path)], cancel=cancel, log=log)
     else:
         run_ffmpeg(["-i", str(joined), "-c", "copy", "-movflags", "+faststart", str(out_path)], cancel=cancel, log=log)
     joined.unlink(missing_ok=True)
     if all_subs:
         write_srt(all_subs, out_path.with_suffix(".srt"))
+    st = footage.stats
+    qa = {"segments": len(segs), "sentence_synced_segments": synced, "pieces": st["pieces"],
+          "reused_seconds": round(st["reused_s"], 1), "blocked_seconds_used": round(st["blocked_s"], 1),
+          "moved_to_fresh_footage": st["moved"], "duration": round(t_global, 1), "delogo": bool(pre_filter)}
+    if opts.get("final_qa", True):
+        progress(0.99, "Kiểm tra chất lượng video")
+        try:
+            from .qa import check_output
+
+            fq = check_output(str(out_path), opts.get("_target_seconds"))
+            qa["final"] = fq
+            for w in fq["warnings"]:
+                log("⚠️ QA: " + w, level="warn")
+            if fq["ok"]:
+                log(f"✅ QA video: không màn hình đen/đứng hình bất thường · âm lượng {fq['loudness_lufs']} LUFS")
+        except Exception as e:  # noqa: BLE001
+            log(f"Bỏ qua kiểm tra chất lượng ({e}).", level="warn")
+    (work_dir / "render_qa.json").write_text(json.dumps(qa, ensure_ascii=False, indent=2), encoding="utf-8")
+    try:
+        out_path.with_suffix(".qa.json").write_text(json.dumps(qa, ensure_ascii=False, indent=2), encoding="utf-8")
+    except OSError:
+        pass
+    log(f"QA dựng: {synced}/{len(segs)} đoạn khớp hình theo câu · {st['pieces']} cảnh · lặp cảnh {st['reused_s']:.0f}s"
+        f" · dính đoạn bị chặn {st['blocked_s']:.0f}s" + (" · đã che logo nguồn" if pre_filter else ""))
     progress(1.0, "Hoàn tất")
     log(f"✅ Đã xuất video: {out_path}  ({t_global:.1f} giây)")
     return out_path
