@@ -2,6 +2,7 @@
 
 Engine:
   faster_whisper : offline, mã nguồn mở (SYSTRAN/faster-whisper), chạy CPU hoặc GPU NVIDIA.
+  whisper_gpu    : offline, whisper.cpp bản Vulkan - chạy trên card AMD/Intel/NVIDIA.
   openai         : OpenAI Whisper API (whisper-1).
   groq           : Groq Whisper large-v3 (rất nhanh, có gói miễn phí).
   subtitle       : dùng file phụ đề có sẵn (.srt/.vtt/.ass).
@@ -22,6 +23,7 @@ from .subtitles import parse_subtitle_file
 
 ENGINES = {
     "faster_whisper": "Whisper offline (faster-whisper) - miễn phí",
+    "whisper_gpu": "⚡ Whisper bằng card đồ họa AMD/Intel/NVIDIA (whisper.cpp Vulkan)",
     "groq": "Groq Whisper API - nhanh, có gói free",
     "openai": "OpenAI Whisper API",
     "subtitle": "Dùng file phụ đề có sẵn (.srt/.vtt/.ass)",
@@ -80,12 +82,21 @@ def transcribe(video: str, work_dir: Path, settings: Settings, engine: str, log,
         return _embedded(video, work_dir, log, cancel)
 
     duration = media_duration(video)
-    if engine == "faster_whisper":
+    if engine in ("faster_whisper", "whisper_gpu"):
         wav = work_dir / "audio_16k.wav"
         if not wav.exists():
             log("Đang tách âm thanh...")
             extract_audio(video, str(wav), cancel=cancel, total=duration,
                           on_progress=lambda p: progress(p * 0.1, "Tách âm thanh"))
+        if engine == "whisper_gpu":
+            from . import whisper_gpu
+
+            m = model if model and model != "auto" else "large-v3-turbo"
+            try:
+                return whisper_gpu.transcribe(str(wav), duration, settings, m, lang, log, progress, cancel, prompt,
+                                              work_dir=work_dir)
+            except whisper_gpu.WhisperGPUError as e:
+                log(f"Whisper GPU chưa dùng được ({e}) - chuyển sang faster-whisper (CPU).", level="warn")
         return _faster_whisper(str(wav), duration, settings, resolve_model(model, device), lang, device, log,
                                progress, cancel, prompt)
     if engine in ("openai", "groq"):

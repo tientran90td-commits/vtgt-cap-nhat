@@ -27,6 +27,10 @@ Phim dài ──► 🔍 Nhận diện phim ──► ① Nhận dạng lời th
 | **🔍 Nhận diện phim** | AI nhận ra phim từ tên file + 7 khung hình + lời thoại (tên phim, năm, nhân vật, nội dung) · đối chiếu **TMDB** (tùy chọn) để lấy tên nhân vật chuẩn · gợi ý tên riêng cho Whisper nghe đúng · **AI xem hình ảnh** các cảnh để chọn clip chính xác · bạn sửa/bổ sung được |
 | **🎯 Khớp hình theo câu** | Mỗi câu thuyết minh chiếu đúng khoảnh khắc nó kể. AI gán mốc phim cho từng câu, app chia giọng đọc theo khoảng lặng thật giữa các câu, **không lặp lại cảnh đã chiếu**, tự lấy cảnh mới gần đó |
 | **🛡️ Nguồn từ web phim** | Tự dò **quảng cáo / chữ chèn cứng** (lớp đứng yên trong khi hình phim thay đổi) và tránh các đoạn đó; tự phát hiện **logo/watermark cố định** và che mờ; ô *Bỏ qua đoạn* cho intro, cảnh không muốn dùng |
+| **⚡ Nhận dạng thoại bằng card AMD** | Engine *Whisper bằng card đồ họa* dùng [whisper.cpp](https://github.com/ggml-org/whisper.cpp) bản Vulkan: chạy trên card AMD/Intel/NVIDIA (vd RX 5700 XT), nhanh hơn CPU nhiều lần · lỗi thì tự quay về faster-whisper |
+| **🎯 Khung dọc bám nhân vật** | Lấp khung *Bám theo khuôn mặt*: phim ngang → video dọc 9:16, khung cắt tự dò khuôn mặt (không có mặt thì bám vùng có chuyển động) và lia mượt theo nhân vật |
+| **🖼 Thumbnail tự động** | Chấm điểm khung hình trong các cảnh được dùng (độ nét, khuôn mặt, tương phản, màu), chèn tiêu đề chữ to: ảnh 1280×720, ảnh dọc 1080×1920 + 2 phương án phụ |
+| **📣 Tiêu đề, mô tả, chương** | AI viết 3 tiêu đề, chữ cho thumbnail, mô tả, hashtag, tag và **mốc chương YouTube** đúng thời điểm trong video → file `.youtube.txt`, nút *Sao chép tất cả* |
 | **💬 Phụ đề gốc in cứng** | Tự phát hiện Vietsub/phụ đề in sẵn trong hình rồi: **làm mờ** dải phụ đề · **phủ dải tối** · **cắt bỏ** phần dưới · **né** (đưa phụ đề của app lên trên) · hoặc **🧠 xóa sạch bằng AI** qua [video-subtitle-remover](https://github.com/YaoFANGUK/video-subtitle-remover) (chỉ xử lý các cảnh được dùng trong recap, có bản cho card AMD) |
 | **🎙️ 1 giọng đồng nhất** | Mặc định cả video giữ đúng 1 giọng: cảm xúc từng đoạn chỉ nhích nhẹ tốc độ, không đổi cao độ/phong cách giọng · tắt tiếng phim gốc khi đang thuyết minh (không lẫn giọng nhân vật) |
 | **🔄 Cập nhật trong app** | Nút **Cập nhật** ở góc trái dưới: tự kiểm tra bản mới, tải & cài đè (giữ nguyên cài đặt, API key, giọng đã tải), sao lưu bản cũ và **khôi phục** được nếu cần |
@@ -138,6 +142,8 @@ python main.py --cli "https://www.youtube.com/watch?v=..." --subtitle phim.srt -
 | [anthropic-sdk-python](https://github.com/anthropics/anthropic-sdk-python), [requests](https://github.com/psf/requests) | MIT, Apache-2.0 | Kết nối AI |
 | [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg) | BSD-2 | FFmpeg dự phòng |
 | [Ollama](https://github.com/ollama/ollama) | MIT | Chạy LLM offline |
+| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | MIT | Nhận dạng thoại bằng card đồ họa (Vulkan) |
+| [Pillow](https://github.com/python-pillow/Pillow) | MIT-CMU | Vẽ ảnh thumbnail |
 | [video-subtitle-remover](https://github.com/YaoFANGUK/video-subtitle-remover) | Apache-2.0 | (tùy chọn, cài riêng) Xóa phụ đề in cứng bằng AI, gọi qua dòng lệnh |
 
 ## 💡 Tham khảo ý tưởng
@@ -167,6 +173,9 @@ MovieRecapAI/
 │   ├── footage.py          # chọn cảnh theo câu, không lặp cảnh, né đoạn bị chặn
 │   ├── overlays.py         # dò quảng cáo chèn cứng, logo cố định & phụ đề in cứng
 │   ├── vsr.py              # gọi video-subtitle-remover xóa phụ đề bằng AI
+│   ├── whisper_gpu.py      # nhận dạng thoại bằng card đồ họa (whisper.cpp Vulkan)
+│   ├── reframe.py          # khung dọc bám khuôn mặt / nhân vật
+│   ├── publish.py          # thumbnail, tiêu đề, mô tả, hashtag, mốc chương
 │   ├── updater.py          # cập nhật tool từ GitHub, sao lưu & khôi phục
 │   ├── season.py           # gộp nhiều tập -> recap cả season
 │   ├── style_ref.py        # học phong cách từ video recap mẫu

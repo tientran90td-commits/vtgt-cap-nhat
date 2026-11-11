@@ -108,6 +108,33 @@ def main():
     fit_d = probe(p.run_render(tmp / "out" / "fit.mp4")).duration
     assert fit_d > base_d + 3, (base_d, fit_d)
     print(f"ép thời lượng: {base_d:.1f}s → {fit_d:.1f}s (mục tiêu 30s, ước tính kịch bản {est:.1f}s)")
+    # Thumbnail + tiêu đề/mô tả/mốc chương (AI giả lập)
+    from recap import publish
+
+    def meta_chat(pid, model, system, user, settings, **k):
+        assert "Segments:" in user and "[0]" in user
+        return json.dumps({"titles": ["Căn phòng bí ẩn và cái kết không ai ngờ", "B", "C"], "thumb_text": "CĂN PHÒNG BÍ ẨN",
+                           "description": "Mô tả hấp dẫn.", "hashtags": ["#recap", "phimhay"], "tags": ["phim"],
+                           "chapters": [{"seg": 0, "title": "Mở đầu"}, {"seg": 1, "title": "Thoại gốc"},
+                                        {"seg": 2, "title": "Bí mật"}]}, ensure_ascii=False)
+    llm.chat = meta_chat
+    s.set("script", "provider", "gemini")
+    s.set("render", "fit_duration", False)
+    s.set("script", "target_minutes", 5)
+    out = p.run_render(tmp / "out" / "pub.mp4")
+    yt = out.with_suffix(".youtube.txt").read_text(encoding="utf-8")
+    assert "Căn phòng bí ẩn" in yt and "CĂN PHÒNG BÍ ẨN" in yt and "#phimhay" in yt, yt
+    assert "Mốc thời gian" not in yt  # video 15s: chương < 10s không hợp lệ với YouTube -> bỏ
+    from PIL import Image
+    th = [out.with_name(out.stem + x) for x in ("_thumb.jpg", "_thumb_doc.jpg")]
+    assert Image.open(th[0]).size == (1280, 720) and Image.open(th[1]).size == (1080, 1920)
+    chs = [{"seg": 0, "title": "A"}, {"seg": 1, "title": "B"}, {"seg": 2, "title": "C"}, {"seg": 3, "title": "D"}]
+    ch = publish.chapters_from(chs, [[0, 0, 40], [1, 40, 30], [2, 70, 5], [3, 75, 40]], 115)
+    assert ch == [(0.0, "A"), (40.0, "B"), (70.0, "C")] or ch == [(0.0, "A"), (40.0, "B"), (75.0, "D")], ch
+    m = publish.make_metadata(p.script, None, [[0, 0, 40], [1, 40, 30], [2, 70, 40]], 110, s)
+    assert [c[1] for c in m["chapter_marks"]] == ["Mở đầu", "Thoại gốc", "Bí mật"], m["chapter_marks"]
+    assert "00:00 Mở đầu" in publish.metadata_text(m) and "01:10 Bí mật" in publish.metadata_text(m)
+    print("thumbnail + tiêu đề:", yt.splitlines()[1], "·", [x.name for x in th])
     # Chế độ không AI
     s.set("script", "provider", "none")
     s.set("script", "target_minutes", 1)

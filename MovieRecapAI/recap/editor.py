@@ -16,7 +16,8 @@ ASPECTS = {
     "4:5": "Dọc 4:5 (Instagram feed)",
     "original": "Giữ tỉ lệ gốc của phim",
 }
-FILLS = {"blur": "Nền mờ (blur) lấp khoảng trống", "crop": "Cắt cúp cho đầy khung", "pad": "Viền đen"}
+FILLS = {"face": "🎯 Cắt đầy khung, bám theo khuôn mặt nhân vật (khuyên dùng cho TikTok)",
+         "blur": "Nền mờ (blur) lấp khoảng trống", "crop": "Cắt cúp giữa khung cho đầy", "pad": "Viền đen"}
 ENCODERS = {
     "auto": "Tự động (dùng GPU nếu có: NVIDIA/AMD/Intel)",
     "libx264": "CPU - H.264 (tương thích nhất)",
@@ -94,9 +95,12 @@ def _delogo(box, sw: int, sh: int) -> str:
     return f"delogo=x={x0}:y={y0}:w={x1 - x0}:h={y1 - y0},"
 
 
-def _video_chain(W: int, H: int, fill: str, speed: float, fps: int, src: str = "[0:v]", pre_filter: str = "") -> str:
+def _video_chain(W: int, H: int, fill: str, speed: float, fps: int, src: str = "[0:v]", pre_filter: str = "",
+                 face_crop: str = "") -> str:
     pre = pre_filter + (f"setpts=PTS/{speed:.4f}," if abs(speed - 1) > 0.001 else "")
-    if fill == "crop":
+    if fill == "face" and face_crop:
+        core = f"{src}{pre}{face_crop}scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}"
+    elif fill in ("crop", "face"):
         core = f"{src}{pre}scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}"
     elif fill == "pad":
         core = (f"{src}{pre}scale={W}:{H}:force_original_aspect_ratio=decrease,"
@@ -255,6 +259,7 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
     all_subs: list[dict] = []
     t_global = 0.0
     part_files = []
+    timeline: list[list] = []  # [chỉ số đoạn, giây bắt đầu trong video xuất, thời lượng]
     for i, seg in enumerate(segs):
         if cancel.is_set():
             raise Cancelled()
@@ -334,7 +339,19 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
                 except Exception as e:  # noqa: BLE001
                     vsr_ok = False
                     log(f"Không xóa được phụ đề bằng AI ({e}) - chuyển sang làm mờ dải phụ đề.", level="warn")
-        key = hashlib.sha1(json.dumps([seg, str(voice), voice and Path(voice).stat().st_size, pieces, need, dur,
+        # Cắt khung bám khuôn mặt (khi tỉ lệ khung đích khác phim gốc)
+        face_crop, fkeys = "", None
+        if opts.get("fill") == "face" and info.width and info.height and \
+                abs(info.width / info.height - W / H) > 0.05:
+            from . import reframe
+            try:
+                fkeys = reframe.concat_keys(
+                    [(reframe.track(video, a, d + 0.2, info.width, info.height, parts_dir / "reframe"), d)
+                     for a, d in pieces], speed)
+                face_crop = reframe.crop_filter(fkeys, W, H)
+            except Exception as e:  # noqa: BLE001
+                log(f"Không dò được khuôn mặt ({e}) - cắt giữa khung.", level="warn")
+        key = hashlib.sha1(json.dumps([seg, str(voice), voice and Path(voice).stat().st_size, pieces, need, dur, fkeys,
                                        pre_filter, hardsub, seg_hs, srcs,
                                        speed, W, H, fps, enc, opts.get("fill"), style, subs, title, logo,
                                        opts.get("logo_position"), opts.get("logo_scale"),
@@ -344,6 +361,7 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
                                       default=str).encode()).hexdigest()[:12]
         part = parts_dir / f"seg_{i:03d}_{key}.mp4"
         part_files.append(part)
+        timeline.append([i, round(t_global, 2), round(dur, 2)])
         t_global += dur
         if part.exists() and part.stat().st_size > 1000:
             log(f"Đoạn {i + 1}: dùng lại bản đã dựng.", level="debug")
@@ -386,7 +404,7 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
             vsrc, pf = "[dl]", ""
         hs_graph, vsrc, hs_extra = _hardsub_filters(hardsub, seg_hs, info.width, info.height, vsrc)
         fc += hs_graph
-        fc += _video_chain(W, H, opts.get("fill", "blur"), speed, fps, vsrc, pf + hs_extra)
+        fc += _video_chain(W, H, opts.get("fill", "blur"), speed, fps, vsrc, pf + hs_extra, face_crop)
         ass_name = None
         if subs or title:
             ass_name = f"seg_{i:03d}.ass"
@@ -460,7 +478,7 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
           "reused_seconds": round(st["reused_s"], 1), "blocked_seconds_used": round(st["blocked_s"], 1),
           "moved_to_fresh_footage": st["moved"], "duration": round(t_global, 1), "delogo": bool(pre_filter),
           "hardsub": hs_mode if hardsub else "none",
-          "fit": {k: fit[k] for k in ("clip_k", "tempo", "drop")}}
+          "fit": {k: fit[k] for k in ("clip_k", "tempo", "drop")}, "timeline": timeline}
     if opts.get("final_qa", True):
         progress(0.99, "Kiểm tra chất lượng video")
         try:

@@ -46,6 +46,11 @@ class ScriptPage(Page):
         f1.addRow("Ngôn ngữ phim", self.stt_lang)
         f1.addRow("Thiết bị", self.stt_dev)
         f1.addRow("File phụ đề", self.sub_file)
+        self.wcpp_dir = PathPicker("dir", placeholder="(để trống = app tự tải) thư mục chứa whisper-cli.exe")
+        self.wcpp_dir.setText(self.app.settings.get("transcribe", "wcpp_dir", ""))
+        self.wcpp_dir.changed.connect(lambda v: self.app.settings.set("transcribe", "wcpp_dir", v))
+        self.wcpp_dir.setToolTip("whisper.cpp bản Vulkan: chạy nhận dạng thoại bằng card AMD/Intel/NVIDIA")
+        f1.addRow("whisper.cpp", self.wcpp_dir)
         f1.addRow(self.scenes)
         f1.addRow(muted("Mẹo: 'Tự chọn' dùng large-v3-turbo (chính xác cao) nếu máy có GPU NVIDIA hoặc CPU từ 8 luồng. "
                         "Máy không có card NVIDIA mà muốn nhanh: dùng Groq Whisper API (miễn phí). "
@@ -188,8 +193,9 @@ class ScriptPage(Page):
     def _stt_ui(self):
         e = self.stt_engine.currentData()
         self.sub_file.setEnabled(e == "subtitle")
-        self.stt_model.setEnabled(e == "faster_whisper")
+        self.stt_model.setEnabled(e in ("faster_whisper", "whisper_gpu"))
         self.stt_dev.setEnabled(e == "faster_whisper")
+        self.wcpp_dir.setEnabled(e == "whisper_gpu")
 
     def _provider_changed(self, *_a, init=False):
         pid = self.provider.currentData()

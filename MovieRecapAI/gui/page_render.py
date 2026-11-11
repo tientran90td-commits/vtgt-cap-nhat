@@ -7,9 +7,10 @@ import sys
 from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import QDesktopServices, QFont
-from PySide6.QtWidgets import (QTabWidget, QCheckBox, QComboBox, QFontComboBox, QFormLayout, QGridLayout, QGroupBox,
-                               QLineEdit, QMessageBox, QVBoxLayout, QWidget)
+from PySide6.QtGui import QDesktopServices, QFont, QPixmap
+from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QFontComboBox, QFormLayout, QGridLayout,
+                               QGroupBox, QHBoxLayout, QLabel, QLineEdit, QMessageBox, QPlainTextEdit, QTabWidget,
+                               QVBoxLayout, QWidget)
 
 from recap import editor
 from recap.ffmpeg_utils import encoder_works
@@ -17,7 +18,7 @@ from recap.ffmpeg_utils import encoder_works
 from .widgets import ColorButton, Page, PathPicker, button, fill_combo, hrow, muted, reveal, scroll, spin
 
 PRESETS = {
-    "tiktok": ("📱 TikTok / Reels / Shorts", {"aspect": "9:16", "fill": "blur", "height": 1080, "fps": 30,
+    "tiktok": ("📱 TikTok / Reels / Shorts", {"aspect": "9:16", "fill": "face", "height": 1080, "fps": 30,
                                              "sub_position": "middle", "sub_size": 60}),
     "youtube": ("▶️ YouTube ngang", {"aspect": "16:9", "fill": "blur", "height": 1080, "fps": 30,
                                      "sub_position": "bottom", "sub_size": 52}),
@@ -214,7 +215,13 @@ class RenderPage(Page):
         self.auto_open = b.check(QCheckBox("Xuất xong tự mở thư mục chứa video"), "render", "open_folder_after")
         f5.addRow(hrow(self.btn_go, button("📂 Mở thư mục", self.open_dir), button("▶ Xem video", self.play_last),
                        button("🧹 Xóa bản dựng tạm", self.clear_cache), "stretch"))
-        f5.addRow(hrow(self.lb_out, "stretch", self.auto_open))
+        self.pub_thumbs = b.check(QCheckBox("Tự tạo thumbnail"), "render", "publish_thumbs")
+        self.pub_meta = b.check(QCheckBox("AI viết tiêu đề, mô tả, hashtag, mốc chương"), "render", "publish_meta")
+        f5.addRow(hrow(self.pub_thumbs, self.pub_meta,
+                       button("📣 Xem tiêu đề && thumbnail", self.show_publish,
+                              tip="Xem/sao chép tiêu đề, mô tả, hashtag, mốc chương; tạo lại thumbnail"),
+                       "stretch", self.auto_open))
+        f5.addRow(self.lb_out)
         l1.setColumnStretch(0, 1)
         l1.setColumnStretch(1, 1)
         l1.setRowStretch(2, 1)
@@ -301,6 +308,21 @@ class RenderPage(Page):
         else:
             reveal(self.app.settings.output_dir())
 
+    def show_publish(self):
+        if not self.last_output or not self.last_output.exists():
+            QMessageBox.information(self, "Chưa có video", "Hãy XUẤT VIDEO trước - thumbnail và tiêu đề được tạo cho "
+                                    "video vừa xuất.")
+            return
+        txt = self.last_output.with_suffix(".youtube.txt")
+        if txt.exists() and self.last_output.with_name(self.last_output.stem + "_thumb.jpg").exists():
+            PublishDialog(self, self.last_output).exec()
+            return
+        p = self.app.require_project()
+        if not p:
+            return
+        self.app.run_task(p.run_publish, self.last_output, on_done=lambda _r: PublishDialog(self, self.last_output).exec(),
+                          title="Tạo thumbnail & tiêu đề")
+
     def on_show(self):
         v = float(self.app.settings.get("script", "target_minutes", 5) or 5)
         if abs(self.minutes.value() - v) > 1e-6:
@@ -381,3 +403,65 @@ class RenderPage(Page):
             QMessageBox.information(self, "Đã cài VSR", f"Đã cài xong VSR tại:\n{path}\n\nĐã chọn chế độ "
                                     "🧠 Xóa sạch bằng AI.")
         self.app.run_task(vsr.install, self.app.settings, on_done=done, title="Cài VSR")
+
+
+class PublishDialog(QDialog):
+    """Xem & sao chép tiêu đề, mô tả, hashtag, mốc chương + xem trước thumbnail."""
+
+    def __init__(self, page, video: Path):
+        super().__init__(page)
+        self.page, self.video = page, Path(video)
+        self.setWindowTitle("📣 Đăng video: tiêu đề, mô tả & thumbnail")
+        self.resize(1100, 720)
+        lay = QHBoxLayout(self)
+        left = QVBoxLayout()
+        self.text = QPlainTextEdit()
+        f = self.video.with_suffix(".youtube.txt")
+        self.text.setPlainText(f.read_text(encoding="utf-8") if f.exists() else "")
+        left.addWidget(self.text, 1)
+        left.addWidget(hrow(button("📋 Sao chép tất cả", self.copy_all, "primary"),
+                            button("🔄 AI viết lại", lambda: self.regen(thumbs=False, meta=True)),
+                            button("🖼 Tạo lại thumbnail", lambda: self.regen(thumbs=True, meta=False)),
+                            button("📂 Mở thư mục", lambda: reveal(self.video)), "stretch"))
+        lay.addLayout(left, 3)
+        self.thumbs = QVBoxLayout()
+        right = QWidget()
+        right.setLayout(self.thumbs)
+        lay.addWidget(scroll(right), 2)
+        self.load_thumbs()
+
+    def load_thumbs(self):
+        while self.thumbs.count():
+            w = self.thumbs.takeAt(0).widget()
+            if w:
+                w.deleteLater()
+        stem = self.video.with_suffix("")
+        for suf in ("_thumb.jpg", "_thumb_2.jpg", "_thumb_3.jpg", "_thumb_doc.jpg"):
+            p = Path(f"{stem}{suf}")
+            if not p.exists():
+                continue
+            pm = QPixmap(str(p))
+            lb = QLabel()
+            lb.setPixmap(pm.scaledToWidth(360 if "doc" not in suf else 200, Qt.SmoothTransformation))
+            lb.setToolTip(str(p))
+            self.thumbs.addWidget(lb)
+            self.thumbs.addWidget(muted(p.name))
+        self.thumbs.addStretch(1)
+
+    def copy_all(self):
+        QApplication.clipboard().setText(self.text.toPlainText())
+        self.page.app.log("Đã sao chép tiêu đề, mô tả, hashtag vào bộ nhớ tạm.")
+
+    def regen(self, thumbs: bool, meta: bool):
+        p = self.page.app.require_project()
+        if not p:
+            return
+
+        def done(_r):
+            f = self.video.with_suffix(".youtube.txt")
+            if f.exists():
+                self.text.setPlainText(f.read_text(encoding="utf-8"))
+            self.load_thumbs()
+        self.page.app.run_task(p.run_publish, self.video, thumbs=thumbs, meta=meta, on_done=done,
+                               title="Tạo thumbnail & tiêu đề")
+

@@ -281,7 +281,22 @@ class Project:
                             hardsub=(self.overlays or {}).get("hardsub"))
         txt = out_path.with_suffix(".txt")
         txt.write_text(script_writer.script_to_text(self.script), encoding="utf-8")
+        if opts.get("publish_thumbs", True) or opts.get("publish_meta", True):
+            progress(0.995, "Tạo thumbnail & tiêu đề")
+            try:
+                self.run_publish(res, log, thumbs=opts.get("publish_thumbs", True),
+                                 meta=opts.get("publish_meta", True))
+            except Cancelled:
+                raise
+            except Exception as e:  # noqa: BLE001
+                log(f"Chưa tạo được thumbnail/tiêu đề ({e}) - video vẫn đã xuất xong.", level="warn")
         return res
+
+    def run_publish(self, out_video, log=_noop_log, progress=_noop_progress, cancel=None, thumbs=True, meta=True) -> dict:
+        """Thumbnail + tiêu đề, mô tả, hashtag, mốc chương cho video đã xuất."""
+        from . import publish
+
+        return publish.prepare(self, Path(out_video), log, thumbs=thumbs, meta=meta)
 
     def run_all(self, log=_noop_log, progress=_noop_progress, cancel=None, subtitle_file=None,
                 out_path=None) -> Path:

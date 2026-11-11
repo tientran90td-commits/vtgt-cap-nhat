@@ -451,6 +451,56 @@ def check_config_migration():
     print("✓ nâng cấp cấu hình")
 
 
+def check_whisper_gpu(s: Settings):
+    """whisper.cpp (Vulkan): gọi whisper-cli, đọc tiến độ + tên card, đọc JSON kết quả đúng định dạng whisper.cpp."""
+    import threading
+
+    from recap import whisper_gpu
+
+    bindir = TMP / "wcpp"
+    bindir.mkdir(exist_ok=True)
+    exe = bindir / "whisper-cli"
+    exe.write_text(f"""#!{sys.executable}
+import json, sys
+a = sys.argv
+out = a[a.index("-of") + 1]
+assert a[a.index("-l") + 1] == "vi" and "-m" in a and "--prompt" in a
+print("ggml_vulkan: Found 1 Vulkan devices:", file=sys.stderr)
+print("ggml_vulkan: 0 = AMD Radeon RX 5700 XT (AMD proprietary driver) | uma: 0 | fp16: 1", file=sys.stderr)
+for p in (10, 50, 100):
+    print(f"whisper_print_progress_callback: progress = {{p:3d}}%", file=sys.stderr)
+json.dump({{"transcription": [
+    {{"offsets": {{"from": 1000, "to": 3500}}, "text": " Xin chào anh Cobb."}},
+    {{"offsets": {{"from": 4000, "to": 4000}}, "text": " [BLANK_AUDIO]"}},
+    {{"offsets": {{"from": 5200, "to": 8000}}, "text": " Giấc mơ này là thật sao?"}}]}},
+    open(out + ".json", "w", encoding="utf-8"), ensure_ascii=False)
+""", encoding="utf-8")
+    exe.chmod(0o755)
+    s.set("transcribe", "wcpp_dir", str(bindir))
+    mdir = s.models_dir() / "whisper.cpp" / "models"
+    mdir.mkdir(parents=True, exist_ok=True)
+    (mdir / "ggml-large-v3-turbo-q8_0.bin").write_bytes(b"0" * 11_000_000)
+    wav = TMP / "a16k.wav"
+    run_ffmpeg(["-f", "lavfi", "-i", "sine=duration=9", "-ac", "1", "-ar", "16000", str(wav)])
+    logs, prog = [], []
+    segs = whisper_gpu.transcribe(str(wav), 9.0, s, "large-v3-turbo", "vi", lambda m, level="info": logs.append(m),
+                                  lambda p, m="": prog.append(p), threading.Event(), prompt="Inception, Cobb",
+                                  work_dir=TMP)
+    assert [x["text"] for x in segs] == ["Xin chào anh Cobb.", "Giấc mơ này là thật sao?"], segs
+    assert segs[0]["start"] == 1.0 and segs[1]["end"] == 8.0
+    assert any("RX 5700 XT" in m for m in logs) and max(prog) == 1.0, logs
+    s.set("transcribe", "wcpp_dir", str(TMP / "khong-co"))
+    old = whisper_gpu.tool_dir
+    whisper_gpu.tool_dir = lambda _s: TMP / "khong-co-2"
+    try:
+        assert whisper_gpu.find_exe(s) is None or "whisper-cli" in str(whisper_gpu.find_exe(s))
+    finally:
+        whisper_gpu.tool_dir = old
+        s.set("transcribe", "wcpp_dir", "")
+    assert "whisper_gpu" in transcribe.ENGINES
+    print("✓ Whisper bằng card đồ họa (whisper.cpp Vulkan): tiến độ, tên card, đọc kết quả")
+
+
 def main():
     s = Settings(TMP / "s.json")
     s.set("paths", "workspace", str(TMP / "ws"))
@@ -462,6 +512,7 @@ def main():
     check_model_fallback(s)
     check_rate_limits(s)
     check_components(s)
+    check_whisper_gpu(s)
     check_vision_payloads(s)
     check_tmdb(s)
     check_film_and_script(s)

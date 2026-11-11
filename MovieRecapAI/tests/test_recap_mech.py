@@ -291,6 +291,56 @@ print("done", a.inpaint_mode)
           f"{before:.3f} → {after:.3f} · không báo nhầm video không phụ đề")
 
 
+def check_reframe(s: Settings):
+    """Khung dọc 9:16 bám theo 'khuôn mặt' (ô vuông sáng chạy từ trái sang phải)."""
+    import cv2
+
+    from recap import reframe
+
+    vid = TMP / "moving.mp4"
+    run_ffmpeg(["-f", "lavfi", "-i", "color=c=0x202020:size=1280x720:rate=25:duration=12", "-f", "lavfi", "-i",
+                "color=c=white:size=140x160:rate=25:duration=12", "-f", "lavfi", "-i", "sine=duration=12",
+                "-filter_complex", "[0:v][1:v]overlay=x='80+t*80':y=280[v]", "-map", "[v]", "-map", "2:a",
+                "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-shortest", str(vid)])
+
+    def fake_faces(g):  # "mặt" = vùng trắng
+        ys, xs = np.where(g > 200)
+        return [(int(xs.min()), int(ys.min()), int(np.ptp(xs)) + 1, int(np.ptp(ys)) + 1)] if len(xs) else []
+    keys = reframe.track(str(vid), 0, 10, 1280, 720, detector=fake_faces)
+    assert keys[0][1] < 0.25 and keys[-1][1] > 0.6, keys  # khung lia theo nhân vật
+    # dò mặt thật (OpenCV) trên hình không có người: không lỗi, về giữa / vùng chi tiết
+    assert reframe.track(str(vid), 0, 3, 1280, 720)
+    old = reframe.faces
+    reframe.faces = fake_faces
+    try:
+        p = Project(str(vid), s)
+        p.overlays = {"ranges": [], "watermark": None, "hardsub": None, "version": 2}
+        p.script = {"title": "t", "segments": [{"start": 0, "end": 10, "narration": ""}]}
+        s.set("render", "aspect", "9:16")
+        s.set("render", "subtitles", False)
+        s.set("render", "fit_duration", False)
+        res = {}
+        for fill in ("face", "crop"):
+            s.set("render", "fill", fill)
+            out = p.run_render(TMP / "out" / f"rf_{fill}.mp4", log=NOLOG)
+            xs = []
+            for t in (1.0, 8.0):
+                f = TMP / "rf.png"
+                run_ffmpeg(["-ss", str(t), "-i", str(out), "-frames:v", "1", str(f)])
+                g = cv2.imread(str(f), cv2.IMREAD_GRAYSCALE)
+                ys_, xs_ = np.where(g > 200)
+                xs.append(xs_.mean() / g.shape[1] if len(xs_) > 50 else None)
+            res[fill] = xs
+        assert all(x is not None and 0.2 < x < 0.8 for x in res["face"]), res  # nhân vật luôn nằm trong khung
+        assert any(x is None or not 0.2 < x < 0.8 for x in res["crop"]), res   # cắt giữa thì lạc mất
+    finally:
+        reframe.faces = old
+        s.set("render", "aspect", "16:9")
+        s.set("render", "fill", "blur")
+        s.set("render", "subtitles", True)
+    print(f"✓ khung dọc bám nhân vật: vị trí trong khung {res['face']} (cắt giữa: {res['crop']})")
+
+
 def main():
     s = Settings(TMP / "s.json")
     s.set("paths", "workspace", str(TMP / "ws"))
@@ -303,6 +353,7 @@ def main():
     check_season(s)
     check_candidates_style(vid, s)
     check_hardsub(s)
+    check_reframe(s)
     print("OK", TMP)
 
 

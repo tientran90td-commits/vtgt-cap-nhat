@@ -56,6 +56,8 @@ DEFAULTS: dict = {
         "model": "auto",
         "language": "auto",
         "device": "auto",
+        "wcpp_dir": "",  # thư mục whisper.cpp (whisper-cli.exe) tự chọn
+        "wcpp_url": "",  # link tải bản dựng whisper.cpp Vulkan khác (để trống = mặc định)
         "use_scenes": True,
     },
     "script": {
@@ -134,6 +136,8 @@ DEFAULTS: dict = {
         "vsr_mode": "sttn-auto",
         "fit_duration": True,  # ép video thành phẩm vừa thời lượng mục tiêu
         "open_folder_after": True,  # xuất xong tự mở thư mục chứa video
+        "publish_thumbs": True,  # xuất xong tự tạo ảnh thumbnail
+        "publish_meta": True,  # xuất xong AI viết tiêu đề, mô tả, hashtag, mốc chương
         "transition": "fade",    # cut | fade - chuyển cảnh mềm giữa các đoạn
         "loudnorm": True,        # cân bằng âm lượng tổng (-16 LUFS)
         "final_qa": True,        # kiểm tra màn hình đen / đứng hình / âm lượng sau khi xuất
