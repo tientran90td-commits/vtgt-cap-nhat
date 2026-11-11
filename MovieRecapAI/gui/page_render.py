@@ -16,7 +16,7 @@ from recap import editor
 from recap.publish import extra
 from recap.ffmpeg_utils import encoder_works
 
-from .widgets import ColorButton, Page, PathPicker, button, fill_combo, hrow, muted, reveal, scroll, spin
+from .widgets import ColorButton, Page, PathPicker, button, fill_combo, hrow, muted, reveal, scroll, spin, sub_toggle
 
 # thiết lập không đưa vào "mẫu của tôi" (phụ thuộc máy)
 PRESET_SKIP = {"vsr_dir", "encoder"}
@@ -157,6 +157,7 @@ class RenderPage(Page):
         self.bold = b.check(QCheckBox("Chữ đậm"), "render", "sub_bold")
         self.maxc = b.spin(spin(16, 80, 1, " ký tự/dòng"), "render", "sub_max_chars")
         self.orig = b.check(QCheckBox("Hiện phụ đề thoại gốc ở các đoạn giữ thoại"), "render", "sub_original")
+        self.subs.toggled.connect(lambda v: self.app.set_subtitles(bool(v)))
         f.addRow(self.subs)
         f.addRow("Phông chữ", hrow(self.font, QLabel("Cỡ (1080p)"), self.size, self.bold, "stretch"))
         f.addRow("Màu chữ / viền", hrow(self.color, self.ocolor, QLabel("Độ dày viền"), self.outline, "stretch"))
@@ -255,7 +256,9 @@ class RenderPage(Page):
         self.lb_out.setTextFormat(Qt.RichText)
         self.lb_out.setTextInteractionFlags(Qt.TextBrowserInteraction)
         self.lb_out.linkActivated.connect(lambda _l: self.open_dir())
-        f5.addRow(hrow(self.btn_go, button("📂 Mở thư mục", self.open_dir), button("▶ Xem video", self.play_last),
+        self.sub_quick = sub_toggle(self.app)
+        f5.addRow(hrow(self.btn_go, self.sub_quick, button("📂 Mở thư mục", self.open_dir),
+                       button("▶ Xem video", self.play_last),
                        button("📣 Tiêu đề && thumbnail", self.show_publish), self.lb_sum,
                        "stretch", button("🧹 Xóa bản dựng tạm", self.clear_cache)))
         f5.addRow(self.lb_out)

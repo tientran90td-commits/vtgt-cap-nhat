@@ -295,6 +295,26 @@ class MainWindow(QMainWindow):
             return None
         return self.project
 
+    def set_subtitles(self, on: bool):
+        """Bật/tắt phụ đề thuyết minh - đồng bộ nút nhanh, ô trong Xuất video và cài đặt."""
+        from .widgets import _paint_sub_toggle
+
+        self.settings.set("render", "subtitles", bool(on))
+        self.settings.save()
+        rp = self.pages[3]
+        if hasattr(rp, "subs") and rp.subs.isChecked() != bool(on):
+            rp.subs.blockSignals(True)
+            rp.subs.setChecked(bool(on))
+            rp.subs.blockSignals(False)
+        for b in getattr(self, "sub_toggles", []):
+            _paint_sub_toggle(b, bool(on))
+        if hasattr(self.pages[0], "on_show"):
+            try:
+                self.pages[0].on_show()
+            except Exception:  # noqa: BLE001
+                pass
+        self.log(f"💬 Phụ đề thuyết minh: {'BẬT' if on else 'TẮT'}")
+
     def turbo(self):
         """🚀 Turbo: áp thiết lập mạnh nhất / nhanh nhất của máy rồi làm luôn từ A đến Z."""
         from recap import turbo

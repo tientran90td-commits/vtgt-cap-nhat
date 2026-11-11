@@ -361,3 +361,29 @@ def reveal(path) -> None:
     p.mkdir(parents=True, exist_ok=True)
     QDesktopServices.openUrl(QUrl.fromLocalFile(str(p)))
 
+
+def sub_toggle(app):
+    """Nút bật/tắt phụ đề thuyết minh (đặt nhiều nơi, luôn đồng bộ với nhau)."""
+    from PySide6.QtWidgets import QPushButton
+
+    b = QPushButton()
+    b.setCheckable(True)
+    b.setCursor(Qt.PointingHandCursor)
+    b.setToolTip("Bật/tắt phụ đề thuyết minh chèn vào video")
+    b.toggled.connect(lambda v: app.set_subtitles(bool(v)))
+    if not hasattr(app, "sub_toggles"):
+        app.sub_toggles = []
+    app.sub_toggles.append(b)
+    _paint_sub_toggle(b, bool(app.settings.get("render", "subtitles", True)))
+    return b
+
+
+def _paint_sub_toggle(b, on: bool):
+    b.blockSignals(True)
+    b.setChecked(on)
+    b.blockSignals(False)
+    b.setText("💬 Phụ đề: BẬT" if on else "💬 Phụ đề: TẮT")
+    b.setObjectName("primary" if on else "")
+    b.style().unpolish(b)
+    b.style().polish(b)
+

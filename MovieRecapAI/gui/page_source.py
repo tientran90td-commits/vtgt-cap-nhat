@@ -162,7 +162,9 @@ class SourcePage(Page):
                                 tip="Dùng thiết lập mạnh nhất của máy (card đồ họa, nhiều luồng) để làm video nhanh nhất")
         self.btn_turbo.setMinimumHeight(46)
         ql.addWidget(hrow(self.btn_turbo, self.btn_auto, stretch_last=False), 0, 1, Qt.AlignRight)
-        ql.addWidget(hrow(button("📚 Nhiều tập → 1 video", self.open_season_dialog),
+        from .widgets import sub_toggle
+
+        ql.addWidget(hrow(sub_toggle(self.app), button("📚 Nhiều tập → 1 video", self.open_season_dialog),
                           button("Đi từng bước: Kịch bản AI →", lambda: self.app.goto(1)), stretch_last=False),
                      1, 1, Qt.AlignRight)
         ql.setColumnStretch(0, 1)
