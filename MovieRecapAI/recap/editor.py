@@ -260,6 +260,7 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
     t_global = 0.0
     part_files = []
     timeline: list[list] = []  # [chỉ số đoạn, giây bắt đầu trong video xuất, thời lượng]
+    jobs: list[tuple] = []  # (chỉ số đoạn, tham số ffmpeg, thời lượng) - dựng sau vòng lặp
     last_ep = None
     for i, seg in enumerate(segs):
         if cancel.is_set():
@@ -448,8 +449,34 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
         args += ["-filter_complex", fc, "-map", "[v]", "-map", "[a]", "-t", f"{dur:.3f}", *enc,
                  "-pix_fmt", "yuv420p", "-r", str(fps), "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
                  part.name]
-        run_ffmpeg(args, cancel=cancel, cwd=str(parts_dir), log=log, total=dur,
-                   on_progress=lambda p, i=i: progress((i + p) / len(segs), f"Dựng đoạn {i + 1}/{len(segs)}"))
+        jobs.append((i, args, dur))
+
+    # Dựng các đoạn (song song nhiều đoạn cùng lúc nếu bật - tận dụng CPU nhiều luồng + bộ mã hóa GPU)
+    workers = max(1, min(6, int(opts.get("parallel", 1) or 1)))
+    if workers <= 1 or len(jobs) <= 1:
+        for i, args, dur in jobs:
+            run_ffmpeg(args, cancel=cancel, cwd=str(parts_dir), log=log, total=dur,
+                       on_progress=lambda p, i=i: progress((i + p) / len(segs), f"Dựng đoạn {i + 1}/{len(segs)}"))
+    elif jobs:
+        from concurrent.futures import FIRST_EXCEPTION, ThreadPoolExecutor, wait
+
+        log(f"Dựng {len(jobs)} đoạn, {workers} đoạn song song...")
+        done_n = [0]
+
+        def one(job):
+            _i, args, _d = job
+            run_ffmpeg(args, cancel=cancel, cwd=str(parts_dir), log=log)
+            done_n[0] += 1
+            progress(done_n[0] / len(jobs) * 0.95, f"Dựng đoạn {done_n[0]}/{len(jobs)} ({workers} song song)")
+        with ThreadPoolExecutor(max_workers=workers) as ex:
+            futs = [ex.submit(one, j) for j in jobs]
+            finished, _pending = wait(futs, return_when=FIRST_EXCEPTION)
+            for f in finished:
+                if f.exception():
+                    cancel.set()  # dừng các đoạn còn lại rồi báo lỗi
+                    for g in futs:
+                        g.cancel()
+                    raise f.exception()
 
     # Ghép các đoạn
     progress(0.97, "Ghép video")

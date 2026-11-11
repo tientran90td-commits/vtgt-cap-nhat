@@ -65,6 +65,11 @@ class RenderPage(Page):
         f.addRow("Mẫu của tôi", hrow(self.my_presets, button("✔ Áp dụng", self.apply_my_preset),
                                     button("💾 Lưu thiết lập hiện tại", self.save_my_preset, "primary"),
                                     button("🗑", self.delete_my_preset, tip="Xóa mẫu đang chọn"), "stretch"))
+        f.addRow("Tốc độ", hrow(button("🚀 Turbo: nhanh nhất", self.app.turbo, "primary",
+                                       tip="Dùng card đồ họa + nhiều luồng CPU, bỏ các bước phụ tốn thời gian"),
+                                button("↩ Bỏ Turbo", self._turbo_off, tip="Khôi phục thiết lập trước khi bật Turbo"),
+                                QLabel("Dựng song song"), b.spin(spin(1, 6, 1, " đoạn"), "render", "parallel"),
+                                "stretch"))
         f.addRow("", hrow(button("↺ Khôi phục mặc định", self.reset_defaults,
                                  tip="Đưa mọi thiết lập video về mặc định của app"), "stretch"))
         f.addRow(muted("Mẫu của tôi lưu toàn bộ thiết lập dưới đây (khung hình, phụ đề, logo, nhạc, âm lượng, thời lượng...)"
@@ -362,12 +367,17 @@ class RenderPage(Page):
         self.refresh_estimate()
         self.app.log("Đã khôi phục thiết lập video mặc định.")
 
+    def _turbo_off(self):
+        self.app.turbo_off()
+        self.refresh_summary()
+
     def refresh_summary(self):
         s = self.app.settings
         r = s.section("render")
         mins = float(s.get("script", "target_minutes", 5) or 5)
         self.lb_sum.setText(f"{editor.ASPECTS.get(r.get('aspect'), r.get('aspect'))} · {r.get('height')}p · "
-                            f"{mins:g} phút" + (" · ép thời lượng" if r.get("fit_duration") else ""))
+                            f"{mins:g} phút" + (" · ép thời lượng" if r.get("fit_duration") else "")
+                            + (" · 🚀 Turbo" if s.get("ui", "turbo") else ""))
         try:
             from recap import script_writer, tts
             v = s.section("voice")

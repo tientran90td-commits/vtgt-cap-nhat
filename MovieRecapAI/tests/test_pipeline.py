@@ -136,6 +136,43 @@ def main():
     assert [c[1] for c in m["chapter_marks"]] == ["Mở đầu", "Thoại gốc", "Bí mật"], m["chapter_marks"]
     assert "00:00 Mở đầu" in publish.metadata_text(m) and "01:10 Bí mật" in publish.metadata_text(m)
     print("thumbnail + tiêu đề:", yt.splitlines()[1], "·", [x.name for x in th])
+    # Turbo: dựng nhiều đoạn song song + đọc giọng nhiều luồng -> kết quả giống hệt dựng tuần tự
+    import threading as _th
+    import time as _time
+
+    from recap import turbo
+    active, peak = [0], [0]
+    lock = _th.Lock()
+
+    def slow_synth(text, voice, base, opts, settings):
+        with lock:
+            active[0] += 1
+            peak[0] = max(peak[0], active[0])
+        _time.sleep(0.3)
+        try:
+            return fake_synth(text, voice, base, opts, settings)
+        finally:
+            with lock:
+                active[0] -= 1
+    tts._synth_edge = slow_synth
+    s.set("voice", "rate", 7)  # đổi cách đọc -> phải đọc lại giọng
+    ch = turbo.plan(s, p)
+    keys = {(a, b) for a, b, _v, _w in ch}
+    assert ("render", "parallel") in keys and ("voice", "parallel") in keys and ("transcribe", "use_scenes") in keys
+    before = {f"{a}.{b}": s.get(a, b) for a, b, _v, _w in ch}
+    turbo.apply(s, ch)
+    s.set("render", "parallel", 3)
+    assert turbo.is_on(s) and s.get("voice", "parallel") == 4
+    s.set("render", "aspect", "16:9")
+    out_par = p.run_render(tmp / "out" / "turbo.mp4")
+    assert peak[0] >= 2, peak  # giọng online đọc song song
+    s.set("render", "parallel", 1)
+    out_seq = p.run_render(tmp / "out" / "seq.mp4")
+    assert abs(probe(out_par).duration - probe(out_seq).duration) < 0.3
+    turbo.restore(s)
+    assert not turbo.is_on(s) and all(s.get(*k.split(".", 1)) == v for k, v in before.items() if k != "render.parallel")
+    tts._synth_edge = fake_synth
+    print(f"turbo: {len(ch)} thiết lập · giọng {peak[0]} luồng · dựng song song = tuần tự ({probe(out_par).duration:.1f}s)")
     # Chế độ không AI
     s.set("script", "provider", "none")
     s.set("script", "target_minutes", 1)

@@ -285,6 +285,43 @@ class MainWindow(QMainWindow):
             return None
         return self.project
 
+    def turbo(self):
+        """🚀 Turbo: áp thiết lập mạnh nhất / nhanh nhất của máy rồi làm luôn từ A đến Z."""
+        from recap import turbo
+
+        changes = turbo.plan(self.settings, self.project)
+        lines = "\n".join(f"• {why}" for _s, _k, _v, why in changes if why) or "• Máy đã ở thiết lập nhanh nhất."
+        box = QMessageBox(QMessageBox.Question, "🚀 Turbo - làm video nhanh nhất",
+                          "Turbo dùng hết sức máy để làm video nhanh nhất:\n\n" + lines +
+                          "\n\nGiọng đọc, phong cách, khung hình... của bạn giữ nguyên. Thiết lập cũ được cất lại - "
+                          "bấm '↩ Bỏ Turbo' (Bước 4 → Mẫu thiết lập) để khôi phục.", parent=self)
+        b_go = box.addButton("🚀 Áp dụng && làm luôn", QMessageBox.AcceptRole)
+        b_set = box.addButton("Chỉ áp dụng", QMessageBox.ActionRole)
+        box.addButton("Hủy", QMessageBox.RejectRole)
+        box.exec()
+        if box.clickedButton() not in (b_go, b_set):
+            return
+        n = turbo.apply(self.settings, changes)
+        self.binder.reload()
+        self.log(f"🚀 Turbo: đã đổi {n} thiết lập sang chế độ nhanh nhất.")
+        cur = self.pages[self.nav.currentRow()] if 0 <= self.nav.currentRow() < len(self.pages) else None
+        if cur is not None:
+            cur.on_show()
+        if box.clickedButton() is b_go:
+            if not self.project:
+                QMessageBox.information(self, "Turbo", "Đã bật Turbo. Hãy chọn phim (hoặc nhiều tập) rồi bấm "
+                                        "⚡ TỰ ĐỘNG LÀM TẤT CẢ.")
+                self.goto(0)
+                return
+            self.run_all()
+
+    def turbo_off(self):
+        from recap import turbo
+
+        n = turbo.restore(self.settings)
+        self.binder.reload()
+        self.log(f"↩ Đã bỏ Turbo, khôi phục {n} thiết lập cũ." if n else "Turbo chưa bật.")
+
     def run_all(self):
         p = self.require_project()
         if not p:

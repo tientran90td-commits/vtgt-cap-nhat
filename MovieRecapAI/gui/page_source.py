@@ -158,7 +158,10 @@ class SourcePage(Page):
         self.lb_quick = muted("")
         ql.addWidget(self.lb_quick, 0, 0)
         self.btn_auto = button("⚡  TỰ ĐỘNG LÀM TẤT CẢ  →  XUẤT VIDEO", self.app.run_all, "big")
-        ql.addWidget(self.btn_auto, 0, 1, Qt.AlignRight)
+        self.btn_turbo = button("🚀 TURBO", self.app.turbo, "primary",
+                                tip="Dùng thiết lập mạnh nhất của máy (card đồ họa, nhiều luồng) để làm video nhanh nhất")
+        self.btn_turbo.setMinimumHeight(46)
+        ql.addWidget(hrow(self.btn_turbo, self.btn_auto, stretch_last=False), 0, 1, Qt.AlignRight)
         ql.addWidget(hrow(button("📚 Nhiều tập → 1 video", self.open_season_dialog),
                           button("Đi từng bước: Kịch bản AI →", lambda: self.app.goto(1)), stretch_last=False),
                      1, 1, Qt.AlignRight)
@@ -309,7 +312,8 @@ class SourcePage(Page):
             f"AI: <b>{PROVIDERS.get(sc['provider'], {}).get('name', '?')}</b> / {sc['model']} · "
             f"Độ dài: <b>{sc['target_minutes']:g} phút</b> · Ngôn ngữ: {sc['language']}<br>"
             f"Giọng: <b>{ENGINES.get(v['engine'], {}).get('name', '?')}</b> / {v['voice']} · "
-            f"Khung hình: <b>{r['aspect']}</b> {r['height']}p · Phụ đề: {'bật' if r['subtitles'] else 'tắt'}")
+            f"Khung hình: <b>{r['aspect']}</b> {r['height']}p · Phụ đề: {'bật' if r['subtitles'] else 'tắt'}"
+            + (" · <b>🚀 Turbo đang bật</b>" if s.get("ui", "turbo") else ""))
         self.lb_quick.setTextFormat(Qt.RichText)
         self.refresh_state()
 

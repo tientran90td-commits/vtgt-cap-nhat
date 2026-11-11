@@ -100,7 +100,7 @@ class Project:
         cancel = cancel or threading.Event()
         try:
             self.overlays = detect(self.video, self.info.duration, self.info.width, self.info.height,
-                                   log, progress, cancel)
+                                   log, progress, cancel, fast=bool(self.settings.get("render", "fast_scan")))
         except Cancelled:
             raise
         except Exception as e:  # noqa: BLE001 - chỉ để chọn cảnh sạch hơn, lỗi thì bỏ qua
@@ -199,6 +199,7 @@ class Project:
             for i, t in zip(idx, fixed):
                 spoken[i] = t
         files: list = []
+        todo = []  # (i, file, opts) cần đọc
         for i, seg in enumerate(segs):
             if cancel.is_set():
                 raise Cancelled()
@@ -210,13 +211,38 @@ class Project:
             key = tts.voice_cache_key(engine, voice, spoken[i], vo)
             out = vdir / f"v{i:03d}_{key}.wav"
             if not out.exists() or out.stat().st_size < 1000:
-                progress(i / len(segs), f"Đọc giọng đoạn {i + 1}/{len(segs)}")
                 for old in vdir.glob(f"v{i:03d}_*.wav"):
                     old.unlink(missing_ok=True)
                 if spoken[i] != text:
                     log(f"Đoạn {i + 1} đọc là: {tts.speak_text(spoken[i], v)}", level="debug")
-                tts.synthesize(engine, spoken[i], voice, out, vo, self.settings, cancel=cancel)
+                todo.append((i, out, vo))
             files.append(out)
+        # giọng online (Edge, OpenAI, Gemini...) đọc nhiều đoạn cùng lúc; giọng offline đọc lần lượt
+        workers = int(v.get("parallel", 1) or 1)
+        if tts.ENGINES.get(engine, {}).get("offline", True):
+            workers = 1
+        if workers <= 1 or len(todo) <= 1:
+            for n, (i, out, vo) in enumerate(todo):
+                if cancel.is_set():
+                    raise Cancelled()
+                progress(n / max(1, len(todo)), f"Đọc giọng đoạn {i + 1}/{len(segs)}")
+                tts.synthesize(engine, spoken[i], voice, out, vo, self.settings, cancel=cancel)
+        else:
+            from concurrent.futures import ThreadPoolExecutor
+
+            log(f"Đọc {len(todo)} đoạn giọng, {workers} đoạn cùng lúc...")
+            done_n = [0]
+
+            def one(job):
+                i, out, vo = job
+                if cancel.is_set():
+                    raise Cancelled()
+                tts.synthesize(engine, spoken[i], voice, out, vo, self.settings, cancel=cancel)
+                done_n[0] += 1
+                progress(done_n[0] / len(todo), f"Đọc giọng {done_n[0]}/{len(todo)} ({workers} luồng)")
+            with ThreadPoolExecutor(max_workers=min(6, workers)) as ex:
+                for f in [ex.submit(one, j) for j in todo]:
+                    f.result()
         progress(1.0, "Xong giọng đọc")
         log(f"Giọng đọc: {sum(1 for f in files if f)} đoạn ({tts.ENGINES[engine]['name']} / {voice}).")
         return files

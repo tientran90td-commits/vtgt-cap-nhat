@@ -95,6 +95,7 @@ DEFAULTS: dict = {
         "tone_auto": True,        # mỗi đoạn đổi cách đọc theo cảm xúc AI gán
         "consistent": True,       # giữ 1 giọng đồng nhất cả video (cảm xúc từng đoạn chỉ chỉnh nhẹ tốc độ)
         "normalize": True,       # chuẩn hóa số, ngày, đơn vị, viết tắt trước khi đọc
+        "parallel": 1,           # số đoạn giọng online đọc cùng lúc
         "ai_pron": False,        # nhờ AI soát lại câu cho dễ đọc
         "transliterate": False,  # phiên âm tên nước ngoài sang tiếng Việt
     },
@@ -136,6 +137,8 @@ DEFAULTS: dict = {
         "vsr_mode": "sttn-auto",
         "fit_duration": True,  # ép video thành phẩm vừa thời lượng mục tiêu
         "open_folder_after": True,  # xuất xong tự mở thư mục chứa video
+        "parallel": 1,  # số đoạn dựng song song (Turbo tăng lên theo số luồng CPU)
+        "fast_scan": False,  # quét quảng cáo/logo/phụ đề cứng nhanh (chỉ đọc keyframe)
         "episode_labels": True,  # recap nhiều tập: hiện "Tập N" khi chuyển tập
         "only_video": True,  # thư mục xuất chỉ để lại video (file phụ cất riêng, xem ở nút 📣)
         "publish_thumbs": True,  # xuất xong tự tạo ảnh thumbnail

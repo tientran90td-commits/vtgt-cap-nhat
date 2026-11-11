@@ -22,7 +22,7 @@ MIN_STATIC_RATIO = 0.002  # tỉ lệ điểm ảnh "đứng yên có cạnh" đ
 PERSISTENT_SHARE = 0.4    # điểm đứng yên ở >= 40% bộ khung -> logo cố định
 
 
-def detect(video: str, duration: float, width: int, height: int, log, progress, cancel) -> dict:
+def detect(video: str, duration: float, width: int, height: int, log, progress, cancel, fast: bool = False) -> dict:
     import numpy as np
 
     try:
@@ -35,7 +35,9 @@ def detect(video: str, duration: float, width: int, height: int, log, progress, 
     w = WIDTH
     h = max(2, int(round(height * w / width / 2)) * 2)
     fsize = w * h * 3
-    cmd = [ffmpeg_exe(), "-hide_banner", "-nostdin", "-loglevel", "error", "-i", video, "-an", "-sn",
+    # fast: chỉ giải mã khung chính (keyframe) - nhanh gấp nhiều lần với phim dài
+    cmd = [ffmpeg_exe(), "-hide_banner", "-nostdin", "-loglevel", "error", *(["-skip_frame", "nokey"] if fast else []),
+           "-i", video, "-an", "-sn",
            "-vf", f"fps=1/{SAMPLE_EVERY},scale={w}:{h}", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]
     proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, **_no_window_kwargs())
     frames = []  # (t, rgb int16, gray, edges)
