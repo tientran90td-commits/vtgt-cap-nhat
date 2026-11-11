@@ -46,11 +46,6 @@ class ScriptPage(Page):
         f1.addRow("Ngôn ngữ phim", self.stt_lang)
         f1.addRow("Thiết bị", self.stt_dev)
         f1.addRow("File phụ đề", self.sub_file)
-        self.wcpp_dir = PathPicker("dir", placeholder="(để trống = app tự tải) thư mục chứa whisper-cli.exe")
-        self.wcpp_dir.setText(self.app.settings.get("transcribe", "wcpp_dir", ""))
-        self.wcpp_dir.changed.connect(lambda v: self.app.settings.set("transcribe", "wcpp_dir", v))
-        self.wcpp_dir.setToolTip("whisper.cpp bản Vulkan: chạy nhận dạng thoại bằng card AMD/Intel/NVIDIA")
-        f1.addRow("whisper.cpp", self.wcpp_dir)
         f1.addRow(self.scenes)
         f1.addRow(muted("Mẹo: 'Tự chọn' dùng large-v3-turbo (chính xác cao) nếu máy có GPU NVIDIA hoặc CPU từ 8 luồng. "
                         "Máy không có card NVIDIA mà muốn nhanh: dùng Groq Whisper API (miễn phí). "
@@ -73,7 +68,8 @@ class ScriptPage(Page):
         self.style = b.combo(fill_combo(QComboBox(), {k: v["name"] for k, v in script_writer.STYLES.items()}),
                              "script", "style")
         self.lang = b.edit_combo(fill_combo(QComboBox(), script_writer.OUTPUT_LANGUAGES), "script", "language")
-        self.minutes = b.spin(spin(0.5, 60, 0.5, " phút", decimals=1), "script", "target_minutes")
+        self.lb_minutes = muted("")
+        self.lb_minutes.setWordWrap(False)
         self.spoiler = b.check(QCheckBox("Kể cả cái kết (spoil)"), "script", "spoiler")
         self.custom = QPlainTextEdit()
         self.custom.setPlaceholderText("Yêu cầu thêm cho AI, ví dụ: gọi nhân vật chính là 'thanh niên', "
@@ -93,10 +89,11 @@ class ScriptPage(Page):
         f2.addRow("Kiểu video", self.mode)
         f2.addRow("Phong cách", self.style)
         f2.addRow("Ngôn ngữ kể", self.lang)
-        f2.addRow("Độ dài video", hrow(self.minutes, self.spoiler, "stretch"))
+        f2.addRow("Độ dài video", hrow(self.lb_minutes, button("⏱ Đổi thời lượng", lambda: self.app.goto(3),
+                                                              tip="Chỉnh ở Bước 4 → ô Thời lượng"),
+                                       self.spoiler, "stretch"))
         f2.addRow("Yêu cầu thêm", self.custom)
-        f2.addRow(hrow(button("② AI viết kịch bản", self.do_script, "primary"),
-                       button("⚡ Làm hết + xuất video", self.app.run_all), "stretch"))
+        f2.addRow(hrow(button("② AI viết kịch bản", self.do_script, "primary"), "stretch"))
 
         # ---- thẻ Nâng cao
         g3 = QWidget()
@@ -195,7 +192,6 @@ class ScriptPage(Page):
         self.sub_file.setEnabled(e == "subtitle")
         self.stt_model.setEnabled(e in ("faster_whisper", "whisper_gpu"))
         self.stt_dev.setEnabled(e == "faster_whisper")
-        self.wcpp_dir.setEnabled(e == "whisper_gpu")
 
     def _provider_changed(self, *_a, init=False):
         pid = self.provider.currentData()
@@ -243,7 +239,8 @@ class ScriptPage(Page):
             self._ref_label()
             if QMessageBox.question(self, "Độ dài video", f"Video mẫu dài {ref['target_minutes']} phút. Đặt độ dài recap "
                                     "giống video mẫu?") == QMessageBox.Yes:
-                self.minutes.setValue(max(0.5, ref["target_minutes"]))
+                self.app.settings.set("script", "target_minutes", max(0.5, ref["target_minutes"]))
+                self.on_show()
         self.app.run_task(style_ref.analyze, f, self.app.settings, on_done=done, title="Học phong cách video mẫu")
 
     def clear_style_ref(self):
@@ -281,10 +278,7 @@ class ScriptPage(Page):
 
     def on_show(self):
         v = float(self.app.settings.get("script", "target_minutes", 5) or 5)
-        if abs(self.minutes.value() - v) > 1e-6:  # đồng bộ với ô Thời lượng ở trang Xuất video
-            self.minutes.blockSignals(True)
-            self.minutes.setValue(v)
-            self.minutes.blockSignals(False)
+        self.lb_minutes.setText(f"<b>{v:g} phút</b>")
         self._provider_changed(init=True)
         self.refresh_transcript_label()
 

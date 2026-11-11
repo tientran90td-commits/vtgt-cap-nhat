@@ -136,6 +136,7 @@ DEFAULTS: dict = {
         "vsr_mode": "sttn-auto",
         "fit_duration": True,  # ép video thành phẩm vừa thời lượng mục tiêu
         "open_folder_after": True,  # xuất xong tự mở thư mục chứa video
+        "only_video": True,  # thư mục xuất chỉ để lại video (file phụ cất riêng, xem ở nút 📣)
         "publish_thumbs": True,  # xuất xong tự tạo ảnh thumbnail
         "publish_meta": True,  # xuất xong AI viết tiêu đề, mô tả, hashtag, mốc chương
         "transition": "fade",    # cut | fade - chuyển cảnh mềm giữa các đoạn

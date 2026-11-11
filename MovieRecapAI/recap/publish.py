@@ -27,6 +27,50 @@ FONT_CANDIDATES = [
 ]
 
 
+EXTRA_SUFFIXES = (".srt", ".txt", ".qa.json", ".youtube.txt", ".publish.json", "_thumb.jpg", "_thumb_2.jpg",
+                  "_thumb_3.jpg", "_thumb_doc.jpg")
+
+
+def extras_dir(video) -> Path:
+    """Nơi cất file phụ của 1 video (phụ đề .srt, kịch bản, thumbnail, tiêu đề...) khi chỉ giữ video thành phẩm."""
+    import hashlib
+
+    from .config import app_home
+
+    v = Path(video).resolve()
+    h = hashlib.sha1(str(v).lower().encode()).hexdigest()[:8]
+    stem = re.sub(r'[<>:"/\\|?*]', "_", v.stem)[:60]
+    return app_home() / "exports" / f"{stem}_{h}"
+
+
+def extra(video, suffix: str) -> Path:
+    """Đường dẫn file phụ của video: cạnh video nếu có, không thì trong thư mục cất riêng."""
+    v = Path(video)
+    side = v.with_name(v.stem + suffix)
+    if side.exists():
+        return side
+    return extras_dir(v) / (v.stem + suffix)
+
+
+def tidy(video, log=None) -> int:
+    """Chỉ để lại video thành phẩm trong thư mục xuất: chuyển file phụ sang thư mục cất riêng."""
+    import shutil
+
+    v = Path(video)
+    dest = extras_dir(v)
+    n = 0
+    for suf in EXTRA_SUFFIXES:
+        f = v.with_name(v.stem + suf)
+        if f.exists():
+            dest.mkdir(parents=True, exist_ok=True)
+            shutil.move(str(f), str(dest / f.name))
+            n += 1
+    if n and log:
+        log(f"🧹 Thư mục xuất chỉ còn video thành phẩm (phụ đề, thumbnail, tiêu đề... xem ở nút 📣 hoặc {dest}).",
+            level="debug")
+    return n
+
+
 def fmt_chapter(t: float) -> str:
     t = int(round(t))
     h, m, s = t // 3600, t % 3600 // 60, t % 60
@@ -333,7 +377,7 @@ def prepare(project, out_video: Path, log=None, thumbs: bool = True, meta: bool 
     """Tạo thumbnail + thông tin đăng cho video vừa xuất."""
     out_video = Path(out_video)
     qa = {}
-    qf = out_video.with_suffix(".qa.json")
+    qf = extra(out_video, ".qa.json")
     if qf.exists():
         try:
             qa = json.loads(qf.read_text(encoding="utf-8"))

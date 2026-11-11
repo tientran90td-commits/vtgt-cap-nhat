@@ -8,13 +8,13 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QHeaderView, QMessageBox, QTableWidget, QTableWidgetItem
+from PySide6.QtWidgets import QFormLayout, QGroupBox, QHeaderView, QMessageBox, QTableWidget, QTableWidgetItem
 
 from recap import components, tts
 from recap.ffmpeg_utils import run_ffmpeg
 
 from .player import AudioPlayer
-from .widgets import Page, button, hrow, muted
+from .widgets import Page, PathPicker, button, hrow, muted
 
 ORDER = ["ffmpeg", "edge_tts", "vieneu", "faster_whisper", "whisper_model", "vieneu_model", "scenedetect", "yt_dlp",
          "anthropic", "num2words", "gtts", "piper", "piper_vi", "pyttsx3", "xtts"]
@@ -37,6 +37,28 @@ class ComponentsPage(Page):
         hh.setSectionResizeMode(3, QHeaderView.ResizeToContents)
         self.table.setSelectionMode(QTableWidget.NoSelection)
         self.root.addWidget(self.table, 1)
+        # Công cụ AI cài thêm (tùy chọn) - gom về một chỗ
+        from recap import vsr
+        s = app.settings
+        gt = QGroupBox("🧠 Công cụ AI cài thêm (tùy chọn)")
+        ft = QFormLayout(gt)
+        self.vsr_dir = PathPicker("dir", placeholder="(để trống = app tự tìm / tự cài) thư mục video-subtitle-remover")
+        self.vsr_dir.setText(s.get("render", "vsr_dir", ""))
+        self.vsr_dir.changed.connect(lambda v: s.set("render", "vsr_dir", v))
+        ft.addRow("🧽 Xóa phụ đề AI (VSR)", hrow(self.vsr_dir,
+                  button("🛠 Tự cài (dùng card đồ họa)", self.install_vsr, "primary",
+                         tip="Tải VSR + model AI, cài môi trường riêng (DirectML cho card AMD/Intel, CUDA cho NVIDIA). "
+                             "Khoảng 3-4 GB, chỉ cài 1 lần."),
+                  button("🔎 Tìm / kiểm tra", self.check_vsr),
+                  button("⬇ Trang tải", lambda: QDesktopServices.openUrl(QUrl(vsr.RELEASES_URL))), stretch_last=False))
+        self.wcpp_dir = PathPicker("dir", placeholder="(để trống = app tự tải) thư mục chứa whisper-cli.exe")
+        self.wcpp_dir.setText(s.get("transcribe", "wcpp_dir", ""))
+        self.wcpp_dir.changed.connect(lambda v: s.set("transcribe", "wcpp_dir", v))
+        ft.addRow("⚡ Whisper card đồ họa", hrow(self.wcpp_dir,
+                  button("⬇ Tải ngay (chương trình + model)", self.install_wcpp, "primary"), stretch_last=False))
+        ft.addRow(muted("VSR: dùng ở Bước 4 → Hình ảnh → Phụ đề in cứng = 🧠 Xóa sạch bằng AI. "
+                        "Whisper card đồ họa: dùng ở Bước 2 → Lời thoại → Công cụ = ⚡ Whisper bằng card đồ họa."))
+        self.root.addWidget(gt)
         self.root.addWidget(hrow(
             button("⬇ Cài tất cả còn thiếu (khuyên dùng)", self.install_missing, "big"),
             button("🔄 Kiểm tra lại", self.refresh),
@@ -215,6 +237,55 @@ class ComponentsPage(Page):
     def open_logs(self):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(components.logs_dir())))
 
+    # ------------------------------------------------ công cụ AI cài thêm
+    def check_vsr(self):
+        from recap import vsr
+        cur = self.vsr_dir.text().strip()
+        try:
+            if not cur:
+                found, err = vsr.autodetect(self.app.settings)
+                if not found:
+                    raise vsr.VSRError(err or "Không tìm thấy VSR trên máy.")
+                self.vsr_dir.setText(found)
+                cur = found
+            QMessageBox.information(self, "VSR sẵn sàng", vsr.check(cur) + "\n\nỞ Bước 4 → Hình ảnh, chọn Phụ đề in "
+                                    "cứng = 🧠 Xóa sạch bằng AI.")
+        except vsr.VSRError as e:
+            QMessageBox.warning(self, "Chưa dùng được VSR", str(e) + "\n\nCách dễ nhất: để trống ô thư mục và bấm "
+                                "🛠 Tự cài.")
+
+    def install_vsr(self):
+        from recap import vsr
+        acc = vsr.accelerator()
+        name = {"directml": "DirectML (card AMD/Intel)", "cuda": "CUDA (card NVIDIA)", "cpu": "CPU"}[acc]
+        if QMessageBox.question(self, "Tự cài VSR", f"App sẽ tải video-subtitle-remover {vsr.VSR_TAG} (mã nguồn + model "
+                                f"AI ~800 MB) và cài thư viện chạy bằng {name}, tổng khoảng 3-4 GB, mất 10-30 phút.\n\n"
+                                f"Nơi cài: {vsr.managed_dir(self.app.settings)}\n\nTiếp tục?") != QMessageBox.Yes:
+            return
+
+        def done(path):
+            self.vsr_dir.setText(path)
+            self.app.settings.set("render", "hardsub_mode", "vsr")
+            QMessageBox.information(self, "Đã cài VSR", f"Đã cài xong VSR tại:\n{path}\n\nĐã bật chế độ "
+                                    "🧠 Xóa sạch bằng AI (Bước 4 → Hình ảnh).")
+        self.app.run_task(vsr.install, self.app.settings, on_done=done, title="Cài VSR")
+
+    def install_wcpp(self):
+        from recap import whisper_gpu
+        s = self.app.settings
+        model = s.get("transcribe", "model", "auto")
+        model = model if model and model != "auto" else "large-v3-turbo"
+
+        def job(log, progress, cancel):
+            exe = whisper_gpu.ensure_exe(s, log, progress, cancel)
+            m = whisper_gpu.ensure_model(s, model, log, progress, cancel)
+            return f"{exe}\n{m}"
+
+        def done(res):
+            s.set("transcribe", "engine", "whisper_gpu")
+            QMessageBox.information(self, "Whisper card đồ họa sẵn sàng", f"Đã có:\n{res}\n\nĐã chọn công cụ nhận dạng "
+                                    "thoại = ⚡ Whisper bằng card đồ họa (Bước 2).")
+        self.app.run_task(job, on_done=done, title="Tải whisper.cpp")
 
 def _safe_cuda() -> bool:
     try:

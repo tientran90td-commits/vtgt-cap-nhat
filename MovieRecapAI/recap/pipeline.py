@@ -290,13 +290,20 @@ class Project:
                 raise
             except Exception as e:  # noqa: BLE001
                 log(f"Chưa tạo được thumbnail/tiêu đề ({e}) - video vẫn đã xuất xong.", level="warn")
+        if opts.get("only_video", True):
+            from . import publish
+
+            publish.tidy(res, log)
         return res
 
     def run_publish(self, out_video, log=_noop_log, progress=_noop_progress, cancel=None, thumbs=True, meta=True) -> dict:
         """Thumbnail + tiêu đề, mô tả, hashtag, mốc chương cho video đã xuất."""
         from . import publish
 
-        return publish.prepare(self, Path(out_video), log, thumbs=thumbs, meta=meta)
+        res = publish.prepare(self, Path(out_video), log, thumbs=thumbs, meta=meta)
+        if self.settings.get("render", "only_video", True):
+            publish.tidy(out_video, log)
+        return res
 
     def run_all(self, log=_noop_log, progress=_noop_progress, cancel=None, subtitle_file=None,
                 out_path=None) -> Path:

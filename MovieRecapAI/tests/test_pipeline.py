@@ -9,7 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from recap import llm, tts  # noqa: E402
+from recap import llm, publish, tts  # noqa: E402
 from recap.config import Settings  # noqa: E402
 from recap.ffmpeg_utils import probe, run_ffmpeg  # noqa: E402
 from recap.pipeline import Project  # noqa: E402
@@ -88,7 +88,7 @@ def main():
         print(aspect, info.summary(), info.width, info.height)
         assert info.has_audio and info.has_video
         assert info.duration > 8
-        assert out.with_suffix(".srt").exists()
+        assert publish.extra(out, ".srt").exists()
     # Ép thời lượng thành phẩm: mục tiêu 30s -> giãn đoạn thoại gốc, đọc chậm lại (giữ cao độ)
     from recap import editor
     pl = editor.plan_fit(100, [(1, 30), (3, 40)], 120)
@@ -109,8 +109,6 @@ def main():
     assert fit_d > base_d + 3, (base_d, fit_d)
     print(f"ép thời lượng: {base_d:.1f}s → {fit_d:.1f}s (mục tiêu 30s, ước tính kịch bản {est:.1f}s)")
     # Thumbnail + tiêu đề/mô tả/mốc chương (AI giả lập)
-    from recap import publish
-
     def meta_chat(pid, model, system, user, settings, **k):
         assert "Segments:" in user and "[0]" in user
         return json.dumps({"titles": ["Căn phòng bí ẩn và cái kết không ai ngờ", "B", "C"], "thumb_text": "CĂN PHÒNG BÍ ẨN",
@@ -122,11 +120,14 @@ def main():
     s.set("render", "fit_duration", False)
     s.set("script", "target_minutes", 5)
     out = p.run_render(tmp / "out" / "pub.mp4")
-    yt = out.with_suffix(".youtube.txt").read_text(encoding="utf-8")
+    # thư mục xuất chỉ còn video thành phẩm; file phụ cất riêng
+    assert sorted(f.name for f in out.parent.glob("pub*")) == ["pub.mp4"], list(out.parent.glob("pub*"))
+    yt = publish.extra(out, ".youtube.txt").read_text(encoding="utf-8")
     assert "Căn phòng bí ẩn" in yt and "CĂN PHÒNG BÍ ẨN" in yt and "#phimhay" in yt, yt
     assert "Mốc thời gian" not in yt  # video 15s: chương < 10s không hợp lệ với YouTube -> bỏ
     from PIL import Image
-    th = [out.with_name(out.stem + x) for x in ("_thumb.jpg", "_thumb_doc.jpg")]
+    th = [publish.extra(out, x) for x in ("_thumb.jpg", "_thumb_doc.jpg")]
+    assert publish.extra(out, ".srt").exists() and publish.extra(out, ".txt").exists()
     assert Image.open(th[0]).size == (1280, 720) and Image.open(th[1]).size == (1080, 1920)
     chs = [{"seg": 0, "title": "A"}, {"seg": 1, "title": "B"}, {"seg": 2, "title": "C"}, {"seg": 3, "title": "D"}]
     ch = publish.chapters_from(chs, [[0, 0, 40], [1, 40, 30], [2, 70, 5], [3, 75, 40]], 115)

@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (QApplication, QCheckBox, QComboBox, QDialog, QFon
                                QVBoxLayout, QWidget)
 
 from recap import editor
+from recap.publish import extra
 from recap.ffmpeg_utils import encoder_works
 
 from .widgets import ColorButton, Page, PathPicker, button, fill_combo, hrow, muted, reveal, scroll, spin
@@ -30,20 +31,19 @@ PRESETS = {
 class RenderPage(Page):
     def __init__(self, app):
         super().__init__(app, "🎞️  Bước 4 · Dựng & xuất video",
-                         "Chọn khung hình, phụ đề, nhạc nền, logo rồi bấm XUẤT VIDEO. Giọng đọc được tạo tự động, "
-                         "các đoạn đã dựng được lưu lại nên sửa 1 đoạn rồi xuất lại sẽ rất nhanh.")
+                         "Chọn mẫu nhanh hoặc chỉnh từng mục trong các thẻ, đặt thời lượng rồi bấm XUẤT VIDEO. "
+                         "Các đoạn đã dựng được lưu lại nên sửa 1 đoạn rồi xuất lại sẽ rất nhanh.")
         b = app.binder
         s = app.settings
-
-        pre = QGroupBox("⚡ Mẫu nhanh")
-        pl = hrow(*[button(v[0], lambda _=False, k=k: self.apply_preset(k)) for k, v in PRESETS.items()], "stretch")
-        QVBoxLayout(pre).addWidget(pl)
+        self.root.addWidget(hrow(muted("⚡ Mẫu nhanh:"),
+                                 *[button(v[0], lambda _=False, k=k: self.apply_preset(k)) for k, v in PRESETS.items()],
+                                 "stretch"))
         tabs = QTabWidget()
-        t1, t2, t3 = QWidget(), QWidget(), QWidget()
-        l1, l2, l3 = QGridLayout(t1), QGridLayout(t2), QVBoxLayout(t3)
-        l1.addWidget(pre, 0, 0, 1, 2)
 
-        g1 = QGroupBox("🖼️ Khung hình")
+        # ---------------------------------------------------------------- 🖼️ Hình ảnh
+        t1 = QWidget()
+        l1 = QGridLayout(t1)
+        g1 = QGroupBox("🖼️ Khung hình && chất lượng")
         f1 = QFormLayout(g1)
         self.aspect = b.combo(fill_combo(QComboBox(), editor.ASPECTS), "render", "aspect")
         self.fill = b.combo(fill_combo(QComboBox(), editor.FILLS), "render", "fill")
@@ -56,38 +56,40 @@ class RenderPage(Page):
         self.encoder = b.combo(fill_combo(QComboBox(), editor.ENCODERS), "render", "encoder")
         self.quality = b.spin(spin(14, 32, 1), "render", "quality")
         self.quality.setToolTip("Số càng nhỏ chất lượng càng cao, file càng nặng (18-23 là đẹp)")
+        self.trans = b.combo(fill_combo(QComboBox(), {"fade": "Mờ dần nhẹ giữa các đoạn (mượt)", "cut": "Cắt thẳng"}),
+                             "render", "transition")
         f1.addRow("Tỉ lệ", self.aspect)
         f1.addRow("Lấp khung", self.fill)
         f1.addRow("Độ phân giải", self.height_)
         f1.addRow("Khung hình/giây", self.fps)
+        f1.addRow("Chuyển cảnh", self.trans)
         f1.addRow("Bộ mã hóa", hrow(self.encoder, button("🔍 Kiểm tra GPU", self.check_gpu)))
         f1.addRow("Chất lượng (CRF)", self.quality)
-        l1.addWidget(g1, 1, 0)
+        l1.addWidget(g1, 0, 0)
+        gh = QGroupBox("🧽 Làm sạch hình phim gốc")
+        fh = QFormLayout(gh)
+        self.hardsub = b.combo(fill_combo(QComboBox(), editor.HARDSUB_MODES), "render", "hardsub_mode")
+        from recap import vsr
+        self.vsr_mode = b.combo(fill_combo(QComboBox(), vsr.MODES), "render", "vsr_mode")
+        fh.addRow("Phụ đề in cứng", self.hardsub)
+        fh.addRow("Thuật toán AI", hrow(self.vsr_mode, button("🧩 Cài / kiểm tra VSR", lambda: self.app.goto(5),
+                                                               tip="Cài công cụ xóa phụ đề bằng AI ở mục Thành phần"),
+                                       stretch_last=False))
+        fh.addRow(b.check(QCheckBox("Che mờ logo / watermark cố định của nguồn (tự phát hiện)"), "render", "delogo"))
+        fh.addRow(muted("App tự phát hiện phụ đề in sẵn trong hình (Vietsub chữ trắng/vàng phía dưới) để che, cắt, né "
+                        "hoặc xóa sạch bằng AI (VSR - chỉ xử lý các cảnh được dùng). Phụ đề rời (.srt, phụ đề nhúng MKV) "
+                        "luôn được bỏ khỏi video xuất ra."))
+        l1.addWidget(gh, 0, 1)
+        l1.setRowStretch(1, 1)
+        l1.setColumnStretch(0, 1)
+        l1.setColumnStretch(1, 1)
 
-        g2 = QGroupBox("🔊 Âm thanh")
-        f2 = QFormLayout(g2)
-        self.vv = b.spin(spin(0, 3, 0.05, decimals=2), "render", "voice_volume")
-        self.ov = b.spin(spin(0, 1, 0.02, decimals=2), "render", "orig_volume_voice")
-        self.oc = b.spin(spin(0, 2, 0.05, decimals=2), "render", "orig_volume_clip")
-        self.music = PathPicker("file", "Âm thanh (*.mp3 *.wav *.m4a *.aac *.ogg *.flac)", "(tùy chọn) Nhạc nền")
-        self.music.setText(s.get("render", "music", ""))
-        self.music.changed.connect(lambda v: b._set("render", "music", v))
-        self.mv = b.spin(spin(0, 1, 0.01, decimals=2), "render", "music_volume")
-        self.fit = b.combo(fill_combo(QComboBox(), editor.FITS), "render", "fit")
-        self.gap = b.spin(spin(0, 2, 0.05, " giây", decimals=2), "render", "gap")
-        f2.addRow("Giọng thuyết minh", self.vv)
-        f2.addRow("Tiếng phim khi có thuyết minh", self.ov)
-        f2.addRow("", muted("0 = tắt hẳn tiếng phim lúc thuyết minh (khuyên dùng: không lẫn lời thoại nhân vật)"))
-        f2.addRow("Tiếng phim ở đoạn thoại gốc", self.oc)
-        f2.addRow("Nhạc nền", self.music)
-        f2.addRow("Âm lượng nhạc", self.mv)
-        f2.addRow("Khớp cảnh", self.fit)
-        f2.addRow("Nghỉ giữa các đoạn", self.gap)
-        l2.addWidget(g2, 0, 0)
-
-        g3 = QGroupBox("💬 Phụ đề")
+        # ---------------------------------------------------------------- 💬 Chữ & logo
+        t2 = QWidget()
+        l2 = QGridLayout(t2)
+        g3 = QGroupBox("💬 Phụ đề thuyết minh")
         f3 = QFormLayout(g3)
-        self.subs = b.check(QCheckBox("Chèn phụ đề vào video (kèm file .srt riêng)"), "render", "subtitles")
+        self.subs = b.check(QCheckBox("Chèn phụ đề vào video"), "render", "subtitles")
         self.font = QFontComboBox()
         self.font.setCurrentFont(QFont(s.get("render", "sub_font", "Arial")))
         self.font.currentFontChanged.connect(lambda f: b._set("render", "sub_font", f.family()))
@@ -108,9 +110,8 @@ class RenderPage(Page):
         f3.addRow("Màu chữ / viền", hrow(self.color, self.ocolor, self.outline, "stretch"))
         f3.addRow("Vị trí", hrow(self.pos, self.maxc, "stretch"))
         f3.addRow(self.orig)
-        l1.addWidget(g3, 1, 1)
-
-        g4 = QGroupBox("🏷️ Tiêu đề && logo")
+        l2.addWidget(g3, 0, 0)
+        g4 = QGroupBox("🏷️ Tiêu đề mở đầu && logo kênh")
         f4 = QFormLayout(g4)
         self.title = b.line(QLineEdit(), "render", "title_text")
         self.title.setPlaceholderText("Chữ hiện ở đầu video (để trống = không có)")
@@ -128,103 +129,114 @@ class RenderPage(Page):
         f4.addRow("Logo", self.logo)
         f4.addRow("Vị trí / kích thước", hrow(self.lpos, self.lscale, "stretch"))
         l2.addWidget(g4, 0, 1)
-        gfx = QGroupBox("✨ Hiệu ứng && âm lượng")
-        ffx = QFormLayout(gfx)
-        self.trans = b.combo(fill_combo(QComboBox(), {"fade": "Mờ dần nhẹ giữa các đoạn (mượt)", "cut": "Cắt thẳng"}),
-                             "render", "transition")
-        ffx.addRow("Chuyển cảnh", self.trans)
-        ffx.addRow(b.check(QCheckBox("Cân bằng âm lượng tổng (-16 LUFS, to đều như YouTube)"), "render", "loudnorm"))
-        l2.addWidget(gfx, 1, 0, 1, 2)
-        l2.setRowStretch(2, 1)
+        l2.setRowStretch(1, 1)
         l2.setColumnStretch(0, 1)
         l2.setColumnStretch(1, 1)
 
-        gs = QGroupBox("🎯 Chọn cảnh thông minh")
-        fs = QVBoxLayout(gs)
+        # ---------------------------------------------------------------- 🔊 Âm thanh
+        t3 = QWidget()
+        l3 = QGridLayout(t3)
+        g2 = QGroupBox("🔊 Âm lượng && nhạc nền")
+        f2 = QFormLayout(g2)
+        self.vv = b.spin(spin(0, 3, 0.05, decimals=2), "render", "voice_volume")
+        self.ov = b.spin(spin(0, 1, 0.02, decimals=2), "render", "orig_volume_voice")
+        self.oc = b.spin(spin(0, 2, 0.05, decimals=2), "render", "orig_volume_clip")
+        self.music = PathPicker("file", "Âm thanh (*.mp3 *.wav *.m4a *.aac *.ogg *.flac)", "(tùy chọn) Nhạc nền")
+        self.music.setText(s.get("render", "music", ""))
+        self.music.changed.connect(lambda v: b._set("render", "music", v))
+        self.mv = b.spin(spin(0, 1, 0.01, decimals=2), "render", "music_volume")
+        f2.addRow("Giọng thuyết minh", self.vv)
+        f2.addRow("Tiếng phim khi có thuyết minh", self.ov)
+        f2.addRow("", muted("0 = tắt hẳn tiếng phim lúc thuyết minh (khuyên dùng: không lẫn lời thoại nhân vật)"))
+        f2.addRow("Tiếng phim ở đoạn thoại gốc", self.oc)
+        f2.addRow("Nhạc nền", self.music)
+        f2.addRow("Âm lượng nhạc", self.mv)
+        f2.addRow(b.check(QCheckBox("Cân bằng âm lượng tổng (-16 LUFS, to đều như YouTube)"), "render", "loudnorm"))
+        l3.addWidget(g2, 0, 0)
+        l3.setRowStretch(1, 1)
+        l3.setColumnStretch(1, 1)
+
+        # ---------------------------------------------------------------- 🎯 Chọn cảnh
+        t4 = QWidget()
+        l4 = QGridLayout(t4)
+        gs = QGroupBox("🎯 Chọn cảnh && nhịp ghép")
+        fs = QFormLayout(gs)
         for key, text, tip in (
                 ("sentence_sync", "Khớp hình theo TỪNG CÂU thuyết minh (mỗi câu chiếu đúng khoảnh khắc nó kể)",
                  "AI gán mốc phim cho từng câu; app chia giọng đọc theo khoảng lặng giữa các câu"),
                 ("no_reuse", "Không lặp lại cảnh đã chiếu (tự lấy cảnh mới gần đó)", ""),
                 ("avoid_overlays", "Tránh đoạn có quảng cáo / chữ chèn cứng của web phim", "Tự dò lớp chèn đứng yên"),
-                ("delogo", "Che mờ logo / watermark cố định của nguồn (tự phát hiện)", ""),
                 ("final_qa", "Kiểm tra video sau khi xuất: màn hình đen, đứng hình, âm lượng", "")):
             cb = b.check(QCheckBox(text), "render", key)
             cb.setToolTip(tip)
-            fs.addWidget(cb)
-        fs.addWidget(muted("Đoạn cần bỏ qua (intro, OP/ED, cảnh nhạy cảm...) nhập ở Bước 1 → ô 'Bỏ qua đoạn'. "
-                           "Sau khi xuất, kết quả kiểm tra nằm cạnh video (file .qa.json) và trong nhật ký."))
-        l3.addWidget(gs)
-        gh = QGroupBox("💬 Phụ đề gốc in cứng trong phim (Vietsub...)")
-        fh = QFormLayout(gh)
-        self.hardsub = b.combo(fill_combo(QComboBox(), editor.HARDSUB_MODES), "render", "hardsub_mode")
-        fh.addRow("Cách xử lý", self.hardsub)
-        fh.addRow(muted("App tự phát hiện phụ đề in sẵn trong hình (chữ trắng/vàng viền đen ở phía dưới) rồi che đi để "
-                        "phụ đề thuyết minh của app không bị đè lên. Phụ đề rời (.srt, phụ đề nhúng trong MKV) luôn được "
-                        "loại bỏ khỏi video xuất ra."))
-        # Xóa sạch bằng AI qua video-subtitle-remover (công cụ ngoài, Apache-2.0)
-        self.vsr_dir = PathPicker("dir", placeholder="Thư mục đã giải nén video-subtitle-remover (VSR)")
-        self.vsr_dir.setText(s.get("render", "vsr_dir", ""))
-        self.vsr_dir.changed.connect(lambda v: b._set("render", "vsr_dir", v))
-        fh.addRow("Thư mục VSR", self.vsr_dir)
-        from recap import vsr
-        self.vsr_mode = b.combo(fill_combo(QComboBox(), vsr.MODES), "render", "vsr_mode")
-        fh.addRow("Thuật toán AI", self.vsr_mode)
-        fh.addRow("", hrow(button("🛠 Tự cài VSR (dùng card đồ họa)", self.install_vsr, "primary",
-                                  tip="Tải mã nguồn VSR + model AI và cài môi trường riêng (DirectML cho card AMD/Intel, "
-                                      "CUDA cho NVIDIA). Khoảng 3-4 GB, chỉ cài 1 lần."),
-                           button("🔎 Tự tìm / ✔ Kiểm tra", self.check_vsr),
-                           button("⬇ Trang tải", lambda: QDesktopServices.openUrl(QUrl(vsr.RELEASES_URL))), "stretch"))
-        fh.addRow(muted("🧠 Chế độ 'Xóa sạch bằng AI': app gọi video-subtitle-remover để xóa chữ và vẽ lại nền, CHỈ cho "
-                        "những cảnh được dùng trong video recap (vài phút, không phải cả phim) và lưu lại để lần sau dùng "
-                        "ngay. Cách dễ nhất: bấm 🛠 Tự cài VSR (để trống ô thư mục). Đã có VSR thì để trống ô thư mục, app "
-                        "tự tìm. Nếu VSR lỗi, app tự chuyển sang làm mờ."))
-        l3.addWidget(gh)
-        l3.addStretch(1)
-        tabs.addTab(scroll(t1), "🖼️ Khung hình && phụ đề")
-        tabs.addTab(scroll(t2), "🔊 Âm thanh, logo && hiệu ứng")
-        tabs.addTab(scroll(t3), "🎯 Chọn cảnh thông minh")
+            fs.addRow(cb)
+        self.fit_mode = b.combo(fill_combo(QComboBox(), editor.FITS), "render", "fit")
+        self.gap = b.spin(spin(0, 2, 0.05, " giây", decimals=2), "render", "gap")
+        fs.addRow("Khớp cảnh với giọng", self.fit_mode)
+        fs.addRow("Nghỉ giữa các đoạn", self.gap)
+        fs.addRow(muted("Đoạn cần bỏ qua (intro, OP/ED, cảnh nhạy cảm...) nhập ở Bước 1 → ô 'Bỏ qua đoạn'."))
+        l4.addWidget(gs, 0, 0)
+        l4.setRowStretch(1, 1)
+        l4.setColumnStretch(1, 1)
 
-        g5 = QGroupBox("📦 Xuất file")
+        # ---------------------------------------------------------------- 📣 Đăng video
+        t5 = QWidget()
+        l5 = QGridLayout(t5)
+        gp = QGroupBox("📣 Sau khi xuất")
+        fp = QFormLayout(gp)
+        self.only_video = b.check(QCheckBox("Thư mục xuất CHỈ để lại video thành phẩm"), "render", "only_video")
+        self.only_video.setToolTip("Phụ đề .srt, kịch bản, thumbnail, tiêu đề... được cất riêng - xem ở nút 📣")
+        self.auto_open = b.check(QCheckBox("Xuất xong tự mở thư mục chứa video"), "render", "open_folder_after")
+        self.pub_thumbs = b.check(QCheckBox("Tự tạo thumbnail (16:9 + dọc 9:16 + 2 phương án)"), "render",
+                                  "publish_thumbs")
+        self.pub_meta = b.check(QCheckBox("AI viết tiêu đề, mô tả, hashtag, mốc chương YouTube"), "render",
+                                "publish_meta")
+        for w in (self.only_video, self.auto_open, self.pub_thumbs, self.pub_meta):
+            fp.addRow(w)
+        fp.addRow(hrow(button("📣 Xem tiêu đề && thumbnail", self.show_publish, "primary"), "stretch"))
+        l5.addWidget(gp, 0, 0)
+        l5.setRowStretch(1, 1)
+        l5.setColumnStretch(1, 1)
+
+        tabs.addTab(scroll(t1), "🖼️ Hình ảnh")
+        tabs.addTab(scroll(t2), "💬 Chữ && logo")
+        tabs.addTab(scroll(t3), "🔊 Âm thanh")
+        tabs.addTab(scroll(t4), "🎯 Chọn cảnh")
+        tabs.addTab(scroll(t5), "📣 Đăng video")
+        self.tabs = tabs
+
+        # ---------------------------------------------------------------- 📦 Xuất file (luôn hiện)
+        g5 = QGroupBox("📦 Xuất video")
         f5 = QFormLayout(g5)
         self.outdir = PathPicker("dir", placeholder=str(s.output_dir()))
         self.outdir.setText(s.get("paths", "output", ""))
         self.outdir.changed.connect(lambda v: b._set("paths", "output", v))
         self.fname = QLineEdit()
         self.fname.setPlaceholderText("Tên file (để trống = theo tiêu đề kịch bản)")
-        f5.addRow("Thư mục lưu", self.outdir)
-        f5.addRow("Tên file", self.fname)
-        # Thời lượng video thành phẩm (dùng chung với 'Độ dài video' ở Bước 2)
+        f5.addRow("Lưu vào", hrow(self.outdir, self.fname))
+        # Thời lượng video thành phẩm: chỉnh ở đây (AI ở Bước 2 cũng viết theo độ dài này)
         self.minutes = b.spin(spin(0.5, 180, 0.5, " phút", decimals=1), "script", "target_minutes")
         self.minutes.setToolTip("Độ dài mong muốn của video thành phẩm - AI viết kịch bản theo độ dài này")
         quick = [button(f"{m:g}′", lambda _=False, m=m: self.minutes.setValue(m)) for m in (1, 3, 5, 10, 15)]
         for q in quick:
             q.setFixedWidth(46)
-        self.fit = b.check(QCheckBox("Ép đúng thời lượng khi xuất"), "render", "fit_duration")
+        self.fit = b.check(QCheckBox("Ép đúng thời lượng"), "render", "fit_duration")
         self.fit.setToolTip("Tự co/giãn đoạn giữ thoại gốc, chỉnh tốc độ đọc (0.88x-1.2x) và bỏ bớt đoạn thoại gốc "
                             "nếu cần để video vừa thời lượng đã chọn")
-        f5.addRow("⏱ Thời lượng", hrow(self.minutes, *quick, self.fit, "stretch"))
         self.lb_est = muted("")
-        f5.addRow("", hrow(self.lb_est, button("✍️ Viết lại kịch bản theo độ dài này", self.rewrite_script,
-                                               tip="AI viết lại kịch bản (Bước 2) cho đúng độ dài mới"), "stretch"))
+        f5.addRow("⏱ Thời lượng", hrow(self.minutes, *quick, self.fit, self.lb_est, "stretch"))
         self.minutes.valueChanged.connect(lambda _v: self.refresh_estimate())
         self.btn_go = button("🚀  XUẤT VIDEO", self.render, "big")
         self.lb_out = muted("")
         self.lb_out.setTextFormat(Qt.RichText)
         self.lb_out.setTextInteractionFlags(Qt.TextBrowserInteraction)
         self.lb_out.linkActivated.connect(lambda _l: self.open_dir())
-        self.auto_open = b.check(QCheckBox("Xuất xong tự mở thư mục chứa video"), "render", "open_folder_after")
         f5.addRow(hrow(self.btn_go, button("📂 Mở thư mục", self.open_dir), button("▶ Xem video", self.play_last),
-                       button("🧹 Xóa bản dựng tạm", self.clear_cache), "stretch"))
-        self.pub_thumbs = b.check(QCheckBox("Tự tạo thumbnail"), "render", "publish_thumbs")
-        self.pub_meta = b.check(QCheckBox("AI viết tiêu đề, mô tả, hashtag, mốc chương"), "render", "publish_meta")
-        f5.addRow(hrow(self.pub_thumbs, self.pub_meta,
-                       button("📣 Xem tiêu đề && thumbnail", self.show_publish,
-                              tip="Xem/sao chép tiêu đề, mô tả, hashtag, mốc chương; tạo lại thumbnail"),
-                       "stretch", self.auto_open))
+                       button("📣 Tiêu đề && thumbnail", self.show_publish),
+                       button("✍️ Viết lại kịch bản theo thời lượng", self.rewrite_script,
+                              tip="AI viết lại kịch bản (Bước 2) cho đúng thời lượng đã chọn"),
+                       "stretch", button("🧹 Xóa bản dựng tạm", self.clear_cache)))
         f5.addRow(self.lb_out)
-        l1.setColumnStretch(0, 1)
-        l1.setColumnStretch(1, 1)
-        l1.setRowStretch(2, 1)
         self.root.addWidget(tabs, 1)
         self.root.addWidget(g5)
         self.last_output: Path | None = None
@@ -313,8 +325,8 @@ class RenderPage(Page):
             QMessageBox.information(self, "Chưa có video", "Hãy XUẤT VIDEO trước - thumbnail và tiêu đề được tạo cho "
                                     "video vừa xuất.")
             return
-        txt = self.last_output.with_suffix(".youtube.txt")
-        if txt.exists() and self.last_output.with_name(self.last_output.stem + "_thumb.jpg").exists():
+        from recap.publish import extra
+        if extra(self.last_output, ".youtube.txt").exists() and extra(self.last_output, "_thumb.jpg").exists():
             PublishDialog(self, self.last_output).exec()
             return
         p = self.app.require_project()
@@ -352,7 +364,6 @@ class RenderPage(Page):
 
     def rewrite_script(self):
         sp = self.app.pages[1]
-        sp.minutes.setValue(self.minutes.value())
         self.app.goto(1)
         sp.do_script()
 
@@ -371,38 +382,6 @@ class RenderPage(Page):
             editor.clear_render_cache(p.dir)
             self.app.log("Đã xóa các đoạn dựng tạm.")
 
-    def check_vsr(self):
-        from recap import vsr
-        cur = self.vsr_dir.text().strip()
-        try:
-            if not cur:
-                found, err = vsr.autodetect(self.app.settings)
-                if not found:
-                    raise vsr.VSRError((err + "\n\n") if err else "Không tìm thấy VSR trên máy.\n\n"
-                                       "Bấm 🛠 Tự cài VSR để app tự tải và cài (dùng được card AMD).")
-                self.vsr_dir.setText(found)
-                cur = found
-            QMessageBox.information(self, "VSR sẵn sàng", vsr.check(cur) + "\n\nChọn 'Cách xử lý' = 🧠 Xóa sạch bằng AI.")
-            self.hardsub.setCurrentIndex(self.hardsub.findData("vsr"))
-        except vsr.VSRError as e:
-            QMessageBox.warning(self, "Chưa dùng được VSR", str(e) + "\n\nCách dễ nhất: để trống ô thư mục và bấm "
-                                "🛠 Tự cài VSR.")
-
-    def install_vsr(self):
-        from recap import vsr
-        acc = vsr.accelerator()
-        name = {"directml": "DirectML (card AMD/Intel)", "cuda": "CUDA (card NVIDIA)", "cpu": "CPU"}[acc]
-        if QMessageBox.question(self, "Tự cài VSR", f"App sẽ tải video-subtitle-remover {vsr.VSR_TAG} (mã nguồn + model "
-                                f"AI ~800 MB) và cài thư viện chạy bằng {name}, tổng khoảng 3-4 GB, mất 10-30 phút.\n\n"
-                                f"Nơi cài: {vsr.managed_dir(self.app.settings)}\n\nTiếp tục?") != QMessageBox.Yes:
-            return
-
-        def done(path):
-            self.vsr_dir.setText(path)
-            self.hardsub.setCurrentIndex(self.hardsub.findData("vsr"))
-            QMessageBox.information(self, "Đã cài VSR", f"Đã cài xong VSR tại:\n{path}\n\nĐã chọn chế độ "
-                                    "🧠 Xóa sạch bằng AI.")
-        self.app.run_task(vsr.install, self.app.settings, on_done=done, title="Cài VSR")
 
 
 class PublishDialog(QDialog):
@@ -416,13 +395,14 @@ class PublishDialog(QDialog):
         lay = QHBoxLayout(self)
         left = QVBoxLayout()
         self.text = QPlainTextEdit()
-        f = self.video.with_suffix(".youtube.txt")
+        f = extra(self.video, ".youtube.txt")
         self.text.setPlainText(f.read_text(encoding="utf-8") if f.exists() else "")
         left.addWidget(self.text, 1)
         left.addWidget(hrow(button("📋 Sao chép tất cả", self.copy_all, "primary"),
                             button("🔄 AI viết lại", lambda: self.regen(thumbs=False, meta=True)),
                             button("🖼 Tạo lại thumbnail", lambda: self.regen(thumbs=True, meta=False)),
-                            button("📂 Mở thư mục", lambda: reveal(self.video)), "stretch"))
+                            button("📂 Thư mục file phụ", lambda: reveal(extra(self.video, ".youtube.txt")),
+                                   tip="Phụ đề .srt, kịch bản, thumbnail, tiêu đề của video này"), "stretch"))
         lay.addLayout(left, 3)
         self.thumbs = QVBoxLayout()
         right = QWidget()
@@ -435,9 +415,8 @@ class PublishDialog(QDialog):
             w = self.thumbs.takeAt(0).widget()
             if w:
                 w.deleteLater()
-        stem = self.video.with_suffix("")
         for suf in ("_thumb.jpg", "_thumb_2.jpg", "_thumb_3.jpg", "_thumb_doc.jpg"):
-            p = Path(f"{stem}{suf}")
+            p = extra(self.video, suf)
             if not p.exists():
                 continue
             pm = QPixmap(str(p))
@@ -458,7 +437,7 @@ class PublishDialog(QDialog):
             return
 
         def done(_r):
-            f = self.video.with_suffix(".youtube.txt")
+            f = extra(self.video, ".youtube.txt")
             if f.exists():
                 self.text.setPlainText(f.read_text(encoding="utf-8"))
             self.load_thumbs()
