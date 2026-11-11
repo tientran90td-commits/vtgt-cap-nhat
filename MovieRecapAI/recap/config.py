@@ -60,7 +60,7 @@ DEFAULTS: dict = {
     },
     "script": {
         "provider": "gemini",
-        "model": "gemini-2.5-flash",
+        "model": "auto",
         "style": "review",
         "language": "Tiếng Việt",
         "target_minutes": 5.0,
@@ -119,7 +119,7 @@ DEFAULTS: dict = {
         "gap": 0.25,
     },
     "ui": {"last_dir": ""},
-    "config_version": 2,
+    "config_version": 3,
 }
 
 
@@ -168,6 +168,15 @@ class Settings:
                     if self.data["transcribe"].get("model") == "small":
                         self.data["transcribe"]["model"] = "auto"
                     self.data["config_version"] = 2
+                if int(raw.get("config_version", 1)) < 3:  # 1.1 -> 1.2: Google ngừng gemini-2.5-flash
+                    sc = self.data["script"]
+                    if sc.get("provider") == "gemini" and str(sc.get("model", "")).startswith(("gemini-2.5", "gemini-2.0",
+                                                                                               "gemini-1.5")):
+                        sc["model"] = "auto"
+                    vo = self.data["voice"]
+                    if vo.get("engine") == "gemini" and str(vo.get("model", "")).startswith("gemini-2.5"):
+                        vo["model"] = ""
+                    self.data["config_version"] = 3
             except Exception:
                 self.data = copy.deepcopy(DEFAULTS)
 

@@ -21,7 +21,8 @@ PROVIDERS: dict[str, dict] = {
         "name": "Google Gemini",
         "kind": "gemini",
         "key": "gemini_key",
-        "models": ["gemini-2.5-flash", "gemini-2.5-pro", "gemini-2.5-flash-lite", "gemini-3-pro-preview"],
+        # "auto": app tự lấy danh sách model của tài khoản và chọn bản Flash mới nhất còn dùng được
+        "models": ["auto", "gemini-3.8-flash", "gemini-2.5-flash", "gemini-2.5-pro"],
         "url_help": "https://aistudio.google.com/apikey",
         "note": "Có gói miễn phí, ngữ cảnh 1 triệu token - rất hợp với phim dài.",
     },
@@ -137,6 +138,10 @@ class LLMError(RuntimeError):
     pass
 
 
+class ModelNotFound(LLMError):
+    """Model không tồn tại / đã ngừng / tài khoản không được dùng -> có thể tự đổi sang model khác."""
+
+
 def _session(settings: Settings) -> requests.Session:
     s = requests.Session()
     proxy = (settings.get("api", "proxy") or "").strip()
@@ -163,9 +168,94 @@ def _require_key(pid: str, settings: Settings) -> str:
     return k
 
 
+_RESOLVED: dict[tuple[str, str], str] = {}  # (provider, model gốc) -> model thực dùng (trong phiên chạy)
+
+
+def _version_key(name: str) -> tuple:
+    nums = [float(x) for x in re.findall(r"\d+(?:\.\d+)?", name.split("/")[-1])[:3]]
+    stable = 0 if re.search(r"preview|exp|experimental|latest-preview", name) else 1
+    return (*(nums + [0, 0, 0])[:3], stable, -len(name))
+
+
+_SKIP_WORDS = ("tts", "image", "embedding", "embed", "live", "audio", "vision-only", "aqa", "learnlm", "thinking-exp",
+               "robotics", "computer-use", "veo", "imagen", "native-audio", "guard", "whisper", "moderation",
+               "realtime", "transcribe", "search")
+
+
+def pick_model(pid: str, old: str, candidates: list[str], kind: str = "text") -> str | None:
+    """Chọn model thay thế gần giống `old` nhất (cùng dòng flash/pro/lite/mini...) và mới nhất."""
+    old_l = (old or "").lower()
+    pool = []
+    for c in candidates:
+        cl = c.lower()
+        if kind == "tts":
+            if "tts" not in cl:
+                continue
+        elif any(w in cl for w in _SKIP_WORDS):
+            continue
+        if pid == "gemini" and not cl.startswith("gemini"):
+            continue
+        pool.append(c)
+    if not pool:
+        return None
+    families = ["flash-lite", "flash", "pro", "mini", "nano", "haiku", "sonnet", "opus", "turbo"]
+    fam = next((f for f in families if f in old_l), "flash" if pid == "gemini" else None)
+    same = [c for c in pool if fam and fam in c.lower() and (fam != "flash" or "lite" not in c.lower())]
+    return sorted(same or pool, key=_version_key, reverse=True)[0]
+
+
+def resolve_model(pid: str, model: str, settings: Settings, log=None, error: str = "", kind: str = "text") -> str:
+    """'auto' -> model mới nhất phù hợp; khi model bị báo không tồn tại -> model thay thế (ưu tiên model
+    mà chính nhà cung cấp gợi ý trong thông báo lỗi)."""
+    key = (pid, model or "auto", kind)
+    if not error and key in _RESOLVED:
+        return _RESOLVED[key]
+    if model and model != "auto" and not error:
+        return model
+    suggested = next((x for x in re.findall(r"models/([a-z0-9][\w.\-]*[a-z0-9])", error or "")
+                      if x != model and (kind != "tts" or "tts" in x)), None)
+    try:
+        cands = list_models(pid, settings)
+    except Exception:  # noqa: BLE001
+        cands = []
+    if suggested and (not cands or suggested in cands):
+        new = suggested
+    else:
+        new = pick_model(pid, model, [c for c in cands if c != model], kind) or suggested
+    if not new:
+        if model == "auto":
+            new = next((x for x in PROVIDERS[pid]["models"] if x != "auto"), model)
+        else:
+            raise LLMError(f"Model '{model}' không dùng được và không tìm được model thay thế. "
+                           "Bấm 🔄 cạnh ô Model ở Bước 2 để chọn model khác.")
+    _RESOLVED[key] = new
+    if log and new != model:
+        log(f"🔁 Dùng model {new}" + (f" thay cho '{model}' (model cũ đã ngừng hoặc không dùng được)."
+                                        if model not in ("", "auto") else " (tự chọn bản mới nhất)."), level="warn")
+    return new
+
+
 def chat(pid: str, model: str, system: str, user: str, settings: Settings, json_mode: bool = True,
          max_tokens: int = 32000, log=None, images: list[tuple[str, bytes]] | None = None) -> str:
-    """Gửi 1 yêu cầu, trả về văn bản trả lời. Tự thử lại khi lỗi mạng/quá tải."""
+    """Gửi 1 yêu cầu, trả về văn bản trả lời. Tự thử lại khi lỗi mạng/quá tải.
+    Nếu model đã ngừng hoạt động -> tự chuyển sang model mới và nhớ lại trong cài đặt."""
+    if PROVIDERS[pid]["kind"] != "none" and (model in ("", "auto") or (pid, model, "text") in _RESOLVED):
+        model = resolve_model(pid, model, settings, log)
+    try:
+        return _chat_once(pid, model, system, user, settings, json_mode, max_tokens, log, images)
+    except ModelNotFound as e:
+        new = resolve_model(pid, model, settings, log, error=str(e) or "not found")
+        if new == model:
+            raise
+        _RESOLVED[(pid, model, "text")] = new
+        if settings.get("script", "provider") == pid and settings.get("script", "model") in (model, "auto", ""):
+            if settings.get("script", "model") != "auto":
+                settings.set("script", "model", new)
+                settings.save()
+        return _chat_once(pid, new, system, user, settings, json_mode, max_tokens, log, images)
+
+
+def _chat_once(pid, model, system, user, settings, json_mode, max_tokens, log, images) -> str:
     kind = PROVIDERS[pid]["kind"]
     last_err: Exception | None = None
     for attempt in range(4):
@@ -206,6 +296,12 @@ def _check(resp: requests.Response, name: str) -> dict:
             detail = resp.json()
         except Exception:
             detail = resp.text[:500]
+        txt = str(detail)
+        low = txt.lower()
+        if resp.status_code == 404 or "model_not_found" in low or "model_decommissioned" in low or \
+                "no longer available" in low or "does not exist" in low or "is not found for api version" in low or \
+                ("model" in low and ("not found" in low or "deprecated" in low or "decommissioned" in low)):
+            raise ModelNotFound(f"{name}: model không dùng được ({resp.status_code}): {txt[:600]}")
         if resp.status_code in (401, 403):
             raise LLMError(f"{name}: API key không hợp lệ hoặc không có quyền ({resp.status_code}). {detail}")
         raise LLMError(f"{name}: lỗi HTTP {resp.status_code}: {detail}")
@@ -325,7 +421,7 @@ def _chat_anthropic(model, system, user, settings, max_tokens, log, images=None)
     except anthropic.PermissionDeniedError as e:
         raise LLMError(f"Claude: key không có quyền dùng model này ({e.message}).") from e
     except anthropic.NotFoundError as e:
-        raise LLMError(f"Claude: không tìm thấy model '{model}'.") from e
+        raise ModelNotFound(f"Claude: không tìm thấy model '{model}'.") from e
     except anthropic.BadRequestError as e:
         raise LLMError(f"Claude: yêu cầu không hợp lệ: {e.message}") from e
     except anthropic.RateLimitError as e:

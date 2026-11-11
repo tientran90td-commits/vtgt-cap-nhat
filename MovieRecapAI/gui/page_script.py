@@ -165,6 +165,8 @@ class ScriptPage(Page):
         else:
             self.model.setCurrentText((p.get("models") or [""])[0])
         note = p.get("note", "")
+        if "auto" in p.get("models", []):
+            note = "Model 'auto' = app tự chọn bản mới nhất còn dùng được. " + note
         key = p.get("key")
         if key and not self.app.settings.get("api", key):
             note = "⚠️ Chưa nhập API key - vào mục 🔑 API & Cài đặt. " + note

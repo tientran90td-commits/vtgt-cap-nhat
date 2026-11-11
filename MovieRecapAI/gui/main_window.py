@@ -222,6 +222,16 @@ class MainWindow(QMainWindow):
                                 "Vào '🔑 API & Cài đặt' để nhập, hoặc chọn AI khác ở bước 2.")
             self.goto(4)
             return
+        v = self.settings.section("voice")
+        if v.get("voice") == "clone" and v.get("engine") in ("vieneu", "xtts"):
+            from pathlib import Path as _P
+
+            if not v.get("xtts_ref") or not _P(v["xtts_ref"]).exists():
+                QMessageBox.warning(self, "Thiếu giọng mẫu",
+                                    "Bạn đang chọn '🎤 Nhân bản giọng' nhưng chưa chọn file giọng mẫu (3-8 giây).\n\n"
+                                    "Vào '🎙️ Giọng đọc' chọn file mẫu, hoặc chọn một giọng có sẵn (vd ⭐ Ngọc Huyền).")
+                self.goto(2)
+                return
         engine = sp.stt_engine.currentData()
         sub = sp.sub_file.text() or self.pending_subtitle
         if engine == "subtitle" and not sub:

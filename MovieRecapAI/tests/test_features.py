@@ -212,6 +212,55 @@ def check_components(s: Settings):
     print(f"✓ thành phần & model tự chọn (CPU {os.cpu_count()} luồng -> {m})")
 
 
+def check_model_fallback(s: Settings):
+    """Google ngừng gemini-2.5-flash (lỗi 404 như ảnh người dùng gửi) -> tự đổi model, nhớ vào cài đặt."""
+    import requests
+
+    calls = []
+
+    class R:
+        def __init__(self, code, js):
+            self.status_code, self._js, self.text = code, js, json.dumps(js)
+
+        def json(self):
+            return self._js
+
+    def post(self, url, **kw):
+        calls.append(url)
+        if "gemini-2.5-flash:" in url:
+            return R(404, {"error": {"code": 404, "status": "NOT_FOUND", "message":
+                    "This model models/gemini-2.5-flash is no longer available to new users. Please update your code "
+                    "to use models/gemini-3.8-flash for the latest features and improvements."}})
+        return R(200, {"candidates": [{"content": {"parts": [{"text": '{"ok": true}'}]}}]})
+
+    def get(self, url, **kw):
+        return R(200, {"models": [{"name": f"models/{n}", "supportedGenerationMethods": ["generateContent"]} for n in
+                                  ("gemini-2.5-flash", "gemini-3.8-flash", "gemini-3.8-flash-lite", "gemini-3.8-pro",
+                                   "gemini-3.8-flash-preview-tts", "gemini-3.9-flash-image")]})
+    old_p, old_g = requests.Session.post, requests.Session.get
+    requests.Session.post, requests.Session.get = post, get
+    llm._RESOLVED.clear()
+    try:
+        s.set("api", "gemini_key", "x")
+        s.set("script", "provider", "gemini")
+        s.set("script", "model", "gemini-2.5-flash")
+        assert llm.chat("gemini", "gemini-2.5-flash", "sys", "u", s) == '{"ok": true}'
+        assert "gemini-3.8-flash:generateContent" in calls[-1], calls
+        assert s.get("script", "model") == "gemini-3.8-flash"
+        n = len(calls)
+        llm.chat("gemini", "gemini-2.5-flash", "sys", "u", s)  # lần sau dùng luôn model mới, không gọi lỗi nữa
+        assert len(calls) == n + 1 and "3.8-flash:" in calls[-1]
+        llm._RESOLVED.clear()
+        assert llm.resolve_model("gemini", "auto", s) == "gemini-3.8-flash"
+        assert llm.resolve_model("gemini", "gemini-2.5-flash-lite", s, error="404") == "gemini-3.8-flash-lite"
+        assert llm.pick_model("gemini", "gemini-2.5-flash-preview-tts", ["gemini-3.8-flash", "gemini-3.8-flash-preview-tts"],
+                              "tts") == "gemini-3.8-flash-preview-tts"
+    finally:
+        requests.Session.post, requests.Session.get = old_p, old_g
+        llm._RESOLVED.clear()
+    print("✓ tự đổi model khi Google ngừng model cũ")
+
+
 def check_config_migration():
     f = TMP / "old.json"
     f.write_text(json.dumps({"render": {"encoder": "libx264"}, "transcribe": {"model": "small"}}), encoding="utf-8")
@@ -219,6 +268,9 @@ def check_config_migration():
     assert s.get("render", "encoder") == "auto" and s.get("transcribe", "model") == "auto"
     f.write_text(json.dumps({"config_version": 2, "render": {"encoder": "libx264"}}), encoding="utf-8")
     assert Settings(f).get("render", "encoder") == "libx264"  # người dùng tự chọn sau này thì giữ nguyên
+    f.write_text(json.dumps({"config_version": 2, "script": {"provider": "gemini", "model": "gemini-2.5-flash"}}),
+                 encoding="utf-8")
+    assert Settings(f).get("script", "model") == "auto"
     print("✓ nâng cấp cấu hình")
 
 
@@ -228,6 +280,7 @@ def main():
     check_read_styles()
     check_synth_robust(s)
     check_config_migration()
+    check_model_fallback(s)
     check_components(s)
     check_vision_payloads(s)
     check_tmdb(s)

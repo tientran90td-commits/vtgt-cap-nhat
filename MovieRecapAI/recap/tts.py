@@ -898,12 +898,21 @@ def _synth_gemini(text, voice, base: Path, opts, settings):
     body = {"contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {"responseModalities": ["AUDIO"],
                                  "speechConfig": {"voiceConfig": {"prebuiltVoiceConfig": {"voiceName": voice}}}}}
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-    for attempt in range(4):
+    for attempt in range(5):
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
         r = _session(settings).post(url, params={"key": key}, json=body, timeout=180)
         if r.status_code in (429, 500, 503):
             time.sleep(4 * (attempt + 1))
             continue
+        if r.status_code == 404 or (r.status_code == 400 and "no longer available" in r.text):
+            # model TTS cũ đã ngừng -> tự chọn model TTS mới nhất của tài khoản
+            from .llm import resolve_model
+
+            new = resolve_model("gemini", model, settings, error=r.text, kind="tts")
+            if new and new != model:
+                model = new
+                settings.set("voice", "model", new)
+                continue
         break
     if r.status_code >= 400:
         raise TTSError(f"Gemini TTS lỗi {r.status_code}: {r.text[:300]}")
