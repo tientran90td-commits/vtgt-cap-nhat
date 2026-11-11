@@ -215,7 +215,8 @@ class Project:
         cancel = cancel or threading.Event()
         sc = self.settings.section("script")
         ai = sc.get("provider") != "none"
-        if ai and sc.get("identify", True) and not self.film:
+        web = sc.get("provider") == "web"  # bản web: bớt số lần copy-dán (bỏ tự nhận diện & AI xem cảnh)
+        if ai and not web and sc.get("identify", True) and not self.film:
             log("Bước 1/6: Nhận diện phim")
             try:
                 self.run_identify(log, lambda p, m="": progress(p * 0.04, m), cancel)
@@ -227,7 +228,7 @@ class Project:
             log("Bước 2/6: Nhận dạng lời thoại")
             self.run_transcribe(log, lambda p, m="": progress(0.04 + p * 0.32, m), cancel, subtitle_file)
             # Nhận diện lại bằng lời thoại nếu lần đầu chưa chắc chắn
-            if ai and sc.get("identify", True) and float((self.film or {}).get("confidence") or 0) < 0.6:
+            if ai and not web and sc.get("identify", True) and float((self.film or {}).get("confidence") or 0) < 0.6:
                 try:
                     self.run_identify(log, lambda p, m="": progress(0.36 + p * 0.02, m), cancel)
                 except Cancelled:
@@ -237,7 +238,7 @@ class Project:
         if self.settings.get("transcribe", "use_scenes", True) and self.scenes is None:
             log("Bước 3/6: Dò chuyển cảnh")
             self.run_scenes(log, lambda p, m="": progress(0.38 + p * 0.1, m), cancel)
-        if ai and sc.get("visual") and not self.visual:
+        if ai and not web and sc.get("visual") and not self.visual:
             log("Bước 4/6: AI xem hình ảnh các cảnh")
             try:
                 self.run_visual(log, lambda p, m="": progress(0.48 + p * 0.07, m), cancel)

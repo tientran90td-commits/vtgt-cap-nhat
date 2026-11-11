@@ -54,7 +54,7 @@ class SettingsPage(Page):
         f1 = QFormLayout(g1)
         self.status: dict[str, QLabel] = {}
         for pid, p in llm.PROVIDERS.items():
-            if pid == "none":
+            if pid in ("none", "web"):
                 continue
             st = QLabel("")
             self.status[pid] = st

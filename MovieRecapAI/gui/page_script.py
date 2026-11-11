@@ -86,6 +86,13 @@ class ScriptPage(Page):
         f2.addRow("Ngôn ngữ kể", self.lang)
         f2.addRow("Độ dài video", hrow(self.minutes, self.spoiler, "stretch"))
         f2.addRow("Yêu cầu thêm", self.custom)
+        self.fallback = b.check(QCheckBox("AI này hết tiền/quá tải → tự chuyển sang AI khác đã nhập key"),
+                                "script", "auto_fallback")
+        f2.addRow(self.fallback)
+        self.web_max = b.spin(spin(5000, 1000000, 5000, " ký tự/lần dán"), "script", "web_max_chars")
+        self.web_max.setToolTip("Phim dài hơn mức này sẽ được chia thành nhiều lần copy-dán. "
+                                "ChatGPT/Gemini web: 30.000-60.000 · Google AI Studio: 300.000+")
+        f2.addRow("Bản web", self.web_max)
         f2.addRow(hrow(button("② AI viết kịch bản", self.do_script, "primary"),
                        button("⚡ Làm hết + xuất video", self.app.run_all), "stretch"))
         ll.addWidget(g2)
@@ -171,6 +178,11 @@ class ScriptPage(Page):
         if key and not self.app.settings.get("api", key):
             note = "⚠️ Chưa nhập API key - vào mục 🔑 API & Cài đặt. " + note
         self.lb_prov.setText(note)
+        if hasattr(self, "web_max"):
+            self.web_max.setVisible(pid == "web")
+            lb = self.web_max.parentWidget().layout().labelForField(self.web_max)
+            if lb:
+                lb.setVisible(pid == "web")
 
     def refresh_models(self):
         pid = self.provider.currentData()

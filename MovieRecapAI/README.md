@@ -73,6 +73,10 @@ Không cần nhập hết, chỉ cần dịch vụ bạn dùng. Bấm **Kiểm t
 
 Key chỉ lưu trên máy bạn: `%APPDATA%\MovieRecapAI\settings.json` (Windows).
 
+**Không muốn dùng API key?** Chọn nhà cung cấp **🌐 Dùng bản WEB** ở Bước 2. App copy sẵn câu lệnh và mở trang ChatGPT / Gemini / **Google AI Studio** / Claude / DeepSeek / Grok / Copilot, bạn dán vào rồi dán câu trả lời ngược lại vào app (thường 1 lần cho mỗi video, phim rất dài thì vài lần). App không tự đăng nhập hay điều khiển trang web vì làm vậy vi phạm điều khoản của các dịch vụ và dễ bị khóa tài khoản. Nên dùng **Google AI Studio**: miễn phí và đọc được lời thoại cả bộ phim trong 1 lần.
+
+**AI báo lỗi 429 / hết tiền?** App phân biệt: *hết tiền/hết lượt trong ngày* (báo rõ cách khắc phục, không thử lại vô ích), *quá tải tạm thời* (đợi đúng thời gian nhà cung cấp yêu cầu), *yêu cầu quá dài* (tự chia nhỏ lời thoại). Nếu bạn đã nhập key của nhiều AI, app **tự chuyển sang AI khác** khi AI đang dùng hết tiền hoặc quá tải. Lưu ý: gói ChatGPT Plus **không** bao gồm API, API OpenAI phải nạp tiền riêng.
+
 **Bộ miễn phí 100%:** Whisper offline + Gemini (free) + Edge TTS. Hoặc **offline hoàn toàn:** Whisper + Ollama + Piper.
 
 ## 🎬 Cách dùng

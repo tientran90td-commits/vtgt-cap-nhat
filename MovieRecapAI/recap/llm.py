@@ -125,6 +125,15 @@ PROVIDERS: dict[str, dict] = {
         "models": [],
         "url_help": "",
     },
+    "web": {
+        "name": "🌐 Dùng bản WEB miễn phí (ChatGPT / Gemini / Claude... copy & dán)",
+        "kind": "web",
+        "key": None,
+        "models": ["aistudio", "chatgpt", "gemini", "claude", "deepseek", "grok", "copilot"],
+        "max_chars": 60000,
+        "note": "Không cần API key. App copy sẵn câu lệnh & mở trang web, bạn dán vào rồi dán câu trả lời lại vào app. "
+                "Khuyên dùng 'aistudio' (Google AI Studio: miễn phí, đọc được phim rất dài).",
+    },
     "none": {
         "name": "Không dùng AI (tự chọn đoạn theo thoại)",
         "kind": "none",
@@ -140,6 +149,22 @@ class LLMError(RuntimeError):
 
 class ModelNotFound(LLMError):
     """Model không tồn tại / đã ngừng / tài khoản không được dùng -> có thể tự đổi sang model khác."""
+
+
+class QuotaError(LLMError):
+    """Hết tiền / hết hạn mức ngày - thử lại vô ích, nên đổi sang AI khác."""
+
+
+class TooLarge(LLMError):
+    """Yêu cầu dài quá hạn mức token/phút của tài khoản -> cần chia nhỏ transcript."""
+
+    def __init__(self, msg: str, limit_tokens: int = 0):
+        super().__init__(msg)
+        self.limit_tokens = limit_tokens
+
+
+class RateLimited(LLMError):
+    """Đã thử lại nhiều lần nhưng nhà cung cấp vẫn báo quá tải."""
 
 
 def _session(settings: Settings) -> requests.Session:
@@ -235,11 +260,63 @@ def resolve_model(pid: str, model: str, settings: Settings, log=None, error: str
     return new
 
 
+FALLBACK_ORDER = ["gemini", "anthropic", "openai", "openrouter", "deepseek", "xai", "mistral", "qwen", "groq"]
+_DEAD: dict[str, str] = {}  # nhà cung cấp đã hết tiền/hạn mức trong phiên này -> bỏ qua luôn
+
+
+def fallback_providers(pid: str, settings: Settings) -> list[str]:
+    """Các AI khác mà người dùng đã nhập key (dùng khi AI chính hết tiền/quá tải)."""
+    out = []
+    for p in FALLBACK_ORDER:
+        if p == pid or p in _DEAD:
+            continue
+        k = PROVIDERS[p].get("key")
+        if k and (settings.get("api", k) or "").strip():
+            out.append(p)
+    return out
+
+
 def chat(pid: str, model: str, system: str, user: str, settings: Settings, json_mode: bool = True,
          max_tokens: int = 32000, log=None, images: list[tuple[str, bytes]] | None = None) -> str:
     """Gửi 1 yêu cầu, trả về văn bản trả lời. Tự thử lại khi lỗi mạng/quá tải.
-    Nếu model đã ngừng hoạt động -> tự chuyển sang model mới và nhớ lại trong cài đặt."""
-    if PROVIDERS[pid]["kind"] != "none" and (model in ("", "auto") or (pid, model, "text") in _RESOLVED):
+    - Model đã ngừng -> tự chuyển model mới.
+    - Hết tiền / quá tải kéo dài -> tự chuyển sang AI khác mà bạn đã nhập key (nếu bật)."""
+    if pid in _DEAD and settings.get("script", "auto_fallback", True):
+        alts = fallback_providers(pid, settings)
+        if alts:
+            pid, model = alts[0], "auto" if alts[0] == "gemini" else PROVIDERS[alts[0]]["models"][0]
+    try:
+        return _chat_model(pid, model, system, user, settings, json_mode, max_tokens, log, images)
+    except (QuotaError, RateLimited) as e:
+        if isinstance(e, QuotaError):
+            _DEAD[pid] = str(e)
+        if not settings.get("script", "auto_fallback", True):
+            raise
+        alts = fallback_providers(pid, settings)
+        if not alts:
+            raise LLMError(f"{e}\n\n👉 Nhập thêm key của AI khác (vd Gemini miễn phí) ở mục 🔑 API & Cài đặt - "
+                           "app sẽ tự chuyển sang khi AI này lỗi.") from e
+        last = e
+        for alt in alts:
+            alt_model = "auto" if alt == "gemini" else PROVIDERS[alt]["models"][0]
+            if log:
+                log(f"🔀 {PROVIDERS[pid]['name']} không dùng được ({str(e).splitlines()[0][:120]}) "
+                    f"-> tự chuyển sang {PROVIDERS[alt]['name']}.", level="warn")
+            try:
+                return _chat_model(alt, alt_model, system, user, settings, json_mode, max_tokens, log, images)
+            except (QuotaError, RateLimited, ModelNotFound) as e2:
+                if isinstance(e2, QuotaError):
+                    _DEAD[alt] = str(e2)
+                last = e2
+            except TooLarge:
+                raise
+            except LLMError as e2:
+                last = e2
+        raise LLMError(f"Tất cả AI đều lỗi. Lỗi cuối: {last}") from e
+
+
+def _chat_model(pid, model, system, user, settings, json_mode, max_tokens, log, images) -> str:
+    if PROVIDERS[pid]["kind"] not in ("none", "web") and (model in ("", "auto") or (pid, model, "text") in _RESOLVED):
         model = resolve_model(pid, model, settings, log)
     try:
         return _chat_once(pid, model, system, user, settings, json_mode, max_tokens, log, images)
@@ -255,10 +332,36 @@ def chat(pid: str, model: str, system: str, user: str, settings: Settings, json_
         return _chat_once(pid, new, system, user, settings, json_mode, max_tokens, log, images)
 
 
+# ---- Chế độ WEB: giao diện đăng ký 1 hàm "cầu nối" hiện hộp thoại copy & dán cho người dùng
+WEB_SITES = {
+    "aistudio": ("Google AI Studio (miễn phí, ngữ cảnh 1 triệu token)", "https://aistudio.google.com/prompts/new_chat"),
+    "chatgpt": ("ChatGPT", "https://chatgpt.com/"),
+    "gemini": ("Gemini", "https://gemini.google.com/app"),
+    "claude": ("Claude", "https://claude.ai/new"),
+    "deepseek": ("DeepSeek", "https://chat.deepseek.com/"),
+    "grok": ("Grok", "https://grok.com/"),
+    "copilot": ("Microsoft Copilot", "https://copilot.microsoft.com/"),
+}
+WEB_BRIDGE = None  # callable(site, prompt, json_mode) -> str ; do giao diện gán
+
+
+def web_prompt(system: str, user: str, json_mode: bool) -> str:
+    tail = ("\n\nQUAN TRỌNG: Chỉ trả lời bằng MỘT khối JSON hợp lệ theo đúng cấu trúc yêu cầu ở trên, "
+            "không giải thích thêm, không cắt ngắn." if json_mode else "")
+    return f"{system.strip()}\n\n{user.strip()}{tail}"
+
+
 def _chat_once(pid, model, system, user, settings, json_mode, max_tokens, log, images) -> str:
     kind = PROVIDERS[pid]["kind"]
+    if kind == "web":
+        if WEB_BRIDGE is None:
+            raise LLMError("Chế độ dùng bản web chỉ chạy trong giao diện app.")
+        if log:
+            log(f"🌐 Chờ bạn dán câu trả lời từ {WEB_SITES.get(model, (model,))[0]}...")
+        return WEB_BRIDGE(model, web_prompt(system, user, json_mode), json_mode)
     last_err: Exception | None = None
-    for attempt in range(4):
+    attempts = 6
+    for attempt in range(attempts):
         try:
             if kind == "anthropic":
                 return _chat_anthropic(model, system, user, settings, max_tokens, log, images)
@@ -271,9 +374,11 @@ def _chat_once(pid, model, system, user, settings, json_mode, max_tokens, log, i
             raise
         except _Retryable as e:
             last_err = e
-            wait = 2 ** (attempt + 1)
+            if attempt == attempts - 1:
+                break
+            wait = min(65.0, max(getattr(e, "delay", 0.0) + 1, 2 ** (attempt + 1)))
             if log:
-                log(f"AI bận/quá tải ({e}). Thử lại sau {wait}s...", level="warn")
+                log(f"AI bận/quá tải ({e}). Thử lại sau {wait:.0f}s ({attempt + 1}/{attempts - 1})...", level="warn")
             time.sleep(wait)
         except requests.RequestException as e:
             last_err = e
@@ -281,15 +386,55 @@ def _chat_once(pid, model, system, user, settings, json_mode, max_tokens, log, i
             if log:
                 log(f"Lỗi mạng ({e}). Thử lại sau {wait}s...", level="warn")
             time.sleep(wait)
+    if isinstance(last_err, _Retryable):
+        raise RateLimited(f"{PROVIDERS[pid]['name']} đang quá tải / giới hạn tốc độ ({last_err}). "
+                          "Hãy thử lại sau ít phút hoặc dùng AI khác.")
     raise LLMError(f"Gọi AI thất bại: {last_err}")
 
 
 class _Retryable(Exception):
-    pass
+    def __init__(self, msg: str = "", delay: float = 0.0):
+        super().__init__(msg)
+        self.delay = delay
+
+
+QUOTA_HELP = {
+    "OpenAI (ChatGPT)": "Tài khoản OpenAI hết tiền hoặc chưa nạp tiền (API tính phí riêng, khác gói ChatGPT Plus). "
+                        "Nạp tại platform.openai.com/settings/organization/billing",
+    "Google Gemini": "Đã dùng hết lượt miễn phí trong ngày của Gemini. Đợi sang ngày mới, bật tính phí, "
+                     "hoặc dùng AI khác.",
+    "Anthropic Claude": "Tài khoản Anthropic hết tín dụng. Nạp tại console.anthropic.com/settings/billing",
+}
+
+
+def classify_limit(status: int, body: str, name: str, retry_after: str | None = None):
+    """Phân loại lỗi 429/413: hết tiền (QuotaError) / yêu cầu quá lớn (TooLarge) / quá tải tạm thời (_Retryable)."""
+    low = (body or "").lower()
+    if "insufficient_quota" in low or "credit balance" in low or "billing_hard_limit" in low or \
+            "perday" in low or "per day" in low or "requests per day" in low or "(rpd)" in low:
+        help_ = QUOTA_HELP.get(name, "Tài khoản đã hết tiền/hết hạn mức của dịch vụ này.")
+        raise QuotaError(f"{name}: {help_}\nChi tiết: {body[:300]}")
+    if "request too large" in low or status == 413 or ("tokens per min" in low and "requested" in low):
+        m = re.search(r"limit[\s:]*([\d,]+)", body or "", re.I)
+        lim = int(m.group(1).replace(",", "")) if m else 0
+        raise TooLarge(f"{name}: yêu cầu dài quá hạn mức token/phút của tài khoản (giới hạn {lim or '?'} token).", lim)
+    delay = 0.0
+    if retry_after:
+        try:
+            delay = float(retry_after)
+        except ValueError:
+            delay = 0.0
+    m = re.search(r'"?retryDelay"?\s*[:=]\s*"?(\d+(?:\.\d+)?)s', body or "") or \
+        re.search(r"(?:try again|retry) in (\d+(?:\.\d+)?)\s*s", body or "", re.I)
+    if m:
+        delay = max(delay, float(m.group(1)))
+    raise _Retryable(f"HTTP {status}", delay)
 
 
 def _check(resp: requests.Response, name: str) -> dict:
-    if resp.status_code in (429, 500, 502, 503, 504, 529):
+    if resp.status_code in (429, 413):
+        classify_limit(resp.status_code, resp.text[:2000], name, resp.headers.get("retry-after"))
+    if resp.status_code in (500, 502, 503, 504, 529):
         raise _Retryable(f"HTTP {resp.status_code}")
     if resp.status_code >= 400:
         try:
@@ -423,9 +568,11 @@ def _chat_anthropic(model, system, user, settings, max_tokens, log, images=None)
     except anthropic.NotFoundError as e:
         raise ModelNotFound(f"Claude: không tìm thấy model '{model}'.") from e
     except anthropic.BadRequestError as e:
+        if "credit balance" in str(e.message).lower():
+            raise QuotaError(f"Anthropic Claude: {QUOTA_HELP['Anthropic Claude']}") from e
         raise LLMError(f"Claude: yêu cầu không hợp lệ: {e.message}") from e
     except anthropic.RateLimitError as e:
-        raise _Retryable("rate limit") from e
+        classify_limit(429, str(e.message), "Anthropic Claude", e.response.headers.get("retry-after"))
     except anthropic.APIStatusError as e:
         if e.status_code >= 500:
             raise _Retryable(f"HTTP {e.status_code}") from e
@@ -446,8 +593,8 @@ def list_models(pid: str, settings: Settings) -> list[str]:
     p = PROVIDERS[pid]
     kind = p["kind"]
     s = _session(settings)
-    if kind == "none":
-        return ["-"]
+    if kind in ("none", "web"):
+        return list(p["models"])
     if kind == "anthropic":
         import anthropic
 

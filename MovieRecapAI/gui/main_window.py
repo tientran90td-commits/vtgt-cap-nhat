@@ -33,6 +33,13 @@ class MainWindow(QMainWindow):
         self.settings = settings or Settings()
         set_ffmpeg_path(self.settings.get("paths", "ffmpeg") or None)
         self.binder = Binder(self.settings)
+        # chế độ dùng AI bản web (copy & dán)
+        from recap import llm as _llm
+
+        from .web_chat import WebBridge
+
+        self.web_bridge = WebBridge(self)
+        _llm.WEB_BRIDGE = self.web_bridge
         self.project: Project | None = None
         self.pending_subtitle: str | None = None
         self.workers: list[Worker] = []

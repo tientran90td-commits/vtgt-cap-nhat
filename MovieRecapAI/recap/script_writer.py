@@ -143,34 +143,51 @@ def write_script(transcript: list[dict], duration: float, settings: Settings, op
         from .llm import resolve_model
 
         model = resolve_model(pid, "auto", settings, log)
-    text = transcript_to_text(transcript)
+    full_text = transcript_to_text(transcript)
     max_chars = int(opts.get("max_chars") or PROVIDERS[pid].get("max_chars") or 150000)
     max_chars = min(max_chars, PROVIDERS[pid].get("max_chars", max_chars))
-    notes = False
-    if len(text) > max_chars:
-        # Phim quá dài so với ngữ cảnh của model -> tóm tắt từng phần trước (map-reduce)
-        parts = _split_lines(text, max_chars // 2)
-        log(f"Transcript dài {len(text):,} ký tự > giới hạn {max_chars:,}. Tóm tắt trước {len(parts)} phần...")
-        summaries = []
-        for i, part in enumerate(parts):
-            if cancel.is_set():
-                raise Cancelled()
-            progress(0.7 * i / len(parts), f"AI đọc phần {i + 1}/{len(parts)}")
-            from .film_id import film_context
-
-            summaries.append(chat(pid, model, CHUNK_SYSTEM, film_context(film) + "\n\n" + part, settings,
-                                  json_mode=False, max_tokens=4000, log=log))
-        text = "\n".join(summaries)
-        notes = True
-    if cancel.is_set():
-        raise Cancelled()
-    progress(0.75, f"AI ({PROVIDERS[pid]['name']} / {model}) đang viết kịch bản...")
-    log(f"Gửi {len(text):,} ký tự cho AI {model}...")
+    if pid == "web":  # bản web: mỗi lần dán tối đa bao nhiêu ký tự (người dùng chỉnh được)
+        max_chars = int(opts.get("web_max_chars") or 60000)
     from .film_id import film_context
+    from .llm import TooLarge
 
     vis = "\n".join(f"[{fmt_ts(v['t'])}] {v['desc']}" for v in (visual or []))
-    raw = chat(pid, model, SYSTEM, build_user_prompt(text, duration, opts, notes, film_context(film), vis), settings,
-               json_mode=True, log=log)
+    for _try in range(4):
+        try:
+            text, notes = full_text, False
+            if len(text) > max_chars:
+                # Phim quá dài so với ngữ cảnh/hạn mức của model -> tóm tắt từng phần trước (map-reduce)
+                parts = _split_lines(text, max_chars // 2)
+                log(f"Transcript dài {len(text):,} ký tự > giới hạn {max_chars:,}. Tóm tắt trước {len(parts)} phần...")
+                summaries = []
+                for i, part in enumerate(parts):
+                    if cancel.is_set():
+                        raise Cancelled()
+                    progress(0.7 * i / len(parts), f"AI đọc phần {i + 1}/{len(parts)}")
+                    summaries.append(chat(pid, model, CHUNK_SYSTEM, film_context(film) + "\n\n" + part, settings,
+                                          json_mode=False, max_tokens=4000, log=log))
+                text = "\n".join(summaries)
+                notes = True
+            if cancel.is_set():
+                raise Cancelled()
+            progress(0.75, f"AI ({PROVIDERS[pid]['name']} / {model}) đang viết kịch bản...")
+            log(f"Gửi {len(text):,} ký tự cho AI {model}...")
+            raw = chat(pid, model, SYSTEM, build_user_prompt(text, duration, opts, notes, film_context(film), vis),
+                       settings, json_mode=True, log=log)
+            break
+        except TooLarge as e:
+            # ~3 ký tự/token cho tiếng Việt/Anh trộn, chừa chỗ cho prompt & câu trả lời
+            cur = min(max_chars, len(full_text))
+            new_max = cur // 2
+            if e.limit_tokens:
+                new_max = min(new_max, int(e.limit_tokens * 3 * 0.5))
+            max_chars = max(3000, new_max)
+            log(f"{e} -> chia nhỏ lời thoại (mỗi phần ≤ {max_chars:,} ký tự) rồi thử lại.", level="warn")
+            if _try == 3:
+                raise
+            import time
+
+            time.sleep(20)  # đợi hạn mức token/phút hồi lại
     data = extract_json(raw)
     script = normalize_script(data, duration, scene_cuts, opts.get("mode", "narrate"))
     progress(1.0, "Đã có kịch bản")

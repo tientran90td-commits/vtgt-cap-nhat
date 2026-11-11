@@ -332,6 +332,100 @@ def check_warmup(s: Settings):
     print("✓ nạp sẵn khi mở app")
 
 
+def check_rate_limits(s: Settings):
+    """Lỗi 429 như ảnh người dùng: OpenAI hết tiền -> báo rõ & tự chuyển sang Gemini; quá tải -> đợi đúng thời gian."""
+    import requests
+    import time as _time
+
+    sent = []
+
+    class R:
+        def __init__(self, code, js, headers=None):
+            self.status_code, self._js, self.text, self.headers = code, js, json.dumps(js), headers or {}
+
+        def json(self):
+            return self._js
+    mode = {"openai": "quota"}
+
+    def post(self, url, **kw):
+        sent.append(url)
+        if "api.openai.com" in url:
+            if mode["openai"] == "quota":
+                return R(429, {"error": {"message": "You exceeded your current quota, please check your plan and "
+                                                    "billing details.", "type": "insufficient_quota",
+                                         "code": "insufficient_quota"}})
+            if mode["openai"] == "toolarge":
+                return R(429, {"error": {"message": "Request too large for gpt-4.1 in organization org-x on tokens "
+                                                    "per min (TPM): Limit 30000, Requested 45210.",
+                                         "code": "rate_limit_exceeded"}})
+            body = kw.get("json") or {}
+            return R(200, {"choices": [{"message": {"content": json.dumps({"segments": [
+                {"start": "00:00:01", "end": "00:00:09", "narration": "ok"}]}) if "segments" in str(body)[:4000]
+                else "tóm tắt"}}]})
+        if "generativelanguage" in url:
+            if mode.get("gemini") == "minute" and sum("generativelanguage" in u for u in sent) == 1:
+                return R(429, {"error": {"code": 429, "status": "RESOURCE_EXHAUSTED", "message": "quota",
+                                         "details": [{"quotaId": "GenerateRequestsPerMinutePerProjectPerModel-FreeTier"},
+                                                     {"@type": "type.googleapis.com/google.rpc.RetryInfo",
+                                                      "retryDelay": "7s"}]}})
+            return R(200, {"candidates": [{"content": {"parts": [{"text": '{"ok": "gemini"}'}]}}]})
+        raise AssertionError(url)
+    waits = []
+    old_post, old_sleep = requests.Session.post, _time.sleep
+    requests.Session.post = post
+    _time.sleep = lambda x: waits.append(x)
+    llm._DEAD.clear()
+    llm._RESOLVED.clear()
+    try:
+        s.set("api", "openai_key", "sk")
+        s.set("api", "gemini_key", "")
+        s.set("script", "auto_fallback", True)
+        try:
+            llm.chat("openai", "gpt-4.1", "sys", "u", s)
+            raise AssertionError("phải báo lỗi")
+        except llm.LLMError as e:
+            assert "hết tiền" in str(e) and "Nhập thêm key" in str(e), e
+        assert sum("openai" in u for u in sent) == 1, "hết tiền thì không được thử lại vô ích"
+        llm._DEAD.clear()
+        s.set("api", "gemini_key", "g")
+        llm._RESOLVED[("gemini", "auto", "text")] = "gemini-3.8-flash"
+        assert llm.chat("openai", "gpt-4.1", "sys", "u", s) == '{"ok": "gemini"}'
+        n_openai = sum("openai" in u for u in sent)
+        llm.chat("openai", "gpt-4.1", "sys", "u", s)  # lần sau đi thẳng Gemini
+        assert sum("openai" in u for u in sent) == n_openai
+        # Gemini quá tải theo phút -> đợi đúng retryDelay (7s) rồi thử lại
+        llm._DEAD.clear()
+        sent.clear()
+        mode["gemini"] = "minute"
+        waits.clear()
+        assert llm.chat("gemini", "gemini-3.8-flash", "sys", "u", s) == '{"ok": "gemini"}'
+        assert waits and waits[0] >= 7, waits
+        # Yêu cầu quá dài so với hạn mức TPM -> tự chia nhỏ lời thoại rồi viết lại
+        mode["openai"] = "toolarge"
+        llm._DEAD.clear()
+        calls = {"n": 0}
+        real_post = requests.Session.post
+
+        def post2(self, url, **kw):
+            calls["n"] += 1
+            if calls["n"] > 1:
+                mode["openai"] = "ok"
+            return real_post(self, url, **kw)
+        requests.Session.post = post2
+        tr = [{"start": i * 5, "end": i * 5 + 4, "text": "câu thoại khá dài " * 6} for i in range(400)]
+        logs = []
+        sc = script_writer.write_script(tr, 2000, s, {"provider": "openai", "model": "gpt-4.1", "target_minutes": 1},
+                                        lambda m, level="": logs.append(m), lambda *a, **k: None,
+                                        __import__("threading").Event())
+        assert sc["segments"] and any("chia nhỏ" in m for m in logs) and any("Tóm tắt trước" in m for m in logs), logs
+    finally:
+        requests.Session.post, _time.sleep = old_post, old_sleep
+        llm._DEAD.clear()
+        llm._RESOLVED.clear()
+        s.set("api", "openai_key", "")
+    print("✓ lỗi 429: hết tiền / quá tải / quá dài + tự chuyển AI")
+
+
 def check_config_migration():
     f = TMP / "old.json"
     f.write_text(json.dumps({"render": {"encoder": "libx264"}, "transcribe": {"model": "small"}}), encoding="utf-8")
@@ -354,6 +448,7 @@ def main():
     check_scenes()
     check_warmup(s)
     check_model_fallback(s)
+    check_rate_limits(s)
     check_components(s)
     check_vision_payloads(s)
     check_tmdb(s)
