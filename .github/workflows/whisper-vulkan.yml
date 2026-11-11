@@ -1,0 +1,75 @@
+# Dựng whisper.cpp (MIT) bản Vulkan cho Windows để Movie Recap AI nhận dạng thoại bằng card AMD/Intel/NVIDIA.
+# whisper.cpp không phát hành sẵn bản Vulkan cho Windows nên ta tự dựng và đăng vào Release của repo này.
+name: whisper.cpp Vulkan (Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/movie-summary-app-0q90dq']
+    paths: ['.github/workflows/whisper-vulkan.yml']
+
+permissions:
+  contents: write
+
+env:
+  WHISPER_TAG: v1.9.5
+  RELEASE_TAG: whisper-vulkan-v1.9.5
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: msys2 {0}
+    steps:
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: UCRT64
+          update: true
+          install: >-
+            git zip
+            mingw-w64-ucrt-x86_64-gcc
+            mingw-w64-ucrt-x86_64-cmake
+            mingw-w64-ucrt-x86_64-ninja
+            mingw-w64-ucrt-x86_64-vulkan-devel
+            mingw-w64-ucrt-x86_64-shaderc
+            mingw-w64-ucrt-x86_64-spirv-headers
+
+      - name: Lấy mã nguồn whisper.cpp
+        run: git clone --depth 1 --branch "$WHISPER_TAG" https://github.com/ggml-org/whisper.cpp src
+
+      - name: Dựng (Vulkan + CPU AVX2, chạy được trên i5/Ryzen đời mới)
+        run: |
+          cd src
+          cmake -B build -G Ninja -DCMAKE_BUILD_TYPE=Release -DGGML_VULKAN=ON -DGGML_NATIVE=OFF \
+            -DGGML_AVX=ON -DGGML_AVX2=ON -DGGML_FMA=ON -DGGML_F16C=ON -DWHISPER_BUILD_TESTS=OFF \
+            -DWHISPER_BUILD_SERVER=OFF -DBUILD_SHARED_LIBS=OFF \
+            -DCMAKE_EXE_LINKER_FLAGS="-static-libgcc -static-libstdc++"
+          cmake --build build -j 4 --target whisper-cli
+
+      - name: Đóng gói kèm DLL cần thiết
+        run: |
+          mkdir -p out/whisper-vulkan
+          cp src/build/bin/whisper-cli.exe out/whisper-vulkan/
+          for d in $(ldd out/whisper-vulkan/whisper-cli.exe | grep -i '/ucrt64/' | awk '{print $3}'); do cp "$d" out/whisper-vulkan/; done
+          cp src/LICENSE out/whisper-vulkan/LICENSE-whisper.cpp.txt
+          echo "whisper.cpp $WHISPER_TAG - Vulkan build (GGML_VULKAN=ON)" > out/whisper-vulkan/VERSION.txt
+          ls -la out/whisper-vulkan
+          cd out && zip -r ../whisper-vulkan-win-x64.zip whisper-vulkan
+
+      - name: Chạy thử (máy CI không có GPU -> tự dùng CPU)
+        run: |
+          curl -sSL -o ggml-tiny.bin https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin
+          ./out/whisper-vulkan/whisper-cli.exe -m ggml-tiny.bin -f src/samples/jfk.wav -l en -oj -of jfk -np -t 2
+          cat jfk.json
+          grep -q '"transcription"' jfk.json
+
+      - name: Đăng Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release delete $env:RELEASE_TAG -R $env:GITHUB_REPOSITORY -y --cleanup-tag 2>$null
+          gh release create $env:RELEASE_TAG whisper-vulkan-win-x64.zip -R $env:GITHUB_REPOSITORY `
+            --target $env:GITHUB_SHA --title "whisper.cpp $env:WHISPER_TAG Vulkan (Windows x64)" `
+            --notes "Bản dựng whisper.cpp $env:WHISPER_TAG (MIT) với Vulkan để Movie Recap AI nhận dạng thoại bằng card đồ họa. Tự động dựng bởi GitHub Actions."
