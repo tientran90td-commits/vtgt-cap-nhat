@@ -207,6 +207,12 @@ def clean_clip(video: str, start: float, dur: float, band: dict, mode: str, vsr_
                log, cancel, settings=None) -> Path:
     """Cắt đoạn [start, start+dur] của phim, xóa phụ đề trong dải `band` bằng VSR, trả về file sạch (bắt đầu từ 0s)."""
     py, root, main = find(resolve_dir(vsr_dir, settings))
+    if str(root) not in _patched:
+        _patched.add(str(root))
+        if _py_ver(str(py)) not in ("3.12", "3.13", "3.14"):
+            n = compat_patch(root)
+            if n:
+                log(f"Đã vá {n} dòng mã VSR cho tương thích Python {_py_ver(str(py))}.", level="debug")
     mode = mode if mode in MODES else "sttn-auto"
     st = os.stat(video)
     key = hashlib.sha1(repr((str(video), st.st_size, int(st.st_mtime), round(start, 3), round(dur, 3),
@@ -272,21 +278,74 @@ def accelerator() -> str:
     return "directml" if os.name == "nt" else "cpu"
 
 
+def _py_ver(py: str) -> str:
+    try:
+        return subprocess.run([py, "-c", "import sys;print('%d.%d' % sys.version_info[:2])"], capture_output=True,
+                              text=True, timeout=60, **_no_window_kwargs()).stdout.strip()
+    except (OSError, subprocess.SubprocessError):
+        return ""
+
+
 def _base_python(accel: str, log) -> str:
-    from .components import python_exe
+    """VSR cần Python 3.12 (mã nguồn dùng cú pháp f-string mới; torch-directml chỉ có tới 3.12)."""
+    from .components import pip_install, python_exe
 
     py = python_exe()
-    ver = subprocess.run([py, "-c", "import sys;print('%d.%d' % sys.version_info[:2])"], capture_output=True,
-                         text=True, **_no_window_kwargs()).stdout.strip()
-    if accel == "directml" and ver not in ("3.10", "3.11", "3.12") and shutil.which("py"):
-        # torch-directml chỉ có cho Python 3.10-3.12 -> thử Python 3.12 qua trình khởi chạy py của Windows
-        r = subprocess.run(["py", "-3.12", "-c", "import sys;print(sys.executable)"], capture_output=True, text=True,
+    if _py_ver(py) == "3.12":
+        return py
+    if shutil.which("py"):  # trình khởi chạy py của Windows: có sẵn Python 3.12 không
+        try:
+            r = subprocess.run(["py", "-3.12", "-c", "import sys;print(sys.executable)"], capture_output=True,
+                               text=True, timeout=60, **_no_window_kwargs())
+            if r.returncode == 0 and r.stdout.strip():
+                return r.stdout.strip()
+        except (OSError, subprocess.SubprocessError):
+            pass
+    # tự tải Python 3.12 độc lập bằng uv (không đụng tới Python của máy)
+    try:
+        log("Tải Python 3.12 riêng cho VSR (qua uv)...")
+        pip_install(["uv"], log)
+        uv = [python_exe(), "-m", "uv"]
+        subprocess.run(uv + ["python", "install", "3.12"], check=True, capture_output=True, timeout=1800,
+                       **_no_window_kwargs())
+        r = subprocess.run(uv + ["python", "find", "3.12"], capture_output=True, text=True, timeout=120,
                            **_no_window_kwargs())
         if r.returncode == 0 and r.stdout.strip():
-            return r.stdout.strip()
-        log(f"Python {ver} chưa có bản DirectML - VSR sẽ chạy bằng CPU (cài Python 3.12 để dùng card AMD).",
+            return r.stdout.strip().splitlines()[-1]
+    except Exception as e:  # noqa: BLE001
+        log(f"Không tải được Python 3.12 ({e}) - dùng Python hiện có, app sẽ tự vá mã VSR cho tương thích.",
             level="warn")
     return py
+
+
+def compat_patch(root: Path) -> int:
+    """Vá cú pháp f-string kiểu Python 3.12 (f'..{x['k']}..') để VSR chạy được trên Python 3.10/3.11."""
+    import re
+
+    fixed = 0
+    pat = re.compile(r"\{([^{}'\"]*)\['([^'\"]+)'\]([^{}]*)\}")
+    for f in (Path(root) / "backend").rglob("*.py"):
+        try:
+            src = f.read_text(encoding="utf-8")
+        except (OSError, UnicodeDecodeError):
+            continue
+        out = []
+        changed = False
+        for line in src.splitlines(keepends=True):
+            if "f'" in line and "['" in line:
+                i = line.find("f'")
+                head, tail = line[:i], line[i:]
+                new = pat.sub(lambda m: "{" + m.group(1) + '["' + m.group(2) + '"]' + m.group(3) + "}", tail)
+                if new != tail:
+                    line, changed = head + new, True
+                    fixed += 1
+            out.append(line)
+        if changed:
+            f.write_text("".join(out), encoding="utf-8")
+    return fixed
+
+
+_patched: set = set()
 
 
 def install(settings, log, progress, cancel, accel: str = "auto") -> str:
@@ -362,6 +421,8 @@ def install(settings, log, progress, cancel, accel: str = "auto") -> str:
     pip(["-r", str(root / "requirements.txt")], 0.8, "Cài thư viện của VSR")
     if accel == "directml":
         pip(["onnxruntime-directml==1.20.1"], 0.9, "Cài ONNX Runtime DirectML")
+    if ver not in ("3.12", "3.13", "3.14"):
+        compat_patch(root)
     settings.set("render", "vsr_dir", str(root))
     progress(1.0, "Đã cài VSR")
     log(f"✅ Đã cài video-subtitle-remover ({'DirectML - dùng card đồ họa' if accel == 'directml' else accel.upper()}) "
