@@ -146,7 +146,7 @@ class VoicePage(Page):
         self.sample.setMaximumHeight(90)
         v2.addWidget(self.sample)
         v2.addWidget(hrow(button("▶ Nghe thử", self.listen, "primary"), button("⏹ Dừng", lambda: self.audio.stop()),
-                          "stretch", button("Tiếp: Xuất video →", lambda: self.app.goto(3), "primary")))
+                          "stretch", button("Tiếp: Thiết lập & xuất video →", lambda: self.app.goto(3), "primary")))
         right.addWidget(g2)
         right.addStretch(1)
 

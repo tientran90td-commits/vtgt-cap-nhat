@@ -56,7 +56,7 @@ class ComponentsPage(Page):
         self.wcpp_dir.changed.connect(lambda v: s.set("transcribe", "wcpp_dir", v))
         ft.addRow("⚡ Whisper card đồ họa", hrow(self.wcpp_dir,
                   button("⬇ Tải ngay (chương trình + model)", self.install_wcpp, "primary"), stretch_last=False))
-        ft.addRow(muted("VSR: dùng ở Bước 4 → Hình ảnh → Phụ đề in cứng = 🧠 Xóa sạch bằng AI. "
+        ft.addRow(muted("VSR: dùng ở Bước 4 → Làm sạch hình phim gốc → Phụ đề in cứng = 🧠 Xóa sạch bằng AI. "
                         "Whisper card đồ họa: dùng ở Bước 2 → Lời thoại → Công cụ = ⚡ Whisper bằng card đồ họa."))
         self.root.addWidget(gt)
         self.root.addWidget(hrow(
@@ -248,7 +248,7 @@ class ComponentsPage(Page):
                     raise vsr.VSRError(err or "Không tìm thấy VSR trên máy.")
                 self.vsr_dir.setText(found)
                 cur = found
-            QMessageBox.information(self, "VSR sẵn sàng", vsr.check(cur) + "\n\nỞ Bước 4 → Hình ảnh, chọn Phụ đề in "
+            QMessageBox.information(self, "VSR sẵn sàng", vsr.check(cur) + "\n\nỞ Bước 4 → Làm sạch hình phim gốc, chọn Phụ đề in "
                                     "cứng = 🧠 Xóa sạch bằng AI.")
         except vsr.VSRError as e:
             QMessageBox.warning(self, "Chưa dùng được VSR", str(e) + "\n\nCách dễ nhất: để trống ô thư mục và bấm "
@@ -267,7 +267,7 @@ class ComponentsPage(Page):
             self.vsr_dir.setText(path)
             self.app.settings.set("render", "hardsub_mode", "vsr")
             QMessageBox.information(self, "Đã cài VSR", f"Đã cài xong VSR tại:\n{path}\n\nĐã bật chế độ "
-                                    "🧠 Xóa sạch bằng AI (Bước 4 → Hình ảnh).")
+                                    "🧠 Xóa sạch bằng AI (Bước 4 → Làm sạch hình phim gốc).")
         self.app.run_task(vsr.install, self.app.settings, on_done=done, title="Cài VSR")
 
     def install_wcpp(self):

@@ -259,7 +259,7 @@ class SourcePage(Page):
                 parts.append("🧽 Có logo cố định → sẽ che mờ")
             if ov.get("hardsub"):
                 parts.append(f"💬 Có phụ đề in cứng ({ov['hardsub']['ratio']:.0%} thời lượng) → sẽ xử lý theo mục "
-                             "Xuất video › Chọn cảnh thông minh")
+                             "Thiết lập & xuất video › Làm sạch hình phim gốc")
         self.lb_guard.setText(" · ".join(parts))
 
     def open_season_dialog(self):

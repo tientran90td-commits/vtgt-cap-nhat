@@ -22,7 +22,7 @@ from .page_source import SourcePage
 from .page_voice import VoicePage
 from .widgets import Binder, Worker, button
 
-NAV = ["🎬   1. Video nguồn", "📝   2. Kịch bản AI", "🎙️   3. Giọng đọc", "🎞️   4. Xuất video",
+NAV = ["🎬   1. Video nguồn", "📝   2. Kịch bản AI", "🎙️   3. Giọng đọc", "🎛️   4. Thiết lập & xuất video",
        "🔑   API & Cài đặt", "🧩   Thành phần & sửa lỗi", "ℹ️   Hướng dẫn & mã nguồn"]
 PAGE_COMPONENTS = 5
 

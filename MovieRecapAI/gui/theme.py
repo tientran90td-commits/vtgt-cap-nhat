@@ -13,6 +13,10 @@ QListWidget#nav {{ background: transparent; border: none; outline: none; padding
 QListWidget#nav::item {{ padding: 12px 14px; margin: 3px 4px; border-radius: 10px; color: #AEB4C8; }}
 QListWidget#nav::item:hover {{ background: #1B1F2C; color: #FFFFFF; }}
 QListWidget#nav::item:selected {{ background: {ACCENT}; color: white; font-weight: 600; }}
+QListWidget#subnav {{ background: #141824; border: 1px solid #2A3043; border-radius: 12px; padding: 6px; outline: none; }}
+QListWidget#subnav::item {{ padding: 9px 10px; margin: 2px 2px; border-radius: 8px; color: #C3C8D8; }}
+QListWidget#subnav::item:hover {{ background: #1F2433; color: #FFFFFF; }}
+QListWidget#subnav::item:selected {{ background: #3A2F7A; color: white; font-weight: 600; }}
 QLabel#appTitle {{ font-size: 15pt; font-weight: 700; color: white; padding: 16px 14px 2px 14px; }}
 QLabel#appSub {{ color: #7D849B; padding: 0 14px 12px 14px; font-size: 9pt; }}
 QLabel#pageTitle {{ font-size: 17pt; font-weight: 700; color: white; }}

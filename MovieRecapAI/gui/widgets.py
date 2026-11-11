@@ -63,6 +63,30 @@ class Binder(QObject):
         self._t.setSingleShot(True)
         self._t.setInterval(600)
         self._t.timeout.connect(self.s.save)
+        self._binds: list = []  # (sec, key, hàm đặt lại giá trị) - dùng khi áp mẫu / khôi phục mặc định
+
+    def register(self, sec, key, setter):
+        """Đăng ký widget tự làm (đường dẫn, màu, phông...) để reload() cập nhật được."""
+        self._binds.append((sec, key, setter))
+
+    def reload(self, sec: str | None = None):
+        """Nạp lại giá trị từ Settings lên mọi widget đã gắn (không phát tín hiệu thay đổi)."""
+        for bsec, key, setter in list(self._binds):
+            if sec and bsec != sec:
+                continue
+            try:
+                setter(self.s.get(bsec, key))
+            except RuntimeError:  # widget đã bị xóa
+                continue
+
+    def _silent(self, w, fn):
+        def setter(v):
+            w.blockSignals(True)
+            try:
+                fn(v)
+            finally:
+                w.blockSignals(False)
+        return setter
 
     def _set(self, sec, key, val):
         self.s.set(sec, key, val)
@@ -72,41 +96,49 @@ class Binder(QObject):
     def line(self, w: QLineEdit, sec, key):
         w.setText(str(self.s.get(sec, key, "") or ""))
         w.textChanged.connect(lambda v: self._set(sec, key, v))
+        self.register(sec, key, self._silent(w, lambda v: w.setText(str(v or ""))))
         return w
 
     def text(self, w, sec, key):
         w.setPlainText(str(self.s.get(sec, key, "") or ""))
         w.textChanged.connect(lambda: self._set(sec, key, w.toPlainText()))
+        self.register(sec, key, self._silent(w, lambda v: w.setPlainText(str(v or ""))))
         return w
 
     def check(self, w: QCheckBox, sec, key):
         w.setChecked(bool(self.s.get(sec, key, False)))
         w.toggled.connect(lambda v: self._set(sec, key, bool(v)))
+        self.register(sec, key, self._silent(w, lambda v: w.setChecked(bool(v))))
         return w
 
     def spin(self, w, sec, key):
         val = self.s.get(sec, key, 0)
         w.setValue(float(val) if isinstance(w, QDoubleSpinBox) else int(val))
         w.valueChanged.connect(lambda v: self._set(sec, key, v))
+        self.register(sec, key, self._silent(w, lambda v: w.setValue(
+            float(v or 0) if isinstance(w, QDoubleSpinBox) else int(v or 0))))
         return w
 
     def slider(self, w: QSlider, sec, key):
         w.setValue(int(self.s.get(sec, key, 0) or 0))
         w.valueChanged.connect(lambda v: self._set(sec, key, int(v)))
+        self.register(sec, key, self._silent(w, lambda v: w.setValue(int(v or 0))))
         return w
 
     def combo(self, w: QComboBox, sec, key, cast=str):
         """Combo dùng userData làm giá trị."""
-        val = self.s.get(sec, key)
-        i = w.findData(val)
-        if i < 0 and val is not None:
-            for j in range(w.count()):
-                if str(w.itemData(j)) == str(val):
-                    i = j
-                    break
-        if i >= 0:
-            w.setCurrentIndex(i)
+        def select(val):
+            i = w.findData(val)
+            if i < 0 and val is not None:
+                for j in range(w.count()):
+                    if str(w.itemData(j)) == str(val):
+                        i = j
+                        break
+            if i >= 0:
+                w.setCurrentIndex(i)
+        select(self.s.get(sec, key))
         w.currentIndexChanged.connect(lambda _i: self._set(sec, key, cast(w.currentData())))
+        self.register(sec, key, self._silent(w, select))
         return w
 
     def edit_combo(self, w: QComboBox, sec, key):
@@ -114,6 +146,7 @@ class Binder(QObject):
         w.setEditable(True)
         w.setCurrentText(str(self.s.get(sec, key, "") or ""))
         w.currentTextChanged.connect(lambda v: self._set(sec, key, v.strip()))
+        self.register(sec, key, self._silent(w, lambda v: w.setCurrentText(str(v or ""))))
         return w
 
 
