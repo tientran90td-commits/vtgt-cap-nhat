@@ -310,6 +310,21 @@ class Project:
         if not self.script or not self.script.get("segments"):
             raise RuntimeError("Chưa có kịch bản để dựng.")
         has_narr = any((s.get("narration") or "").strip() for s in self.script["segments"])
+        out_path = Path(out_path) if out_path else self.default_output()
+        ropts = self.settings.section("render")
+        want_t, want_m = ropts.get("publish_thumbs", True), ropts.get("publish_meta", True)
+        bg = None
+        if want_t or want_m:
+            # thumbnail + tiêu đề làm SONG SONG trong lúc lồng tiếng & dựng (không phải chờ ở cuối)
+            from . import publish
+
+            step(log, "publish", "start", "chạy song song")
+            try:
+                bg = publish.Background(self, out_path, log, want_t, want_m, total_est=self.estimate_seconds())
+            except Exception as e:  # noqa: BLE001
+                log(f"Chưa tạo được thumbnail/tiêu đề ({e}).", level="warn")
+        else:
+            step(log, "publish", "skip", "tắt")
         if has_narr:
             step(log, "voice", "start")
             voices = self.run_voices(log, lambda p, m="": progress(p * 0.4, m), cancel)
@@ -317,7 +332,6 @@ class Project:
         else:
             voices = [None] * len(self.script["segments"])
             step(log, "voice", "skip", "giữ thoại gốc")
-        out_path = Path(out_path) if out_path else self.default_output()
         step(log, "render", "start")
         opts = self.settings.section("render")
         opts["_target_seconds"] = float(self.settings.get("script", "target_minutes", 5) or 5) * 60
@@ -335,14 +349,10 @@ class Project:
         step(log, "render", "done", Path(res).name)
         txt = out_path.with_suffix(".txt")
         txt.write_text(script_writer.script_to_text(self.script), encoding="utf-8")
-        if not (opts.get("publish_thumbs", True) or opts.get("publish_meta", True)):
-            step(log, "publish", "skip", "tắt")
-        if opts.get("publish_thumbs", True) or opts.get("publish_meta", True):
-            progress(0.995, "Tạo thumbnail & tiêu đề")
-            step(log, "publish", "start")
+        if bg is not None:
+            progress(0.995, "Hoàn tất thumbnail & tiêu đề")
             try:
-                self.run_publish(res, log, thumbs=opts.get("publish_thumbs", True),
-                                 meta=opts.get("publish_meta", True))
+                bg.finish()
                 step(log, "publish", "done")
             except Cancelled:
                 raise

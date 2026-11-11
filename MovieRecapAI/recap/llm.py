@@ -279,7 +279,7 @@ def fallback_providers(pid: str, settings: Settings) -> list[str]:
 
 # ---- Hủy & theo dõi khi chờ AI trả lời
 _tls = threading.local()
-WAIT_LIMIT = 420.0   # 1 lần gọi AI quá 7 phút -> coi như treo, thử lại / chuyển AI khác
+WAIT_LIMIT = 300.0   # 1 lần gọi AI quá 5 phút -> coi như treo, chuyển AI khác (hoặc thử lại nếu không có AI khác)
 HEARTBEAT = 20.0
 
 
@@ -435,8 +435,15 @@ def _chat_once(pid, model, system, user, settings, json_mode, max_tokens, log, i
             if kind == "anthropic":
                 return _watch(lambda: _chat_anthropic(model, system, user, settings, max_tokens, log, images), name, log)
             if kind == "gemini":
-                return _watch(lambda: _chat_gemini(model, system, user, settings, json_mode, max_tokens, images),
-                              name, log)
+                t0 = time.time()
+                out = _watch(lambda: _chat_gemini(model, system, user, settings, json_mode, max_tokens, images),
+                             name, log)
+                u = LAST_USAGE or {}
+                if log and u:
+                    log(f"AI trả lời sau {time.time() - t0:.0f}s · {u.get('candidatesTokenCount', 0):,} token"
+                        + (f" (+{u['thoughtsTokenCount']:,} token suy nghĩ)" if u.get("thoughtsTokenCount") else "")
+                        + f" · {model}")
+                return out
             if kind == "openai":
                 return _watch(lambda: _chat_openai(pid, model, system, user, settings, json_mode, max_tokens, images),
                               name, log)
@@ -447,7 +454,9 @@ def _chat_once(pid, model, system, user, settings, json_mode, max_tokens, log, i
             last_err = e
             if "không trả lời sau" in str(e):
                 stalls += 1
-                if stalls >= 2:  # treo 2 lần liền -> chuyển AI khác luôn, không chờ thêm
+                # có AI khác (đã nhập key) -> chuyển ngay sau 1 lần treo; không có thì thử lại thêm 1 lần
+                has_alt = bool(fallback_providers(pid, settings)) and settings.get("script", "auto_fallback", True)
+                if stalls >= (1 if has_alt else 2):
                     break
             if attempt == attempts - 1:
                 break
@@ -601,6 +610,7 @@ def _chat_openai(pid, model, system, user, settings, json_mode, max_tokens, imag
 # trước khi viết. Viết kịch bản recap không cần suy luận sâu -> mặc định "low" nhanh gấp nhiều lần.
 THINKING = {"low": "⚡ Nhanh (khuyên dùng)", "auto": "Mặc định của model", "high": "🧠 Kỹ (chậm, viết sâu hơn)"}
 _NO_THINK: set = set()  # model không nhận tham số suy nghĩ
+LAST_USAGE: dict = {}   # số token của lần gọi gần nhất (để ghi nhật ký)
 
 
 def _thinking_level(settings) -> str:
@@ -659,6 +669,8 @@ def _chat_gemini(model, system, user, settings, json_mode, max_tokens, images=No
         body["generationConfig"].pop("thinkingConfig", None)
         r = _session(settings).post(url, params={"key": key}, json=body, timeout=(20, WAIT_LIMIT + 30))
     data = _check(r, "Gemini")
+    global LAST_USAGE
+    LAST_USAGE = data.get("usageMetadata") or {}
     cands = data.get("candidates") or []
     if not cands:
         raise LLMError(f"Gemini không trả kết quả: {data.get('promptFeedback', data)}")
@@ -786,4 +798,22 @@ def extract_json(text: str) -> dict:
         try:
             return json.loads(fixed)
         except json.JSONDecodeError as e:
+            got = _salvage(text[text.find("{"):])
+            if got is not None:
+                return got
             raise LLMError(f"Không đọc được JSON từ AI: {e}\n{text[:500]}") from e
+
+
+def _salvage(t: str):
+    """Câu trả lời bị cắt giữa chừng (hết giới hạn độ dài): giữ lại mọi đoạn hoàn chỉnh trước chỗ bị cắt."""
+    ends = [m.start() for m in re.finditer(r"\}", t)][::-1][:300]
+    for pos in ends:
+        head = t[:pos + 1]
+        for tail in ("]}", "]}]}", "}]}", "]}}"):
+            try:
+                d = json.loads(re.sub(r",\s*([\]}])", r"\1", head + tail))
+            except json.JSONDecodeError:
+                continue
+            if isinstance(d, dict) and (d.get("segments") or d.get("frames") or len(d) > 1):
+                return d
+    return None

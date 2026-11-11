@@ -208,6 +208,12 @@ def _avoid_block(avoid) -> str:
     return "=== AVOID these time ranges for clips: ===\n" + "; ".join(items)
 
 
+def script_tokens(opts: dict) -> int:
+    """Giới hạn độ dài câu trả lời theo độ dài video (chặn AI 'viết lặp vô tận' tới hàng chục nghìn token)."""
+    mins = float(opts.get("target_minutes", 5) or 5)
+    return int(max(8000, min(32000, 5000 + mins * 1800)))
+
+
 def _llm_cancel():
     from .llm import _cancel_ev
 
@@ -281,7 +287,7 @@ def write_script(transcript: list[dict], duration: float, settings: Settings, op
             log(f"Gửi {len(text):,} ký tự cho AI {model}...")
             raw = chat(pid, model, SYSTEM, build_user_prompt(text, duration, opts, notes, film_context(film), vis,
                                                              episodes, avoid),
-                       settings, json_mode=True, log=log)
+                       settings, json_mode=True, log=log, max_tokens=script_tokens(opts))
             break
         except TooLarge as e:
             # ~3 ký tự/token cho tiếng Việt/Anh trộn, chừa chỗ cho prompt & câu trả lời
@@ -297,6 +303,38 @@ def write_script(transcript: list[dict], duration: float, settings: Settings, op
 
             time.sleep(20)  # đợi hạn mức token/phút hồi lại
     script = normalize_script(extract_json(raw), duration, scene_cuts, opts.get("mode", "narrate"))
+    # Kiểm tra độ dài: AI hay viết quá ngắn (vd mục tiêu 5 phút mà chỉ ra 1 phút) -> yêu cầu viết dài thêm
+    target = float(opts.get("target_minutes", 5) or 5) * 60
+    if pid not in ("none", "web") and opts.get("mode", "narrate") != "highlight":
+        est = estimate_seconds(script, opts)
+        for rnd in range(2):
+            if est >= 0.75 * target or cancel.is_set():
+                break
+            wps = _WPS.get(opts.get("language", "Tiếng Việt"), 2.6)
+            log(f"Kịch bản AI viết chỉ ~{est / 60:.1f} phút (mục tiêu {target / 60:g} phút) → yêu cầu AI viết dài "
+                f"thêm (lần {rnd + 1})...", level="warn")
+            progress(0.78, "AI viết dài thêm cho đủ thời lượng")
+            words_now = sum(len((x.get("narration") or "").split()) for x in script["segments"])
+            more = (f"\n\n=== YOUR PREVIOUS SCRIPT WAS FAR TOO SHORT ===\nIt had {len(script['segments'])} segments and "
+                    f"only {words_now} words of narration (~{est:.0f}s when read aloud), but the video MUST be about "
+                    f"{int(target)} seconds = about {int(target * wps)} words of narration in about "
+                    f"{max(3, int(round(target / 16)))} segments. Rewrite the COMPLETE script from scratch: cover MORE "
+                    "of the story (more events, more segments spread over the whole film) and give EVERY segment 2-4 "
+                    f"full sentences (~{int(16 * wps)} words). Do not stop early. Return the full JSON.")
+            try:
+                raw2 = chat(pid, model, SYSTEM, build_user_prompt(text, duration, opts, notes, film_context(film), vis,
+                                                                  episodes, avoid) + more,
+                            settings, json_mode=True, log=log, max_tokens=script_tokens(opts))
+                s2 = normalize_script(extract_json(raw2), duration, scene_cuts, opts.get("mode", "narrate"))
+            except Cancelled:
+                raise
+            except Exception as e:  # noqa: BLE001
+                log(f"AI viết dài thêm lỗi ({e}) - giữ kịch bản hiện có.", level="warn")
+                break
+            e2 = estimate_seconds(s2, opts)
+            if e2 > est:
+                script, est = s2, e2
+        log(f"Độ dài kịch bản ước tính ~{est / 60:.1f} phút (mục tiêu {target / 60:g} phút).")
     n_cand = max(1, min(3, int(opts.get("candidates") or 1)))
     if n_cand > 1 and pid != "web" and opts.get("mode", "narrate") != "highlight":
         cands = [script]
@@ -309,7 +347,8 @@ def write_script(transcript: list[dict], duration: float, settings: Settings, op
             o2 = dict(opts, _variant=VARIANTS[k % len(VARIANTS)])
             try:
                 r2 = chat(pid, model, SYSTEM, build_user_prompt(text, duration, o2, notes, film_context(film), vis,
-                                                                 episodes, avoid), settings, json_mode=True, log=log)
+                                                                 episodes, avoid), settings, json_mode=True, log=log,
+                          max_tokens=script_tokens(opts))
                 return normalize_script(extract_json(r2), duration, scene_cuts, opts.get("mode", "narrate"))
             except Cancelled:
                 raise
@@ -323,6 +362,14 @@ def write_script(transcript: list[dict], duration: float, settings: Settings, op
     progress(1.0, "Đã có kịch bản")
     log(f"Kịch bản: {len(script['segments'])} đoạn - '{script.get('title', '')}'")
     return script
+
+
+def estimate_seconds(sc: dict, opts: dict) -> float:
+    """Độ dài video ước tính từ kịch bản (đọc lời thuyết minh + các đoạn giữ thoại gốc)."""
+    wps = _WPS.get(opts.get("language", "Tiếng Việt"), 2.6)
+    segs = sc.get("segments", [])
+    return sum(len((x.get("narration") or "").split()) / wps + 0.35 for x in segs if x.get("narration")) + \
+        sum(min(90.0, x["end"] - x["start"]) for x in segs if not x.get("narration"))
 
 
 def engineering_score(sc: dict, duration: float, opts: dict) -> float:

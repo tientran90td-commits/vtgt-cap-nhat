@@ -340,8 +340,9 @@ def episode_chapters(script: dict, episodes: list) -> list[dict]:
     return out
 
 
-def make_metadata(script: dict, film: dict | None, timeline: list, total: float, settings: Settings, log=None,
-                  episodes: list | None = None) -> dict:
+def ai_metadata(script: dict, film: dict | None, total: float, settings: Settings, log=None,
+                episodes: list | None = None) -> dict:
+    """Phần AI (tiêu đề, mô tả, hashtag, tên chương) - không cần video đã dựng xong, chạy song song được."""
     sc = settings.section("script")
     lang = sc.get("language", "Tiếng Việt")
     meta = None
@@ -363,6 +364,10 @@ def make_metadata(script: dict, film: dict | None, timeline: list, total: float,
                     "Segments:\n" + "\n".join(lines)[:24000])
             meta = extract_json(chat(pid, model, META_SYSTEM, user, settings, json_mode=True, max_tokens=3000, log=log))
         except Exception as e:  # noqa: BLE001
+            from .ffmpeg_utils import Cancelled
+
+            if isinstance(e, Cancelled):
+                raise
             if log:
                 log(f"AI chưa viết được tiêu đề/mô tả ({e}) - dùng mẫu có sẵn.", level="warn")
     base = _fallback_meta(script, film, lang)
@@ -372,11 +377,23 @@ def make_metadata(script: dict, film: dict | None, timeline: list, total: float,
         if not meta.get(k):
             meta[k] = v
     meta["hashtags"] = [h if str(h).startswith("#") else "#" + str(h).replace(" ", "") for h in meta["hashtags"]][:15]
+    meta["_base_chapters"] = base["chapters"]
+    return meta
+
+
+def finalize_meta(meta: dict, script: dict, timeline: list, total: float, episodes: list | None = None) -> dict:
+    """Ghép tên chương với mốc thời gian thật của video đã dựng."""
+    base_ch = meta.pop("_base_chapters", None) or []
     ep_marks = chapters_from(episode_chapters(script, episodes), timeline, total) if episodes and len(episodes) > 1 \
         else []
-    meta["chapter_marks"] = ep_marks or chapters_from(meta.get("chapters") or base["chapters"], timeline, total) or \
-        chapters_from(base["chapters"], timeline, total)
+    meta["chapter_marks"] = ep_marks or chapters_from(meta.get("chapters") or base_ch, timeline, total) or \
+        chapters_from(base_ch, timeline, total)
     return meta
+
+
+def make_metadata(script: dict, film: dict | None, timeline: list, total: float, settings: Settings, log=None,
+                  episodes: list | None = None) -> dict:
+    return finalize_meta(ai_metadata(script, film, total, settings, log, episodes), script, timeline, total, episodes)
 
 
 def metadata_text(meta: dict) -> str:
@@ -419,3 +436,62 @@ def prepare(project, out_video: Path, log=None, thumbs: bool = True, meta: bool 
         band = (project.overlays or {}).get("hardsub")
         res["thumbs"] = [str(p) for p in make_thumbnails(project.video, project.script, out_video, text, log, band)]
     return res
+
+
+class Background:
+    """Làm thumbnail + tiêu đề/mô tả SONG SONG trong lúc lồng tiếng & dựng video (không phải chờ ở cuối)."""
+
+    def __init__(self, project, out_video: Path, log=None, thumbs: bool = True, meta: bool = True,
+                 total_est: float = 0.0):
+        import threading
+
+        from .llm import _cancel_ev, set_cancel
+
+        self.project, self.out, self.log = project, Path(out_video), log
+        self.want_thumbs, self.want_meta = thumbs, meta
+        self.meta, self.thumbs, self.err = None, [], None
+        ev = _cancel_ev()
+
+        def run():
+            set_cancel(ev)
+            try:
+                if meta:
+                    self.meta = ai_metadata(project.script, project.film, total_est, project.settings, log,
+                                            getattr(project, "episodes", None))
+                if thumbs:
+                    text = (self.meta or {}).get("thumb_text") or (project.script or {}).get("title") or ""
+                    band = (project.overlays or {}).get("hardsub")
+                    self.thumbs = [str(p) for p in make_thumbnails(project.video, project.script, self.out, text, log,
+                                                                   band)]
+            except Exception as e:  # noqa: BLE001
+                self.err = e
+        self.th = threading.Thread(target=run, daemon=True)
+        self.th.start()
+
+    def finish(self) -> dict:
+        """Chờ phần chạy nền xong, gắn mốc chương theo video thật, ghi file."""
+        self.th.join()
+        if self.err is not None:
+            raise self.err
+        res: dict = {"thumbs": self.thumbs, "meta": None}
+        if self.meta is not None:
+            qa = {}
+            qf = extra(self.out, ".qa.json")
+            if qf.exists():
+                try:
+                    qa = json.loads(qf.read_text(encoding="utf-8"))
+                except ValueError:
+                    qa = {}
+            total = float((qa.get("final") or {}).get("duration") or qa.get("duration") or 0)
+            m = finalize_meta(self.meta, self.project.script, qa.get("timeline") or [], total,
+                              getattr(self.project, "episodes", None))
+            txt = metadata_text(m)
+            self.out.with_suffix(".youtube.txt").write_text(txt, encoding="utf-8")
+            self.out.with_suffix(".publish.json").write_text(json.dumps(m, ensure_ascii=False, indent=2),
+                                                             encoding="utf-8")
+            res["meta"], res["text"] = m, txt
+            if self.log:
+                self.log(f"📝 Đã viết tiêu đề, mô tả, hashtag, {len(m['chapter_marks'])} mốc chương → "
+                         f"{self.out.with_suffix('.youtube.txt').name}")
+        return res
+

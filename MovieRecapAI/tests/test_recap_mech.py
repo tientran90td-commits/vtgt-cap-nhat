@@ -331,6 +331,7 @@ y0, y1, x0, x1 = a.c[0]
 subprocess.check_call([{ffmpeg_exe()!r}, "-y", "-loglevel", "error", "-i", a.i, "-vf",
                        f"drawbox=x={{x0}}:y={{y0}}:w={{x1 - x0}}:h={{y1 - y0}}:color=gray:t=fill", a.o])
 print("done", a.inpaint_mode)
+open(a.o + ".run", "w").write("1")
 """, encoding="utf-8")
     from recap import vsr
     py_, root_, main_ = vsr.find(str(TMP / "vsr_pkg"))  # tự tìm sâu bên trong thư mục được chọn
@@ -346,10 +347,21 @@ print("done", a.inpaint_mode)
     s.set("render", "hardsub_mode", "vsr")
     s.set("render", "vsr_dir", str(TMP / "vsr_pkg"))
     logs = []
+    one_seg = p.script
+    p.script = {"title": "t", "segments": [{"start": 2, "end": 8, "narration": ""}, {"start": 20, "end": 26, "narration": ""},
+                                           {"start": 40, "end": 46, "narration": ""}]}
     out3 = p.run_render(TMP / "out" / "vsr.mp4", log=lambda m, level="info": logs.append(m))
     cleaned = list((p.dir / "vsr").glob("clean_*.mp4"))
-    assert cleaned and band_edges(out3, hs["y0"], hs["y1"]) < before * 0.2, (cleaned, logs[-5:])
+    runs = list((p.dir / "vsr").glob("*.run"))
+    assert len(cleaned) == 3 and len(runs) == 1, (cleaned, runs)  # 3 đoạn, chỉ 1 lần chạy VSR
+    assert band_edges(out3, hs["y0"], hs["y1"]) < before * 0.2, logs[-5:]
     assert not any("Không xóa được" in m for m in logs), logs
+    logs.clear()
+    p.run_render(TMP / "out" / "vsr2.mp4", log=lambda m, level="info": logs.append(m))
+    assert not any("AI xóa phụ đề" in m for m in logs)  # lần sau dùng lại kết quả, không chạy VSR
+    p.script = one_seg
+    import shutil as _sh
+    _sh.rmtree(p.dir / "vsr", ignore_errors=True)
     s.set("render", "vsr_dir", str(TMP / "khong-co"))  # VSR hỏng/thiếu -> tự chuyển sang làm mờ, vẫn xuất được
     logs.clear()
     out4 = p.run_render(TMP / "out" / "vsr_fail.mp4", log=lambda m, level="info": logs.append(m))

@@ -550,12 +550,42 @@ def check_ai_speed(s: Settings):
         t0 = _time.time()
         tr = [{"start": i * 5.0, "end": i * 5 + 4.0, "text": f"t{i}"} for i in range(20)]
         script_writer.write_script(tr, 100, s, dict(s.section("script"), provider="gemini", model="gemini-x",
-                                                    candidates=3, mode="narrate"),
+                                                    candidates=3, mode="narrate", target_minutes=0.01),
                                    lambda *a, **k: None, lambda *a, **k: None, __import__("threading").Event())
         took = _time.time() - t0
         assert took < 2.8, took
     finally:
         script_writer.chat = old_chat
+    # AI viết quá ngắn (mục tiêu 5 phút, ra ~1 phút) -> app yêu cầu viết dài thêm
+    asks = []
+
+    def short_then_long(pid, model, system, user, settings, **kw):
+        asks.append(user)
+        n, words = (4, 8) if len(asks) == 1 else (18, 45)
+        return json.dumps({"title": "x", "segments": [
+            {"start": f"00:{i:02d}:10", "end": f"00:{i:02d}:25", "narration": " ".join(["chữ"] * words)}
+            for i in range(n)]})
+    script_writer.chat = short_then_long
+    logs = []
+    try:
+        tr = [{"start": i * 20.0, "end": i * 20 + 4.0, "text": f"t{i}"} for i in range(60)]
+        sc = script_writer.write_script(tr, 1200, s, dict(s.section("script"), provider="gemini", model="gemini-x",
+                                                          candidates=1, mode="narrate", target_minutes=5),
+                                        lambda m, level="info": logs.append(m), lambda *a, **k: None,
+                                        __import__("threading").Event())
+    finally:
+        script_writer.chat = old_chat
+    est = script_writer.estimate_seconds(sc, {"language": "Tiếng Việt"})
+    assert len(asks) == 2 and "FAR TOO SHORT" in asks[1] and len(sc["segments"]) == 18 and est > 240, (len(asks), est)
+    assert any("viết dài thêm" in m for m in logs)
+    # câu trả lời bị cắt giữa chừng (AI viết lặp tới hết giới hạn) -> giữ các đoạn hoàn chỉnh
+    cut = ('{"title":"X","segments":[{"start":"00:00:10","end":"00:00:20","narration":"A"},'
+           '{"start":"00:00:30","end":"00:00:40","narration":"B"},{"start":"00:01:00","narration":"lặp lặp lặp')
+    d = llm.extract_json(cut)
+    assert d["title"] == "X" and [x["narration"] for x in d["segments"]] == ["A", "B"], d
+    assert script_writer.script_tokens({"target_minutes": 5}) == 14000
+    assert script_writer.script_tokens({"target_minutes": 1}) == 8000
+    assert script_writer.script_tokens({"target_minutes": 60}) == 32000
     print(f"✓ AI nhanh: giảm suy nghĩ theo model · 3 phương án song song {took:.1f}s (lần lượt ~3s)")
 
 

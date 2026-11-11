@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -203,9 +204,19 @@ def _band_coords(band: dict, w: int, h: int) -> list[str]:
     return [str(y0), str(y1), "0", str(w)]
 
 
-def clean_clip(video: str, start: float, dur: float, band: dict, mode: str, vsr_dir: str, work_dir: Path,
-               log, cancel, settings=None) -> Path:
-    """Cắt đoạn [start, start+dur] của phim, xóa phụ đề trong dải `band` bằng VSR, trả về file sạch (bắt đầu từ 0s)."""
+def _clip_key(video: str, start: float, dur: float, band: dict, mode: str) -> str:
+    st = os.stat(video)
+    return hashlib.sha1(repr((str(video), st.st_size, int(st.st_mtime), round(start, 3), round(dur, 3),
+                              band.get("y0"), band.get("y1"), mode)).encode()).hexdigest()[:14]
+
+
+def cached(video: str, start: float, dur: float, band: dict, mode: str, work_dir: Path) -> Path | None:
+    mode = mode if mode in MODES else "sttn-auto"
+    out = Path(work_dir) / "vsr" / f"clean_{_clip_key(video, start, dur, band, mode)}.mp4"
+    return out if out.exists() and out.stat().st_size > 1000 else None
+
+
+def _prepare(vsr_dir: str, settings, log):
     py, root, main = find(resolve_dir(vsr_dir, settings))
     if str(root) not in _patched:
         _patched.add(str(root))
@@ -213,40 +224,55 @@ def clean_clip(video: str, start: float, dur: float, band: dict, mode: str, vsr_
             n = compat_patch(root)
             if n:
                 log(f"Đã vá {n} dòng mã VSR cho tương thích Python {_py_ver(str(py))}.", level="debug")
-    mode = mode if mode in MODES else "sttn-auto"
-    st = os.stat(video)
-    key = hashlib.sha1(repr((str(video), st.st_size, int(st.st_mtime), round(start, 3), round(dur, 3),
-                             band.get("y0"), band.get("y1"), mode)).encode()).hexdigest()[:14]
-    out_dir = Path(work_dir) / "vsr"
-    out_dir.mkdir(parents=True, exist_ok=True)
-    out = out_dir / f"clean_{key}.mp4"
-    if out.exists() and out.stat().st_size > 1000:
-        return out
-    clip = out_dir / f"in_{key}.mp4"
-    run_ffmpeg(["-ss", f"{max(0.0, start):.3f}", "-t", f"{dur:.3f}", "-i", str(video), "-map", "0:v:0", "-map", "0:a:0?",
-                "-c:v", "libx264", "-preset", "veryfast", "-crf", "14", "-pix_fmt", "yuv420p",
-                "-c:a", "aac", "-b:a", "192k", str(clip)], cancel=cancel)
-    info = probe(clip)
-    tmp = out_dir / f"tmp_{key}.mp4"
-    tmp.unlink(missing_ok=True)
-    cmd = [str(py), str(main), "-i", str(clip), "-o", str(tmp),
+    return py, root, main
+
+
+def _run_vsr(py, root, main, src: Path, dst: Path, band: dict, mode: str, total: float, log, cancel, progress=None):
+    info = probe(src)
+    dst.unlink(missing_ok=True)
+    cmd = [str(py), str(main), "-i", str(src), "-o", str(dst),
            "-c", *_band_coords(band, info.width, info.height), "--inpaint-mode", mode]
     env = dict(os.environ, PYTHONPATH=str(root) + os.pathsep + os.environ.get("PYTHONPATH", ""),
                PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
-    log(f"AI xóa phụ đề (VSR {mode}) đoạn {start:.0f}s-{start + dur:.0f}s...", level="debug")
     t0 = time.time()
     proc = subprocess.Popen(cmd, cwd=str(root), env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
                             stdin=subprocess.DEVNULL, **_no_window_kwargs())
     tail: list[str] = []
+    beat = 30.0
+    import queue
+    import threading
+
+    q: queue.Queue = queue.Queue()
+
+    def reader():  # đọc kết quả VSR ở luồng phụ để vòng chính luôn kiểm tra được nút Hủy
+        try:
+            for raw in iter(proc.stdout.readline, b""):
+                q.put(raw)
+        finally:
+            q.put(None)
+    threading.Thread(target=reader, daemon=True).start()
     try:
-        for raw in iter(proc.stdout.readline, b""):
+        while True:
+            try:
+                raw = q.get(timeout=1.0)
+            except queue.Empty:
+                raw = b""
+            if raw is None:
+                break
             line = raw.decode("utf-8", "replace").strip()
             if line:
                 tail = (tail + [line])[-12:]
+                m = re.search(r"(\d{1,3})%\|", line) or re.search(r"[Pp]rogress[^0-9]*(\d{1,3})", line)
+                if m and progress:
+                    progress(min(0.99, int(m.group(1)) / 100), f"AI xóa phụ đề {int(m.group(1))}%")
+            el = time.time() - t0
+            if el > beat:
+                beat += 30.0
+                log(f"⏳ VSR đang xóa phụ đề {total:.0f}s phim... {int(el)}s")
             if cancel is not None and cancel.is_set():
                 proc.kill()
                 raise Cancelled()
-            if time.time() - t0 > 600 + dur * 120:
+            if el > 900 + total * 60:
                 proc.kill()
                 raise VSRError("VSR chạy quá lâu - đã dừng.")
     finally:
@@ -255,19 +281,76 @@ def clean_clip(video: str, start: float, dur: float, band: dict, mode: str, vsr_
         except Exception:  # noqa: BLE001
             pass
         proc.wait()
-    if proc.returncode != 0 or not tmp.exists() or tmp.stat().st_size < 1000:
+    if proc.returncode != 0 or not dst.exists() or dst.stat().st_size < 1000:
         raise VSRError("VSR lỗi (mã %s):\n%s" % (proc.returncode, "\n".join(tail[-6:])))
     try:
-        if probe(tmp).duration < dur * 0.8:
+        if probe(dst).duration < total * 0.8:
             raise VSRError("VSR trả về video ngắn bất thường.")
     except VSRError:
         raise
     except Exception as e:  # noqa: BLE001
         raise VSRError(f"Video VSR trả về bị hỏng: {e}") from e
-    os.replace(tmp, out)
-    clip.unlink(missing_ok=True)
-    log(f"VSR xong đoạn {start:.0f}s ({time.time() - t0:.0f}s xử lý).", level="debug")
-    return out
+    return time.time() - t0
+
+
+_ENC = ["-c:v", "libx264", "-preset", "veryfast", "-crf", "14", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k",
+        "-ar", "48000", "-ac", "2"]
+
+
+def clean_batch(video: str, clips: list[tuple[float, float]], band: dict, mode: str, vsr_dir: str, work_dir: Path,
+                log, cancel, settings=None, progress=None) -> dict:
+    """Xóa phụ đề NHIỀU đoạn trong MỘT lần chạy VSR (chỉ nạp model AI 1 lần - nhanh hơn rất nhiều so với
+    chạy riêng từng đoạn). Trả về {(start, dur): file sạch}."""
+    mode = mode if mode in MODES else "sttn-auto"
+    out_dir = Path(work_dir) / "vsr"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    res, todo = {}, []
+    for a, d in dict.fromkeys((round(a, 3), round(d, 3)) for a, d in clips):
+        c = cached(video, a, d, band, mode, work_dir)
+        if c:
+            res[(a, d)] = c
+        else:
+            todo.append((a, d))
+    if not todo:
+        return res
+    py, root, main = _prepare(vsr_dir, settings, log)
+    total = sum(d for _a, d in todo)
+    log(f"🧽 AI xóa phụ đề {len(todo)} đoạn ({total:.0f}s phim) trong 1 lần chạy VSR {mode}...")
+    tag = hashlib.sha1(repr(todo).encode()).hexdigest()[:10]
+    pieces, offsets, off = [], [], 0.0
+    for k, (a, d) in enumerate(todo):
+        if cancel is not None and cancel.is_set():
+            raise Cancelled()
+        f = out_dir / f"in_{tag}_{k:03d}.mp4"
+        run_ffmpeg(["-ss", f"{max(0.0, a):.3f}", "-t", f"{d:.3f}", "-i", str(video), "-map", "0:v:0", "-map", "0:a:0?",
+                    *_ENC, str(f)], cancel=cancel)
+        dd = probe(f).duration or d
+        pieces.append(f)
+        offsets.append((off, dd))
+        off += dd
+    lst = out_dir / f"in_{tag}.txt"
+    lst.write_text("".join(f"file '{p.name}'\n" for p in pieces), encoding="utf-8")
+    batch_in, batch_out = out_dir / f"batch_{tag}.mp4", out_dir / f"batch_{tag}_clean.mp4"
+    run_ffmpeg(["-f", "concat", "-safe", "0", "-i", lst.name, "-c", "copy", batch_in.name], cancel=cancel,
+               cwd=str(out_dir))
+    took = _run_vsr(py, root, main, batch_in, batch_out, band, mode, off, log, cancel, progress)
+    for (a, d), (o, dd) in zip(todo, offsets):
+        dest = out_dir / f"clean_{_clip_key(video, a, d, band, mode)}.mp4"
+        tmp = dest.with_name(dest.stem + "_tmp.mp4")
+        run_ffmpeg(["-ss", f"{o:.3f}", "-t", f"{dd:.3f}", "-i", str(batch_out), *_ENC, str(tmp)], cancel=cancel)
+        os.replace(tmp, dest)
+        res[(a, d)] = dest
+    for f in [*pieces, lst, batch_in, batch_out]:
+        Path(f).unlink(missing_ok=True)
+    log(f"VSR xong {len(todo)} đoạn trong {took:.0f}s.")
+    return res
+
+
+def clean_clip(video: str, start: float, dur: float, band: dict, mode: str, vsr_dir: str, work_dir: Path,
+               log, cancel, settings=None) -> Path:
+    """Xóa phụ đề 1 đoạn [start, start+dur] (bắt đầu từ 0s)."""
+    return clean_batch(video, [(start, dur)], band, mode, vsr_dir, work_dir, log, cancel, settings)[
+        (round(start, 3), round(dur, 3))]
 
 
 # ------------------------------------------------------------------ tự cài VSR từ mã nguồn

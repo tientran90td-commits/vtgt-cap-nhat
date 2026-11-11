@@ -124,6 +124,8 @@ def _logo_xy(pos: str) -> str:
     }.get(pos, f"W-w-{m}:{m}")
 
 
+VSR_TOKEN = "@@vsr@@"  # chỗ giữ file nguồn chờ VSR xóa phụ đề
+
 HARDSUB_MODES = {
     "blur": "Làm mờ dải phụ đề gốc (khuyên dùng)",
     "vsr": "🧠 Xóa sạch bằng AI (video-subtitle-remover, cần cài VSR)",
@@ -207,7 +209,6 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
     hs_mode = opts.get("hardsub_mode", "blur") if hardsub else "none"
     if hardsub and hs_mode != "none":
         log(f"Phụ đề gốc in cứng: {HARDSUB_MODES.get(hs_mode, hs_mode)}")
-    vsr_ok = hs_mode == "vsr"
     synced = 0
     W, H = output_size(info, opts.get("aspect", "16:9"), int(opts.get("height", 1080)))
     fps_opt = opts.get("fps", 30)
@@ -261,6 +262,7 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
     part_files = []
     timeline: list[list] = []  # [chỉ số đoạn, giây bắt đầu trong video xuất, thời lượng]
     jobs: list[tuple] = []  # (chỉ số đoạn, tham số ffmpeg, thời lượng) - dựng sau vòng lặp
+    vsr_needed: list[tuple] = []  # các đoạn cần AI xóa phụ đề (chạy VSR 1 lần cho tất cả)
     last_ep = None
     for i, seg in enumerate(segs):
         if cancel.is_set():
@@ -333,21 +335,21 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
 
         # Nguồn hình của từng cảnh: phim gốc, hoặc bản đã được AI (VSR) xóa phụ đề
         srcs = [(video, a) for a, _d in pieces]
+        key_srcs = srcs
         seg_hs = hs_mode
+        need_vsr = []
         if hs_mode == "vsr":
-            seg_hs = "blur"
-            if vsr_ok:
-                from . import vsr
-                try:
-                    srcs = [(str(vsr.clean_clip(video, a, d + 0.2, hardsub, opts.get("vsr_mode", "sttn-auto"),
-                                                opts.get("vsr_dir", ""), work_dir, log, cancel)), 0.0)
-                            for a, d in pieces]
-                    seg_hs = "vsr"
-                except Cancelled:
-                    raise
-                except Exception as e:  # noqa: BLE001
-                    vsr_ok = False
-                    log(f"Không xóa được phụ đề bằng AI ({e}) - chuyển sang làm mờ dải phụ đề.", level="warn")
+            # chưa chạy VSR ngay: ghi lại các đoạn cần xóa phụ đề, xong vòng lặp chạy VSR 1 LẦN cho tất cả
+            from . import vsr
+            srcs, need_vsr = [], []
+            for a, d in pieces:
+                c = vsr.cached(video, a, d + 0.2, hardsub, opts.get("vsr_mode", "sttn-auto"), work_dir)
+                if c:
+                    srcs.append((str(c), 0.0))
+                else:
+                    srcs.append((f"{VSR_TOKEN}{a:.3f}|{d + 0.2:.3f}", 0.0))
+                    need_vsr.append((a, d + 0.2))
+            key_srcs = [("vsr", round(a, 3), round(d, 3)) for a, d in pieces]
         # Cắt khung bám khuôn mặt (khi tỉ lệ khung đích khác phim gốc)
         face_crop, fkeys = "", None
         if opts.get("fill") == "face" and info.width and info.height and \
@@ -361,7 +363,7 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
             except Exception as e:  # noqa: BLE001
                 log(f"Không dò được khuôn mặt ({e}) - cắt giữa khung.", level="warn")
         key = hashlib.sha1(json.dumps([seg, str(voice), voice and Path(voice).stat().st_size, pieces, need, dur, fkeys,
-                                       pre_filter, hardsub, seg_hs, srcs,
+                                       pre_filter, hardsub, seg_hs, key_srcs,
                                        speed, W, H, fps, enc, opts.get("fill"), style, subs, title, logo,
                                        opts.get("logo_position"), opts.get("logo_scale"),
                                        opts.get("orig_volume_voice"), opts.get("orig_volume_clip"),
@@ -377,6 +379,7 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
             continue
         for old in parts_dir.glob(f"seg_{i:03d}_*.mp4"):
             old.unlink(missing_ok=True)
+        vsr_needed += need_vsr
 
         args = []
         for (sv, sa), (_a, d) in zip(srcs, pieces):
@@ -450,6 +453,25 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
                  "-pix_fmt", "yuv420p", "-r", str(fps), "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
                  part.name]
         jobs.append((i, args, dur))
+
+    # Xóa phụ đề bằng AI cho mọi đoạn cần dựng - 1 lần chạy VSR (nạp model 1 lần)
+    if vsr_needed:
+        from . import vsr
+        try:
+            done = vsr.clean_batch(video, vsr_needed, hardsub, opts.get("vsr_mode", "sttn-auto"), opts.get("vsr_dir", ""),
+                                   work_dir, log, cancel, progress=lambda p, m="": progress(0.05 + 0.4 * p, m))
+        except Cancelled:
+            raise
+        except Exception as e:  # noqa: BLE001
+            log(f"Không xóa được phụ đề bằng AI ({e}) - chuyển sang làm mờ dải phụ đề.", level="warn")
+            return render(script, video, info, voices, dict(opts, hardsub_mode="blur"), out_path, work_dir, transcript,
+                          log, progress, cancel, blocked=blocked, watermark=watermark, hardsub=hardsub,
+                          episodes=episodes)
+        for _i, args, _d in jobs:
+            for k, v in enumerate(args):
+                if isinstance(v, str) and v.startswith(VSR_TOKEN):
+                    a, d = (float(x) for x in v[len(VSR_TOKEN):].split("|"))
+                    args[k] = str(done[(round(a, 3), round(d, 3))])
 
     # Dựng các đoạn (song song nhiều đoạn cùng lúc nếu bật - tận dụng CPU nhiều luồng + bộ mã hóa GPU)
     workers = max(1, min(6, int(opts.get("parallel", 1) or 1)))
