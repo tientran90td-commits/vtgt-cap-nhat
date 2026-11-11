@@ -27,6 +27,9 @@ Phim dài ──► 🔍 Nhận diện phim ──► ① Nhận dạng lời th
 | **🔍 Nhận diện phim** | AI nhận ra phim từ tên file + 7 khung hình + lời thoại (tên phim, năm, nhân vật, nội dung) · đối chiếu **TMDB** (tùy chọn) để lấy tên nhân vật chuẩn · gợi ý tên riêng cho Whisper nghe đúng · **AI xem hình ảnh** các cảnh để chọn clip chính xác · bạn sửa/bổ sung được |
 | **🎯 Khớp hình theo câu** | Mỗi câu thuyết minh chiếu đúng khoảnh khắc nó kể. AI gán mốc phim cho từng câu, app chia giọng đọc theo khoảng lặng thật giữa các câu, **không lặp lại cảnh đã chiếu**, tự lấy cảnh mới gần đó |
 | **🛡️ Nguồn từ web phim** | Tự dò **quảng cáo / chữ chèn cứng** (lớp đứng yên trong khi hình phim thay đổi) và tránh các đoạn đó; tự phát hiện **logo/watermark cố định** và che mờ; ô *Bỏ qua đoạn* cho intro, cảnh không muốn dùng |
+| **💬 Phụ đề gốc in cứng** | Tự phát hiện Vietsub/phụ đề in sẵn trong hình rồi: **làm mờ** dải phụ đề · **phủ dải tối** · **cắt bỏ** phần dưới · **né** (đưa phụ đề của app lên trên) · hoặc **🧠 xóa sạch bằng AI** qua [video-subtitle-remover](https://github.com/YaoFANGUK/video-subtitle-remover) (chỉ xử lý các cảnh được dùng trong recap, có bản cho card AMD) |
+| **🎙️ 1 giọng đồng nhất** | Mặc định cả video giữ đúng 1 giọng: cảm xúc từng đoạn chỉ nhích nhẹ tốc độ, không đổi cao độ/phong cách giọng · tắt tiếng phim gốc khi đang thuyết minh (không lẫn giọng nhân vật) |
+| **🔄 Cập nhật trong app** | Nút **Cập nhật** ở góc trái dưới: tự kiểm tra bản mới, tải & cài đè (giữ nguyên cài đặt, API key, giọng đã tải), sao lưu bản cũ và **khôi phục** được nếu cần |
 | **📚 Recap cả season** | Gộp nhiều tập (tự sắp theo số tập) thành 1 video recap, AI kể theo thứ tự tập, tự bỏ OP/ED của mỗi tập |
 | **🏁 Nhiều phương án** | AI viết 2–3 kịch bản (mở đầu gắt hơn / kể rõ ràng hơn), tự chấm điểm cuốn hút + độ chính xác + độ dài, rồi chọn bản hay nhất · **góc nhìn người kể** (toàn tri / qua mắt nhân vật / thám tử / reviewer) · **học phong cách từ video recap mẫu** (nhịp đọc, độ dài cảnh, giọng văn) |
 | **✅ Kiểm tra thành phẩm** | Sau khi xuất: phát hiện màn hình đen, cảnh đứng hình lâu (dễ bị coi là trình chiếu ảnh), âm lượng, độ dài so với mục tiêu · **cân bằng âm lượng** -16 LUFS · chuyển cảnh mờ dần nhẹ · khung hình/giây giống phim gốc |
@@ -110,6 +113,9 @@ python main.py --cli "https://www.youtube.com/watch?v=..." --subtitle phim.srt -
 - **Phát âm chuẩn nhất cho tiếng Việt:** chọn engine *⭐ VieNeu-TTS* (đã cài sẵn qua `install.bat`, lần đầu tự tải model), bật *Phát âm chuẩn*, bấm *🔎 Xem cách đọc* để xem câu sẽ được đọc ra sao. Tên riêng hay bị đọc sai thì thêm vào *📖 Từ điển phát âm* (vd `Thanos → Tha-nốt`). Nếu muốn kỹ hơn, bật *AI soát phát âm*.
 - **Tất cả giọng Piper offline:** engine *Piper* → *🔌 Kho giọng Piper*: tải **tất cả giọng chính thức** (hơn 100 giọng, khoảng chục GB) hoặc *Tất cả giọng tiếng Việt*; tải giọng cộng đồng từ **bất kỳ repo HuggingFace** nào; **nhập file** `.onnx` + `.onnx.json`; **đặt tên** cho giọng (vd "Ngọc Huyền - nữ hoạt ngôn"). Cách đọc (hoạt ngôn, nghiêm túc...) chỉnh cả độ biểu cảm của Piper.
 - **⭐ Giọng gợi ý:** chọn nhanh ở đầu trang Giọng đọc, vd *Ngọc Huyền · nữ hoạt ngôn* (VieNeu, offline).
+- **Cập nhật tool:** bấm **🔄 Cập nhật** ở góc trái dưới (nút chuyển màu khi có bản mới) → *Cập nhật ngay* → *Khởi động lại*. Bản cũ được sao lưu ở `_backup\<phiên bản>\`, bấm *Khôi phục bản trước* nếu bản mới có lỗi. (Từ bản 1.6 trở về trước chưa có nút này: tải zip bản 1.7 và chép đè một lần.)
+- **Video có 2 giọng khác nhau:** giữ bật *Giữ 1 giọng đồng nhất cả video* (trang Giọng đọc) và để *Âm lượng phim gốc khi thuyết minh* = 0 để không lẫn tiếng nhân vật trong phim.
+- **Phim có Vietsub in cứng:** trang *Xuất video* → tab *Chọn cảnh thông minh* → *Phụ đề gốc in cứng*. Muốn xóa sạch bằng AI: tải **video-subtitle-remover** bản `windows-directml` (card AMD như RX 5700 XT) hoặc bản `cuda` (card NVIDIA) tại trang Release của dự án, giải nén, mở VSR 1 lần, rồi chọn thư mục đó và chế độ *🧠 Xóa sạch bằng AI*.
 - Giọng Piper tiếng Việt: vào *Giọng đọc* → engine *Piper* → *Tải thêm giọng Piper* → lọc `vi_`.
 - Nhân bản giọng tiếng Việt: `pip install coqui-tts`, tải model **viXTTS** (<https://huggingface.co/capleaf/viXTTS>), rồi chọn engine *XTTS*, giọng *Nhân bản*, file mẫu và thư mục model.
 
@@ -132,6 +138,7 @@ python main.py --cli "https://www.youtube.com/watch?v=..." --subtitle phim.srt -
 | [anthropic-sdk-python](https://github.com/anthropics/anthropic-sdk-python), [requests](https://github.com/psf/requests) | MIT, Apache-2.0 | Kết nối AI |
 | [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg) | BSD-2 | FFmpeg dự phòng |
 | [Ollama](https://github.com/ollama/ollama) | MIT | Chạy LLM offline |
+| [video-subtitle-remover](https://github.com/YaoFANGUK/video-subtitle-remover) | Apache-2.0 | (tùy chọn, cài riêng) Xóa phụ đề in cứng bằng AI, gọi qua dòng lệnh |
 
 ## 💡 Tham khảo ý tưởng
 
@@ -158,7 +165,9 @@ MovieRecapAI/
 │   ├── film_id.py          # nhận diện phim, TMDB, AI xem hình ảnh cảnh phim
 │   ├── components.py       # tự kiểm tra & cài thư viện, FFmpeg, model
 │   ├── footage.py          # chọn cảnh theo câu, không lặp cảnh, né đoạn bị chặn
-│   ├── overlays.py         # dò quảng cáo chèn cứng & logo cố định
+│   ├── overlays.py         # dò quảng cáo chèn cứng, logo cố định & phụ đề in cứng
+│   ├── vsr.py              # gọi video-subtitle-remover xóa phụ đề bằng AI
+│   ├── updater.py          # cập nhật tool từ GitHub, sao lưu & khôi phục
 │   ├── season.py           # gộp nhiều tập -> recap cả season
 │   ├── style_ref.py        # học phong cách từ video recap mẫu
 │   ├── qa.py               # kiểm tra video thành phẩm

@@ -72,6 +72,7 @@ def main():
     import recap.script_writer as sw
     sw.chat = llm.chat
     s.set("script", "provider", "gemini")
+    s.set("script", "mode", "mixed")  # có đoạn giữ thoại gốc
     p.run_script()
     assert len(p.script["segments"]) == 3
     assert p.script["segments"][2]["end"] <= 180

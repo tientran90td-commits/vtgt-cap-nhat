@@ -1,4 +1,4 @@
-"""Phát hiện chữ/quảng cáo chèn cứng (của web phim) và logo cố định.
+"""Phát hiện chữ/quảng cáo chèn cứng (của web phim), logo cố định và phụ đề in cứng (Vietsub...).
 
 Ý tưởng: lớp chèn cứng (quảng cáo, banner, logo web) đứng yên từng điểm ảnh trong khi hình phim bên dưới
 thay đổi. Lấy 3 khung hình cách nhau vài giây mà nội dung phim đã đổi khác: những điểm "cạnh" (edge) trùng
@@ -29,9 +29,9 @@ def detect(video: str, duration: float, width: int, height: int, log, progress, 
         import cv2
     except ImportError:
         log("Thiếu OpenCV - bỏ qua bước lọc quảng cáo chèn.", level="warn")
-        return {"ranges": [], "watermark": None}
+        return {"ranges": [], "watermark": None, "hardsub": None, "version": 2}
     if not width or not height or duration < 30:
-        return {"ranges": [], "watermark": None}
+        return {"ranges": [], "watermark": None, "hardsub": None, "version": 2}
     w = WIDTH
     h = max(2, int(round(height * w / width / 2)) * 2)
     fsize = w * h * 3
@@ -41,6 +41,11 @@ def detect(video: str, duration: float, width: int, height: int, log, progress, 
     frames = []  # (t, rgb int16, gray, edges)
     triplets = []  # (t0, t2, packed static mask)
     counts = np.zeros((h, w), np.int32)
+    # phụ đề in cứng: chữ trắng/vàng có viền tối ở nửa dưới khung hình
+    band0 = int(h * 0.55)
+    tcount = np.zeros((h - band0, w), np.int32)
+    sub_masks = []  # mặt nạ chữ (nén bit) của các khung có chữ
+    kernel = np.ones((3, 3), np.uint8)
     n_total = max(1, int(duration / SAMPLE_EVERY))
     idx = 0
     try:
@@ -54,6 +59,16 @@ def detect(video: str, duration: float, width: int, height: int, log, progress, 
             rgb = np.frombuffer(buf, np.uint8).reshape(h, w, 3)
             gray = cv2.cvtColor(rgb, cv2.COLOR_RGB2GRAY)
             edges = cv2.Canny(gray, 80, 160) > 0
+            band = rgb[band0:]
+            r, g, b = band[..., 0].astype(np.int16), band[..., 1].astype(np.int16), band[..., 2].astype(np.int16)
+            light = ((r > 200) & (g > 200) & (b > 200)) | ((r > 200) & (g > 180) & (b < 120))
+            # nét chữ mảnh: bỏ các mảng sáng lớn (bầu trời, vạch màu...) bằng phép mở hình thái
+            big = cv2.morphologyEx(light.astype(np.uint8), cv2.MORPH_OPEN, np.ones((5, 5), np.uint8)) > 0
+            dark = cv2.dilate((gray[band0:] < 60).astype(np.uint8), kernel) > 0
+            text = light & ~big & dark
+            if text.mean() > 0.0015:
+                tcount += text
+                sub_masks.append((idx, np.packbits(text)))
             frames.append((idx * SAMPLE_EVERY, rgb.astype(np.int16), gray.astype(np.int16), edges))
             if len(frames) > 2 * STEP + 1:
                 frames.pop(0)
@@ -74,9 +89,42 @@ def detect(video: str, duration: float, width: int, height: int, log, progress, 
         except Exception:  # noqa: BLE001
             pass
         proc.wait()
+    hardsub = None
+    bh = h - band0
+    # Lượt 2: bỏ điểm ảnh "chữ" đứng yên ở phần lớn khung (họa tiết/logo cố định) -> phần còn lại phải là chữ
+    # nằm giữa khung, và ĐỔI NỘI DUNG theo thời gian như phụ đề thật.
+    static = tcount > 0.6 * max(1, len(sub_masks))
+    sub_frames, sub_changes, prev_i, prev_m = 0, 0, None, None
+    sub_rows = np.zeros(bh, np.int64)
+    for i, packed in sub_masks:
+        m = np.unpackbits(packed)[: bh * w].reshape(bh, w).astype(bool) & ~static
+        if m.mean() < 0.001:
+            prev_m = None
+            continue
+        xs_ = np.nonzero(m)[1]
+        if not (0.3 * w < xs_.mean() < 0.7 * w and xs_.std() < 0.28 * w):
+            prev_m = None
+            continue
+        sub_frames += 1
+        sub_rows += m.sum(axis=1)
+        if prev_m is not None and prev_i == i - 1:
+            inter = (m & prev_m).sum()
+            if inter / ((m | prev_m).sum() or 1) < 0.5:
+                sub_changes += 1
+        prev_i, prev_m = i, m
+    if idx and sub_frames / idx >= 0.15 and sub_changes / max(1, sub_frames - 1) >= 0.15:
+        if sub_rows.max() > 0:
+            rows = np.where(sub_rows > 0.25 * sub_rows.max())[0]
+            y0 = (band0 + rows.min()) / h - 0.025
+            y1 = (band0 + rows.max() + 1) / h + 0.025
+            if y1 - y0 <= 0.28:  # dải phụ đề phải hẹp
+                hardsub = {"y0": float(round(max(0.0, y0), 4)), "y1": float(round(min(1.0, y1), 4)),
+                           "ratio": float(round(sub_frames / idx, 2))}
+        log(f"Phát hiện phụ đề in cứng ở {hardsub['ratio']:.0%} khung hình (dải {hardsub['y0']:.0%}-{hardsub['y1']:.0%} "
+            "chiều cao).")
     if not triplets:
         progress(1.0, "Xong lọc quảng cáo")
-        return {"ranges": [], "watermark": None}
+        return {"ranges": [], "watermark": None, "hardsub": hardsub, "version": 2}
     persistent = counts >= max(3, PERSISTENT_SHARE * len(triplets))
     watermark = None
     if persistent.sum() >= 30:
@@ -104,4 +152,5 @@ def detect(video: str, duration: float, width: int, height: int, log, progress, 
     total = sum(e - s for s, e in ranges)
     log(f"Lọc quảng cáo chèn: {len(ranges)} đoạn (~{total:.0f}s) sẽ được tránh"
         + (" · phát hiện logo/watermark cố định -> sẽ che mờ" if watermark else ""))
-    return {"ranges": [[round(s, 2), round(e, 2)] for s, e in ranges], "watermark": watermark}
+    return {"ranges": [[round(s, 2), round(e, 2)] for s, e in ranges], "watermark": watermark, "hardsub": hardsub,
+            "version": 2}

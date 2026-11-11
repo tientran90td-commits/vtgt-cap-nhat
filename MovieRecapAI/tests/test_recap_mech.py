@@ -18,7 +18,7 @@ import numpy as np  # noqa: E402
 
 from recap import overlays, script_writer, season, tts  # noqa: E402
 from recap.config import Settings  # noqa: E402
-from recap.ffmpeg_utils import probe, run_ffmpeg  # noqa: E402
+from recap.ffmpeg_utils import ffmpeg_exe, probe, run_ffmpeg  # noqa: E402
 from recap.footage import Footage, sentence_durations, valid_sentences  # noqa: E402
 from recap.pipeline import Project  # noqa: E402
 from recap.subtitles import transcript_to_text  # noqa: E402
@@ -200,6 +200,86 @@ def check_candidates_style(vid: Path, s: Settings):
           f"cảnh ~{ref['avg_cut']}s")
 
 
+def check_hardsub(s: Settings):
+    """Phụ đề in cứng (các câu khác nhau, chữ trắng viền đen ở dưới): phát hiện -> làm mờ / cắt."""
+    import cv2
+
+    vid = TMP / "vietsub.mp4"
+    lines = ["Anh đang làm gì ở đây vậy?", "Tôi chỉ đi ngang qua thôi mà.", "Đừng có nói dối tôi nữa!",
+             "Chúng ta phải rời khỏi nơi này ngay.", "Kẻ thù đang đến gần rồi đó.", "Nhanh lên, không còn thời gian!",
+             "Cậu có tin vào số phận không?", "Mọi chuyện sẽ ổn thôi, đừng lo."]
+    (TMP / "vietsub.srt").write_text("\n".join(
+        f"{i + 1}\n00:00:{i * 3:02d},000 --> 00:00:{i * 3 + 2:02d},800\n{lines[i % len(lines)]}\n" for i in range(20)),
+        encoding="utf-8")
+    run_ffmpeg(["-f", "lavfi", "-i", "testsrc2=size=640x360:rate=25:duration=60", "-f", "lavfi", "-i",
+                "sine=duration=60", "-vf", "subtitles=filename=vietsub.srt:force_style='Fontname=DejaVu Sans,"
+                "Fontsize=22,Bold=1,Outline=2,PrimaryColour=&H00FFFFFF,OutlineColour=&H00000000'",
+                "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-shortest", str(vid)], cwd=str(TMP))
+    info = probe(vid)
+    res = overlays.detect(str(vid), info.duration, info.width, info.height, NOLOG, NOLOG, threading.Event())
+    hs = res["hardsub"]
+    assert hs and 0.7 < hs["y0"] < 0.92 and hs["y1"] > 0.9 and hs["ratio"] > 0.6, hs
+    assert not res["ranges"], res  # phụ đề đổi liên tục -> không bị coi là quảng cáo
+    plain = TMP / "plain.mp4"   # nguồn không phụ đề -> không được báo nhầm
+    run_ffmpeg(["-f", "lavfi", "-i", "testsrc2=size=640x360:rate=25:duration=40", "-c:v", "libx264", "-preset",
+                "ultrafast", str(plain)])
+    pi = probe(plain)
+    assert overlays.detect(str(plain), pi.duration, pi.width, pi.height, NOLOG, NOLOG, threading.Event())["hardsub"] is None
+
+    def band_edges(path, y0, y1):
+        f = TMP / "band.png"
+        run_ffmpeg(["-ss", "4", "-i", str(path), "-frames:v", "1", "-vf", "scale=640:360", str(f)])
+        g = cv2.imread(str(f), cv2.IMREAD_GRAYSCALE)
+        return (cv2.Canny(g[int(y0 * 360):int(y1 * 360)], 80, 160) > 0).mean()
+    p = Project(str(vid), s)
+    p.overlays = res
+    p.script = {"title": "t", "segments": [{"start": 2, "end": 12, "narration": ""}]}
+    s.set("render", "subtitles", False)
+    s.set("render", "fill", "crop")
+    before = band_edges(vid, hs["y0"], hs["y1"])
+    s.set("render", "hardsub_mode", "blur")
+    out = p.run_render(TMP / "out" / "blur.mp4", log=NOLOG)
+    after = band_edges(out, hs["y0"], hs["y1"])
+    assert after < before * 0.5, (before, after)
+    s.set("render", "hardsub_mode", "crop")
+    out2 = p.run_render(TMP / "out" / "crop.mp4", log=NOLOG)
+    assert band_edges(out2, 0.88, 0.99) < before
+    # Xóa bằng AI qua video-subtitle-remover: dùng 1 bản VSR giả (cùng dòng lệnh) tô kín vùng được giao
+    pkg = TMP / "vsr_pkg" / "vsr-v1.4.0"
+    (pkg / "backend").mkdir(parents=True, exist_ok=True)
+    (pkg / "Python").mkdir(exist_ok=True)
+    py = pkg / "Python" / "python"
+    if not py.exists():
+        py.symlink_to(sys.executable)
+    (pkg / "backend" / "main.py").write_text(f"""import argparse, subprocess
+ap = argparse.ArgumentParser()
+ap.add_argument("-i"); ap.add_argument("-o"); ap.add_argument("-c", nargs=4, type=int, action="append")
+ap.add_argument("--inpaint-mode")
+a = ap.parse_args()
+y0, y1, x0, x1 = a.c[0]
+subprocess.check_call([{ffmpeg_exe()!r}, "-y", "-loglevel", "error", "-i", a.i, "-vf",
+                       f"drawbox=x={{x0}}:y={{y0}}:w={{x1 - x0}}:h={{y1 - y0}}:color=gray:t=fill", a.o])
+print("done", a.inpaint_mode)
+""", encoding="utf-8")
+    s.set("render", "hardsub_mode", "vsr")
+    s.set("render", "vsr_dir", str(TMP / "vsr_pkg"))
+    logs = []
+    out3 = p.run_render(TMP / "out" / "vsr.mp4", log=lambda m, level="info": logs.append(m))
+    cleaned = list((p.dir / "vsr").glob("clean_*.mp4"))
+    assert cleaned and band_edges(out3, hs["y0"], hs["y1"]) < before * 0.2, (cleaned, logs[-5:])
+    assert not any("Không xóa được" in m for m in logs), logs
+    s.set("render", "vsr_dir", str(TMP / "khong-co"))  # VSR hỏng/thiếu -> tự chuyển sang làm mờ, vẫn xuất được
+    logs.clear()
+    out4 = p.run_render(TMP / "out" / "vsr_fail.mp4", log=lambda m, level="info": logs.append(m))
+    assert any("chuyển sang làm mờ" in m for m in logs) and band_edges(out4, hs["y0"], hs["y1"]) < before * 0.5
+    s.set("render", "hardsub_mode", "blur")
+    s.set("render", "subtitles", True)
+    s.set("render", "fill", "blur")
+    print(f"✓ xóa phụ đề bằng AI (VSR): {len(cleaned)} đoạn được xử lý · VSR lỗi -> tự làm mờ")
+    print(f"✓ phụ đề in cứng: dải {hs['y0']:.0%}-{hs['y1']:.0%} ({hs['ratio']:.0%} thời lượng) · làm mờ: cạnh chữ "
+          f"{before:.3f} → {after:.3f} · không báo nhầm video không phụ đề")
+
+
 def main():
     s = Settings(TMP / "s.json")
     s.set("paths", "workspace", str(TMP / "ws"))
@@ -211,6 +291,7 @@ def main():
     check_render_sync(vid, s)
     check_season(s)
     check_candidates_style(vid, s)
+    check_hardsub(s)
     print("OK", TMP)
 
 

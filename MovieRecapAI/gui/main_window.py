@@ -74,6 +74,8 @@ class MainWindow(QMainWindow):
         self.lb_proj.setObjectName("appSub")
         self.lb_proj.setWordWrap(True)
         sl.addWidget(self.lb_proj)
+        self.btn_update = button(f"🔄 Cập nhật · v{APP_VERSION}", self.update_dialog, tip="Kiểm tra & cài bản mới")
+        sl.addWidget(self.btn_update)
         h.addWidget(side)
 
         right = QVBoxLayout()
@@ -143,6 +145,7 @@ class MainWindow(QMainWindow):
         from PySide6.QtCore import QTimer
 
         QTimer.singleShot(300, self.startup_check)
+        QTimer.singleShot(5000, self.check_update_quiet)
 
     # ------------------------------------------------------------ chuẩn bị khi mở app
     def startup_check(self):
@@ -413,6 +416,25 @@ class MainWindow(QMainWindow):
             self.logbox.appendHtml(f"<span style='color:#6C7489'>{ts}</span> <span style='color:{color}'>{text}</span>")
         else:
             self.logbox.appendHtml(f"<span style='color:#6C7489'>{ts}</span> {text}")
+
+    # ------------------------------------------------------------ cập nhật tool
+    def check_update_quiet(self):
+        from recap import updater
+
+        def done(info):
+            self._update_info = info
+            if info.get("newer"):
+                self.btn_update.setText(f"🆕 Có bản mới v{info['latest']} - Cập nhật")
+                self.btn_update.setObjectName("primary")
+                self.btn_update.style().polish(self.btn_update)
+                self.log(f"🆕 Đã có bản mới v{info['latest']} - bấm nút 'Cập nhật' ở góc trái dưới.", "warn")
+        self.run_task(lambda log, progress, cancel: updater.check(self.settings), on_done=done,
+                      on_fail=lambda m: None, title="Kiểm tra bản mới", quiet=True)
+
+    def update_dialog(self):
+        from .update_dialog import UpdateDialog
+
+        UpdateDialog(self).exec()
 
     def closeEvent(self, e):
         for w in list(self.workers):

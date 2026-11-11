@@ -120,8 +120,34 @@ def _logo_xy(pos: str) -> str:
     }.get(pos, f"W-w-{m}:{m}")
 
 
+HARDSUB_MODES = {
+    "blur": "Làm mờ dải phụ đề gốc (khuyên dùng)",
+    "vsr": "🧠 Xóa sạch bằng AI (video-subtitle-remover, cần cài VSR)",
+    "bar": "Phủ dải tối lên phụ đề gốc",
+    "crop": "Cắt bỏ phần dưới chứa phụ đề gốc",
+    "avoid": "Giữ nguyên, chỉ đưa phụ đề của app lên trên để không đè",
+    "none": "Không xử lý",
+}
+
+
+def _hardsub_filters(hs: dict | None, mode: str, sw: int, sh: int, src: str) -> tuple[str, str, str]:
+    """Trả về (đồ thị lọc phụ, nhãn nguồn mới, bộ lọc thêm vào chuỗi) để che/cắt dải phụ đề in cứng."""
+    if not hs or mode in ("none", "avoid", "vsr", "", None) or not sw or not sh:
+        return "", src, ""
+    y = max(0, int(hs["y0"] * sh) // 2 * 2)
+    hh = max(2, min(sh - y, int((hs["y1"] - hs["y0"]) * sh)) // 2 * 2)
+    if mode == "crop" and hs["y1"] > 0.8 and y > sh * 0.6:
+        return "", src, f"crop=iw:{y}:0:0,"
+    if mode == "bar" or (mode == "crop"):
+        return "", src, f"drawbox=x=0:y={y}:w=iw:h={hh}:color=black@0.88:t=fill,"
+    graph = (f"{src}split=2[hs0][hs1];[hs1]crop=iw:{hh}:0:{y},gblur=sigma=18:steps=2,eq=brightness=-0.12[hsb];"
+             f"[hs0][hsb]overlay=0:{y}[hsrc];")
+    return graph, "[hsrc]", ""
+
+
 def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, out_path: Path, work_dir: Path,
-           transcript: list[dict] | None, log, progress, cancel, blocked=None, watermark=None) -> Path:
+           transcript: list[dict] | None, log, progress, cancel, blocked=None, watermark=None,
+           hardsub: dict | None = None) -> Path:
     """voices[i] = đường dẫn WAV giọng đọc của đoạn i, hoặc None nếu đoạn giữ âm thanh gốc.
     blocked: các khoảng không được dùng (quảng cáo chèn, OP/ED, đoạn người dùng bỏ).
     watermark: {"box": [...]} logo cố định của nguồn để che mờ."""
@@ -132,6 +158,10 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
     use_blocked = [r for r in (blocked or []) if opts.get("avoid_overlays", True) or (len(r) < 3 or r[2] != "overlay")]
     footage = Footage(info.duration, use_blocked, no_reuse=opts.get("no_reuse", True))
     pre_filter = _delogo((watermark or {}).get("box"), info.width, info.height) if opts.get("delogo", True) else ""
+    hs_mode = opts.get("hardsub_mode", "blur") if hardsub else "none"
+    if hardsub and hs_mode != "none":
+        log(f"Phụ đề gốc in cứng: {HARDSUB_MODES.get(hs_mode, hs_mode)}")
+    vsr_ok = hs_mode == "vsr"
     synced = 0
     W, H = output_size(info, opts.get("aspect", "16:9"), int(opts.get("height", 1080)))
     fps_opt = opts.get("fps", 30)
@@ -150,6 +180,8 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
         "outline_color": opts.get("sub_outline_color"), "outline": opts.get("sub_outline", 3),
         "position": opts.get("sub_position", "bottom"), "bold": opts.get("sub_bold", True),
     }
+    if hardsub and opts.get("hardsub_mode", "blur") == "avoid" and style["position"] == "bottom":
+        style["position"] = "top"  # né phụ đề gốc nằm ở dưới
     max_chars = int(opts.get("sub_max_chars", 42))
     if W < H:
         max_chars = min(max_chars, 28)
@@ -219,8 +251,25 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
         for s in subs:
             all_subs.append({"start": s["start"] + t_global, "end": s["end"] + t_global, "text": s["text"]})
 
+        # Nguồn hình của từng cảnh: phim gốc, hoặc bản đã được AI (VSR) xóa phụ đề
+        srcs = [(video, a) for a, _d in pieces]
+        seg_hs = hs_mode
+        if hs_mode == "vsr":
+            seg_hs = "blur"
+            if vsr_ok:
+                from . import vsr
+                try:
+                    srcs = [(str(vsr.clean_clip(video, a, d + 0.2, hardsub, opts.get("vsr_mode", "sttn-auto"),
+                                                opts.get("vsr_dir", ""), work_dir, log, cancel)), 0.0)
+                            for a, d in pieces]
+                    seg_hs = "vsr"
+                except Cancelled:
+                    raise
+                except Exception as e:  # noqa: BLE001
+                    vsr_ok = False
+                    log(f"Không xóa được phụ đề bằng AI ({e}) - chuyển sang làm mờ dải phụ đề.", level="warn")
         key = hashlib.sha1(json.dumps([seg, str(voice), voice and Path(voice).stat().st_size, pieces, need, dur,
-                                       pre_filter,
+                                       pre_filter, hardsub, seg_hs, srcs,
                                        speed, W, H, fps, enc, opts.get("fill"), style, subs, title, logo,
                                        opts.get("logo_position"), opts.get("logo_scale"),
                                        opts.get("orig_volume_voice"), opts.get("orig_volume_clip"),
@@ -237,8 +286,8 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
             old.unlink(missing_ok=True)
 
         args = []
-        for a, d in pieces:
-            args += ["-ss", f"{a:.3f}", "-t", f"{d + 0.2:.3f}", "-i", video]
+        for (sv, sa), (_a, d) in zip(srcs, pieces):
+            args += ["-ss", f"{sa:.3f}", "-t", f"{d + 0.2:.3f}", "-i", sv]
         idx = len(pieces)
         voice_idx = logo_idx = None
         if voice:
@@ -249,13 +298,15 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
             args += ["-i", logo]
             logo_idx = idx
             idx += 1
+        # có dùng tiếng phim gốc trong đoạn này không (tắt hẳn khi thuyết minh -> không ghép tiếng gốc)
+        use_orig_audio = info.has_audio and ((voice and float(opts.get("orig_volume_voice", 0.0)) > 0) or not voice)
         if len(pieces) > 1:  # ghép các cảnh của từng câu thành 1 đoạn
             fc = ""
             for k, (_a, d) in enumerate(pieces):
                 fc += f"[{k}:v]trim=duration={d:.3f},setpts=PTS-STARTPTS,fps={fps},setsar=1[pv{k}];"
-                if info.has_audio:
+                if use_orig_audio:
                     fc += f"[{k}:a]atrim=duration={d:.3f},asetpts=PTS-STARTPTS,aresample=48000[pa{k}];"
-            if info.has_audio:
+            if use_orig_audio:
                 fc += "".join(f"[pv{k}][pa{k}]" for k in range(len(pieces))) + \
                     f"concat=n={len(pieces)}:v=1:a=1[cv][ca];"
             else:
@@ -263,7 +314,13 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
             vsrc, asrc = "[cv]", "[ca]"
         else:
             fc, vsrc, asrc = "", "[0:v]", "[0:a]"
-        fc += _video_chain(W, H, opts.get("fill", "blur"), speed, fps, vsrc, pre_filter)
+        pf = pre_filter
+        if pf and hardsub and seg_hs == "blur":  # che logo trước, rồi mới làm mờ dải phụ đề
+            fc += f"{vsrc}{pf.rstrip(',')}[dl];"
+            vsrc, pf = "[dl]", ""
+        hs_graph, vsrc, hs_extra = _hardsub_filters(hardsub, seg_hs, info.width, info.height, vsrc)
+        fc += hs_graph
+        fc += _video_chain(W, H, opts.get("fill", "blur"), speed, fps, vsrc, pf + hs_extra)
         ass_name = None
         if subs or title:
             ass_name = f"seg_{i:03d}.ass"
@@ -335,7 +392,8 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
     st = footage.stats
     qa = {"segments": len(segs), "sentence_synced_segments": synced, "pieces": st["pieces"],
           "reused_seconds": round(st["reused_s"], 1), "blocked_seconds_used": round(st["blocked_s"], 1),
-          "moved_to_fresh_footage": st["moved"], "duration": round(t_global, 1), "delogo": bool(pre_filter)}
+          "moved_to_fresh_footage": st["moved"], "duration": round(t_global, 1), "delogo": bool(pre_filter),
+          "hardsub": hs_mode if hardsub else "none"}
     if opts.get("final_qa", True):
         progress(0.99, "Kiểm tra chất lượng video")
         try:

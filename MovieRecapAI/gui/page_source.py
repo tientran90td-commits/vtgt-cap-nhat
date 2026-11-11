@@ -257,6 +257,9 @@ class SourcePage(Page):
             parts.append(f"🛡️ Quảng cáo chèn: {n} đoạn sẽ được tránh" if n else "🛡️ Không thấy quảng cáo chèn")
             if ov.get("watermark"):
                 parts.append("🧽 Có logo cố định → sẽ che mờ")
+            if ov.get("hardsub"):
+                parts.append(f"💬 Có phụ đề in cứng ({ov['hardsub']['ratio']:.0%} thời lượng) → sẽ xử lý theo mục "
+                             "Xuất video › Chọn cảnh thông minh")
         self.lb_guard.setText(" · ".join(parts))
 
     def open_season_dialog(self):

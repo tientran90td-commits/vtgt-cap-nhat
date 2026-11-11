@@ -91,6 +91,7 @@ DEFAULTS: dict = {
         "read_style": "natural",  # cách đọc chung
         "read_custom": "",        # mô tả cách đọc tự viết
         "tone_auto": True,        # mỗi đoạn đổi cách đọc theo cảm xúc AI gán
+        "consistent": True,       # giữ 1 giọng đồng nhất cả video (cảm xúc từng đoạn chỉ chỉnh nhẹ tốc độ)
         "normalize": True,       # chuẩn hóa số, ngày, đơn vị, viết tắt trước khi đọc
         "ai_pron": False,        # nhờ AI soát lại câu cho dễ đọc
         "transliterate": False,  # phiên âm tên nước ngoài sang tiếng Việt
@@ -102,7 +103,7 @@ DEFAULTS: dict = {
         "fps": 30,
         "encoder": "auto",
         "quality": 21,
-        "orig_volume_voice": 0.12,
+        "orig_volume_voice": 0.0,  # tắt tiếng phim khi đang thuyết minh (không lẫn lời thoại nhân vật)
         "orig_volume_clip": 1.0,
         "voice_volume": 1.0,
         "fit": "extend",
@@ -128,12 +129,16 @@ DEFAULTS: dict = {
         "no_reuse": True,        # không lặp lại cảnh đã chiếu
         "avoid_overlays": True,  # tránh đoạn có quảng cáo/chữ chèn cứng của web phim
         "delogo": True,          # che mờ logo/watermark cố định của nguồn
+        "hardsub_mode": "blur",  # phụ đề gốc in cứng: blur | vsr | bar | crop | avoid | none
+        "vsr_dir": "",  # thư mục video-subtitle-remover (xóa phụ đề bằng AI)
+        "vsr_mode": "sttn-auto",
         "transition": "fade",    # cut | fade - chuyển cảnh mềm giữa các đoạn
         "loudnorm": True,        # cân bằng âm lượng tổng (-16 LUFS)
         "final_qa": True,        # kiểm tra màn hình đen / đứng hình / âm lượng sau khi xuất
     },
-    "ui": {"last_dir": "", "auto_install": True, "preload": True},
-    "config_version": 3,
+    "ui": {"last_dir": "", "auto_install": True, "preload": True,
+           "update_repo": "tientran90td-commits/vtgt-cap-nhat", "update_branch": "claude/movie-summary-app-0q90dq"},
+    "config_version": 4,
 }
 
 
@@ -191,6 +196,11 @@ class Settings:
                     if vo.get("engine") == "gemini" and str(vo.get("model", "")).startswith("gemini-2.5"):
                         vo["model"] = ""
                     self.data["config_version"] = 3
+                if int(raw.get("config_version", 1)) < 4:  # 1.6 -> 1.7: sửa lỗi video có 2 giọng
+                    if abs(float(self.data["render"].get("orig_volume_voice", 0) or 0) - 0.12) < 1e-6:
+                        self.data["render"]["orig_volume_voice"] = 0.0
+                    self.data["voice"]["consistent"] = True
+                    self.data["config_version"] = 4
             except Exception:
                 self.data = copy.deepcopy(DEFAULTS)
 

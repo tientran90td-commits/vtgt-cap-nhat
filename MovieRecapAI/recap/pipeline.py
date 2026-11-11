@@ -244,13 +244,14 @@ class Project:
         log("② Dựng video...")
         opts = self.settings.section("render")
         opts["_target_seconds"] = float(self.settings.get("script", "target_minutes", 5) or 5) * 60
-        if opts.get("avoid_overlays", True) or opts.get("delogo", True):
-            if self.overlays is None:
+        if opts.get("avoid_overlays", True) or opts.get("delogo", True) or opts.get("hardsub_mode", "blur") != "none":
+            if self.overlays is None or int(self.overlays.get("version", 1)) < 2:
                 log("Lọc quảng cáo chèn & logo của nguồn...")
                 self.run_overlays(log, lambda p, m="": progress((0.4 if has_narr else 0) + p * 0.05, m), cancel)
         res = editor.render(self.script, self.video, self.info, voices, opts, out_path, self.dir, self.transcript,
                             log, lambda p, m="": progress((0.4 if has_narr else 0) + p * (0.6 if has_narr else 1), m),
-                            cancel, blocked=self.blocked(), watermark=(self.overlays or {}).get("watermark"))
+                            cancel, blocked=self.blocked(), watermark=(self.overlays or {}).get("watermark"),
+                            hardsub=(self.overlays or {}).get("hardsub"))
         txt = out_path.with_suffix(".txt")
         txt.write_text(script_writer.script_to_text(self.script), encoding="utf-8")
         return res
@@ -284,7 +285,8 @@ class Project:
             log("Bước 3/6: Dò chuyển cảnh")
             self.run_scenes(log, lambda p, m="": progress(0.38 + p * 0.1, m), cancel)
         ro = self.settings.section("render")
-        if (ro.get("avoid_overlays", True) or ro.get("delogo", True)) and self.overlays is None:
+        if (ro.get("avoid_overlays", True) or ro.get("delogo", True) or ro.get("hardsub_mode", "blur") != "none") and \
+                (self.overlays is None or int(self.overlays.get("version", 1)) < 2):
             log("Lọc quảng cáo chèn & logo của nguồn")
             self.run_overlays(log, lambda p, m="": progress(0.47 + p * 0.03, m), cancel)
         if ai and not web and sc.get("visual") and not self.visual:

@@ -165,9 +165,23 @@ EXPRESSIVE = {"openai", "gemini", "azure", "elevenlabs"}
 
 
 def apply_read_style(engine: str, opts: dict) -> dict:
-    """Áp cách đọc (opts['tone'] của đoạn, hoặc opts['read_style'] chung) cho từng engine."""
+    """Áp cách đọc (opts['tone'] của đoạn, hoặc opts['read_style'] chung) cho từng engine.
+
+    Giữ 1 giọng đồng nhất (opts['consistent'], mặc định bật): cảm xúc riêng từng đoạn KHÔNG được đổi cao độ /
+    phong cách giọng (nghe như người khác), chỉ nhích nhẹ tốc độ đọc. Giọng & cao độ theo cách đọc CHUNG."""
+    seg_tone = opts.get("tone") or ""
+    glob = opts.get("read_style") or "natural"
+    if opts.get("consistent", True) and seg_tone and seg_tone != glob and seg_tone in READ_STYLES:
+        base = _apply_style(engine, dict(opts, tone=""), glob)
+        delta = READ_STYLES[seg_tone]["rate"] - READ_STYLES.get(glob, READ_STYLES["natural"])["rate"]
+        base["rate"] = float(base.get("rate", 0) or 0) + max(-6.0, min(6.0, delta))
+        return base
+    return _apply_style(engine, opts, seg_tone or glob)
+
+
+def _apply_style(engine: str, opts: dict, key: str) -> dict:
     o = dict(opts)
-    key = o.get("tone") or o.get("read_style") or "natural"
+    key = key or "natural"
     st = READ_STYLES.get(key, READ_STYLES["natural"])
     custom = (o.get("read_custom") or "").strip() if key == "custom" else ""
     desc_vi = custom or st["vi"]
@@ -1195,7 +1209,7 @@ def speak_text(text: str, opts: dict) -> str:
 
 def voice_cache_key(engine: str, voice: str, text: str, opts: dict) -> str:
     keys = ("rate", "pitch", "volume", "model", "style", "lang_code", "xtts_ref", "xtts_model_dir", "normalize",
-            "ai_pron", "transliterate", "read_style", "read_custom", "tone")
+            "ai_pron", "transliterate", "read_style", "read_custom", "tone", "consistent")
     payload = json.dumps([engine, voice, text, {k: opts.get(k) for k in keys}, textnorm.load_dict()],
                          ensure_ascii=False, sort_keys=True)
     return hashlib.sha1(payload.encode("utf-8")).hexdigest()[:16]

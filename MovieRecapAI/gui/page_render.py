@@ -76,6 +76,7 @@ class RenderPage(Page):
         self.gap = b.spin(spin(0, 2, 0.05, " giây", decimals=2), "render", "gap")
         f2.addRow("Giọng thuyết minh", self.vv)
         f2.addRow("Tiếng phim khi có thuyết minh", self.ov)
+        f2.addRow("", muted("0 = tắt hẳn tiếng phim lúc thuyết minh (khuyên dùng: không lẫn lời thoại nhân vật)"))
         f2.addRow("Tiếng phim ở đoạn thoại gốc", self.oc)
         f2.addRow("Nhạc nền", self.music)
         f2.addRow("Âm lượng nhạc", self.mv)
@@ -152,6 +153,29 @@ class RenderPage(Page):
         fs.addWidget(muted("Đoạn cần bỏ qua (intro, OP/ED, cảnh nhạy cảm...) nhập ở Bước 1 → ô 'Bỏ qua đoạn'. "
                            "Sau khi xuất, kết quả kiểm tra nằm cạnh video (file .qa.json) và trong nhật ký."))
         l3.addWidget(gs)
+        gh = QGroupBox("💬 Phụ đề gốc in cứng trong phim (Vietsub...)")
+        fh = QFormLayout(gh)
+        self.hardsub = b.combo(fill_combo(QComboBox(), editor.HARDSUB_MODES), "render", "hardsub_mode")
+        fh.addRow("Cách xử lý", self.hardsub)
+        fh.addRow(muted("App tự phát hiện phụ đề in sẵn trong hình (chữ trắng/vàng viền đen ở phía dưới) rồi che đi để "
+                        "phụ đề thuyết minh của app không bị đè lên. Phụ đề rời (.srt, phụ đề nhúng trong MKV) luôn được "
+                        "loại bỏ khỏi video xuất ra."))
+        # Xóa sạch bằng AI qua video-subtitle-remover (công cụ ngoài, Apache-2.0)
+        self.vsr_dir = PathPicker("dir", placeholder="Thư mục đã giải nén video-subtitle-remover (VSR)")
+        self.vsr_dir.setText(s.get("render", "vsr_dir", ""))
+        self.vsr_dir.changed.connect(lambda v: b._set("render", "vsr_dir", v))
+        fh.addRow("Thư mục VSR", self.vsr_dir)
+        from recap import vsr
+        self.vsr_mode = b.combo(fill_combo(QComboBox(), vsr.MODES), "render", "vsr_mode")
+        fh.addRow("Thuật toán AI", self.vsr_mode)
+        fh.addRow("", hrow(button("⬇ Tải VSR", lambda: QDesktopServices.openUrl(QUrl(vsr.RELEASES_URL)),
+                                  tip="Card AMD (RX 5700 XT...) chọn bản windows-directml; NVIDIA chọn bản cuda"),
+                           button("✔ Kiểm tra VSR", self.check_vsr), "stretch"))
+        fh.addRow(muted("🧠 Chế độ 'Xóa sạch bằng AI': app gọi video-subtitle-remover để xóa chữ và vẽ lại nền, CHỈ cho "
+                        "những cảnh được dùng trong video recap (vài phút, không phải cả phim) và lưu lại để lần sau dùng "
+                        "ngay. Cài: tải bản vsr-…-windows-directml.7z (card AMD) ở trang Release, giải nén, mở VSR 1 lần "
+                        "cho chạy xong, rồi chọn thư mục đó ở trên. Nếu VSR lỗi, app tự chuyển sang làm mờ."))
+        l3.addWidget(gh)
         l3.addStretch(1)
         tabs.addTab(scroll(t1), "🖼️ Khung hình && phụ đề")
         tabs.addTab(scroll(t2), "🔊 Âm thanh, logo && hiệu ứng")
@@ -253,3 +277,9 @@ class RenderPage(Page):
             editor.clear_render_cache(p.dir)
             self.app.log("Đã xóa các đoạn dựng tạm.")
 
+    def check_vsr(self):
+        from recap import vsr
+        try:
+            QMessageBox.information(self, "VSR sẵn sàng", vsr.check(self.vsr_dir.text().strip()))
+        except vsr.VSRError as e:
+            QMessageBox.warning(self, "Chưa dùng được VSR", str(e))

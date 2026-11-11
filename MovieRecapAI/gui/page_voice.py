@@ -98,6 +98,11 @@ class VoicePage(Page):
         fs.addRow("Cách đọc chung", self.read_style)
         fs.addRow("Mô tả riêng", self.read_custom)
         fs.addRow(self.tone_auto)
+        self.consistent = b.check(QCheckBox("Giữ 1 giọng đồng nhất cả video (cảm xúc từng đoạn chỉ chỉnh nhẹ tốc độ)"),
+                                  "voice", "consistent")
+        self.consistent.setToolTip("Tắt ô này thì mỗi đoạn có thể đổi cao độ/phong cách giọng theo cảm xúc - "
+                                   "nghe sinh động hơn nhưng dễ như 2 người đọc khác nhau.")
+        fs.addRow(self.consistent)
         fs.addRow(self.lb_style)
         self.read_style.currentIndexChanged.connect(lambda _i: self._style_ui())
         g = gs

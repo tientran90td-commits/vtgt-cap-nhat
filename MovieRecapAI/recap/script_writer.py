@@ -381,6 +381,9 @@ def normalize_script(data: dict, duration: float, scene_cuts=None, mode: str = "
             sents.append({"text": str(x["text"]).strip(), "start": round(a, 2), "end": round(min(b, duration), 2)})
         if sents and not narr and mode != "highlight":
             narr = " ".join(x["text"] for x in sents)
+        if mode == "narrate" and not narr:
+            # chế độ thuyết minh: đoạn trống lời sẽ phát tiếng phim gốc (giọng nhân vật xen vào) -> bỏ
+            continue
         tone = str(s.get("tone") or "").strip().lower()
         out.append({
             "start": round(st, 2),

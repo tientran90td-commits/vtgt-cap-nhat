@@ -23,8 +23,11 @@ def check_read_styles():
     base = {"rate": 5, "pitch": 0}
     o = tts.apply_read_style("edge", dict(base, read_style="funny"))
     assert o["rate"] == 15 and o["pitch"] == 1, o
-    o = tts.apply_read_style("edge", dict(base, read_style="funny", tone="horror"))  # tone của đoạn được ưu tiên
+    # tone của đoạn được ưu tiên khi tắt "giữ 1 giọng đồng nhất"
+    o = tts.apply_read_style("edge", dict(base, read_style="funny", tone="horror", consistent=False))
     assert o["rate"] == -5 and o["pitch"] == -3, o
+    o = tts.apply_read_style("edge", dict(base, read_style="funny", tone="horror"))  # mặc định: giữ cao độ chung
+    assert o["pitch"] == 1 and o["rate"] == 9, o
     o = tts.apply_read_style("openai", dict(base, read_style="serious"))
     assert "news anchor" in o["style"] and o["rate"] == 5
     o = tts.apply_read_style("azure", dict(base, read_style="sad"))
@@ -124,8 +127,17 @@ def check_film_and_script(s: Settings):
     s.set("voice", "read_style", "serious")
     s.set("voice", "rate", 0)
     s.set("voice", "tone_auto", True)
+    s.set("voice", "consistent", False)  # cảm xúc tự do từng đoạn
     p2.run_voices()
     assert got == [("dramatic", 3.0), ("funny", 10.0), ("serious", -4.0)], got
+    # Giữ 1 giọng đồng nhất (mặc định): cao độ giống nhau mọi đoạn, chỉ nhích tốc độ tối đa ±6%
+    s.set("voice", "consistent", True)
+    for t in ("dramatic", "funny", "serious", "horror", "kids"):
+        o = tts.apply_read_style("edge", {"read_style": "serious", "tone": t, "rate": 0, "pitch": 0, "consistent": True})
+        assert o["pitch"] == -1 and -10 <= o["rate"] <= 2, (t, o["rate"], o["pitch"])
+        o = tts.apply_read_style("gemini", {"read_style": "serious", "tone": t, "consistent": True})
+        assert "nghiêm túc" in o.get("style", ""), o  # Gemini giữ 1 phong cách giọng
+    s.set("voice", "consistent", False)
     got.clear()
     s.set("voice", "tone_auto", False)
     p2.run_voices()
