@@ -301,3 +301,27 @@ def spin(lo, hi, step=1, suffix="", decimals=None):
     if suffix:
         w.setSuffix(suffix)
     return w
+
+
+def reveal(path) -> None:
+    """Mở thư mục chứa file và chọn sẵn file đó (Windows Explorer / Finder)."""
+    import os
+    import subprocess
+    import sys
+    from pathlib import Path
+
+    from PySide6.QtCore import QUrl
+    from PySide6.QtGui import QDesktopServices
+
+    p = Path(path)
+    if p.is_file():
+        if sys.platform.startswith("win"):
+            subprocess.Popen(f'explorer /select,"{os.path.normpath(str(p))}"')
+            return
+        if sys.platform == "darwin":
+            subprocess.Popen(["open", "-R", str(p)])
+            return
+        p = p.parent
+    p.mkdir(parents=True, exist_ok=True)
+    QDesktopServices.openUrl(QUrl.fromLocalFile(str(p)))
+

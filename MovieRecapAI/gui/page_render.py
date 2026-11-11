@@ -6,7 +6,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices, QFont
 from PySide6.QtWidgets import (QTabWidget, QCheckBox, QComboBox, QFontComboBox, QFormLayout, QGridLayout, QGroupBox,
                                QLineEdit, QMessageBox, QVBoxLayout, QWidget)
@@ -14,7 +14,7 @@ from PySide6.QtWidgets import (QTabWidget, QCheckBox, QComboBox, QFontComboBox, 
 from recap import editor
 from recap.ffmpeg_utils import encoder_works
 
-from .widgets import ColorButton, Page, PathPicker, button, fill_combo, hrow, muted, scroll, spin
+from .widgets import ColorButton, Page, PathPicker, button, fill_combo, hrow, muted, reveal, scroll, spin
 
 PRESETS = {
     "tiktok": ("📱 TikTok / Reels / Shorts", {"aspect": "9:16", "fill": "blur", "height": 1080, "fps": 30,
@@ -168,13 +168,15 @@ class RenderPage(Page):
         from recap import vsr
         self.vsr_mode = b.combo(fill_combo(QComboBox(), vsr.MODES), "render", "vsr_mode")
         fh.addRow("Thuật toán AI", self.vsr_mode)
-        fh.addRow("", hrow(button("⬇ Tải VSR", lambda: QDesktopServices.openUrl(QUrl(vsr.RELEASES_URL)),
-                                  tip="Card AMD (RX 5700 XT...) chọn bản windows-directml; NVIDIA chọn bản cuda"),
-                           button("✔ Kiểm tra VSR", self.check_vsr), "stretch"))
+        fh.addRow("", hrow(button("🛠 Tự cài VSR (dùng card đồ họa)", self.install_vsr, "primary",
+                                  tip="Tải mã nguồn VSR + model AI và cài môi trường riêng (DirectML cho card AMD/Intel, "
+                                      "CUDA cho NVIDIA). Khoảng 3-4 GB, chỉ cài 1 lần."),
+                           button("🔎 Tự tìm / ✔ Kiểm tra", self.check_vsr),
+                           button("⬇ Trang tải", lambda: QDesktopServices.openUrl(QUrl(vsr.RELEASES_URL))), "stretch"))
         fh.addRow(muted("🧠 Chế độ 'Xóa sạch bằng AI': app gọi video-subtitle-remover để xóa chữ và vẽ lại nền, CHỈ cho "
                         "những cảnh được dùng trong video recap (vài phút, không phải cả phim) và lưu lại để lần sau dùng "
-                        "ngay. Cài: tải bản vsr-…-windows-directml.7z (card AMD) ở trang Release, giải nén, mở VSR 1 lần "
-                        "cho chạy xong, rồi chọn thư mục đó ở trên. Nếu VSR lỗi, app tự chuyển sang làm mờ."))
+                        "ngay. Cách dễ nhất: bấm 🛠 Tự cài VSR (để trống ô thư mục). Đã có VSR thì để trống ô thư mục, app "
+                        "tự tìm. Nếu VSR lỗi, app tự chuyển sang làm mờ."))
         l3.addWidget(gh)
         l3.addStretch(1)
         tabs.addTab(scroll(t1), "🖼️ Khung hình && phụ đề")
@@ -190,11 +192,29 @@ class RenderPage(Page):
         self.fname.setPlaceholderText("Tên file (để trống = theo tiêu đề kịch bản)")
         f5.addRow("Thư mục lưu", self.outdir)
         f5.addRow("Tên file", self.fname)
+        # Thời lượng video thành phẩm (dùng chung với 'Độ dài video' ở Bước 2)
+        self.minutes = b.spin(spin(0.5, 180, 0.5, " phút", decimals=1), "script", "target_minutes")
+        self.minutes.setToolTip("Độ dài mong muốn của video thành phẩm - AI viết kịch bản theo độ dài này")
+        quick = [button(f"{m:g}′", lambda _=False, m=m: self.minutes.setValue(m)) for m in (1, 3, 5, 10, 15)]
+        for q in quick:
+            q.setFixedWidth(46)
+        self.fit = b.check(QCheckBox("Ép đúng thời lượng khi xuất"), "render", "fit_duration")
+        self.fit.setToolTip("Tự co/giãn đoạn giữ thoại gốc, chỉnh tốc độ đọc (0.88x-1.2x) và bỏ bớt đoạn thoại gốc "
+                            "nếu cần để video vừa thời lượng đã chọn")
+        f5.addRow("⏱ Thời lượng", hrow(self.minutes, *quick, self.fit, "stretch"))
+        self.lb_est = muted("")
+        f5.addRow("", hrow(self.lb_est, button("✍️ Viết lại kịch bản theo độ dài này", self.rewrite_script,
+                                               tip="AI viết lại kịch bản (Bước 2) cho đúng độ dài mới"), "stretch"))
+        self.minutes.valueChanged.connect(lambda _v: self.refresh_estimate())
         self.btn_go = button("🚀  XUẤT VIDEO", self.render, "big")
         self.lb_out = muted("")
+        self.lb_out.setTextFormat(Qt.RichText)
+        self.lb_out.setTextInteractionFlags(Qt.TextBrowserInteraction)
+        self.lb_out.linkActivated.connect(lambda _l: self.open_dir())
+        self.auto_open = b.check(QCheckBox("Xuất xong tự mở thư mục chứa video"), "render", "open_folder_after")
         f5.addRow(hrow(self.btn_go, button("📂 Mở thư mục", self.open_dir), button("▶ Xem video", self.play_last),
                        button("🧹 Xóa bản dựng tạm", self.clear_cache), "stretch"))
-        f5.addRow(self.lb_out)
+        f5.addRow(hrow(self.lb_out, "stretch", self.auto_open))
         l1.setColumnStretch(0, 1)
         l1.setColumnStretch(1, 1)
         l1.setRowStretch(2, 1)
@@ -253,14 +273,66 @@ class RenderPage(Page):
 
     def finished(self, path):
         self.last_output = Path(path)
-        self.lb_out.setText(f"✅ Đã lưu: {path}  (kèm .srt phụ đề và .txt kịch bản)")
-        r = QMessageBox.question(self, "Xong!", f"Đã xuất video:\n{path}\n\nMở video ngay?")
-        if r == QMessageBox.Yes:
+        try:
+            from recap.ffmpeg_utils import media_duration
+            dur = media_duration(path)
+            dtxt = f" · dài {int(dur // 60)}:{int(dur % 60):02d}"
+        except Exception:  # noqa: BLE001
+            dtxt = ""
+        self.lb_out.setText(f'✅ Đã lưu{dtxt}: <a href="open" style="color:#8ab4ff">{path}</a> '
+                            "(bấm để mở thư mục · kèm .srt phụ đề và .txt kịch bản)")
+        if self.app.settings.get("render", "open_folder_after", True):
+            reveal(path)
+            return
+        box = QMessageBox(QMessageBox.Information, "Xong!", f"Đã xuất video{dtxt}:\n{path}", parent=self)
+        b_play = box.addButton("▶ Xem video", QMessageBox.AcceptRole)
+        b_dir = box.addButton("📂 Mở thư mục", QMessageBox.ActionRole)
+        box.addButton("Đóng", QMessageBox.RejectRole)
+        box.exec()
+        if box.clickedButton() is b_play:
             self.play_last()
+        elif box.clickedButton() is b_dir:
+            self.open_dir()
 
     def open_dir(self):
-        d = self.last_output.parent if self.last_output else self.app.settings.output_dir()
-        QDesktopServices.openUrl(QUrl.fromLocalFile(str(d)))
+        """Mở thư mục lưu video (chọn sẵn video vừa xuất)."""
+        if self.last_output and self.last_output.exists():
+            reveal(self.last_output)
+        else:
+            reveal(self.app.settings.output_dir())
+
+    def on_show(self):
+        v = float(self.app.settings.get("script", "target_minutes", 5) or 5)
+        if abs(self.minutes.value() - v) > 1e-6:
+            self.minutes.blockSignals(True)
+            self.minutes.setValue(v)
+            self.minutes.blockSignals(False)
+        self.refresh_estimate()
+
+    def refresh_estimate(self):
+        p = self.app.project
+        if not p or not (p.script or {}).get("segments"):
+            self.lb_est.setText("Chưa có kịch bản - AI sẽ viết theo độ dài này ở Bước 2.")
+            return
+        try:
+            est = p.estimate_seconds()
+        except Exception:  # noqa: BLE001
+            return
+        tgt = self.minutes.value() * 60
+        diff = est - tgt
+        txt = f"Kịch bản hiện tại ≈ {int(est // 60)}:{int(est % 60):02d}"
+        if abs(diff) > max(10, 0.1 * tgt):
+            txt += (f" ({'dài' if diff > 0 else 'ngắn'} hơn mục tiêu {abs(diff) / 60:.1f} phút"
+                    + (" - sẽ được ép bớt khi xuất" if self.fit.isChecked() and diff > 0 else "") + ")")
+        else:
+            txt += " ✓ khớp mục tiêu"
+        self.lb_est.setText(txt)
+
+    def rewrite_script(self):
+        sp = self.app.pages[1]
+        sp.minutes.setValue(self.minutes.value())
+        self.app.goto(1)
+        sp.do_script()
 
     def play_last(self):
         if self.last_output and self.last_output.exists():
@@ -279,7 +351,33 @@ class RenderPage(Page):
 
     def check_vsr(self):
         from recap import vsr
+        cur = self.vsr_dir.text().strip()
         try:
-            QMessageBox.information(self, "VSR sẵn sàng", vsr.check(self.vsr_dir.text().strip()))
+            if not cur:
+                found, err = vsr.autodetect(self.app.settings)
+                if not found:
+                    raise vsr.VSRError((err + "\n\n") if err else "Không tìm thấy VSR trên máy.\n\n"
+                                       "Bấm 🛠 Tự cài VSR để app tự tải và cài (dùng được card AMD).")
+                self.vsr_dir.setText(found)
+                cur = found
+            QMessageBox.information(self, "VSR sẵn sàng", vsr.check(cur) + "\n\nChọn 'Cách xử lý' = 🧠 Xóa sạch bằng AI.")
+            self.hardsub.setCurrentIndex(self.hardsub.findData("vsr"))
         except vsr.VSRError as e:
-            QMessageBox.warning(self, "Chưa dùng được VSR", str(e))
+            QMessageBox.warning(self, "Chưa dùng được VSR", str(e) + "\n\nCách dễ nhất: để trống ô thư mục và bấm "
+                                "🛠 Tự cài VSR.")
+
+    def install_vsr(self):
+        from recap import vsr
+        acc = vsr.accelerator()
+        name = {"directml": "DirectML (card AMD/Intel)", "cuda": "CUDA (card NVIDIA)", "cpu": "CPU"}[acc]
+        if QMessageBox.question(self, "Tự cài VSR", f"App sẽ tải video-subtitle-remover {vsr.VSR_TAG} (mã nguồn + model "
+                                f"AI ~800 MB) và cài thư viện chạy bằng {name}, tổng khoảng 3-4 GB, mất 10-30 phút.\n\n"
+                                f"Nơi cài: {vsr.managed_dir(self.app.settings)}\n\nTiếp tục?") != QMessageBox.Yes:
+            return
+
+        def done(path):
+            self.vsr_dir.setText(path)
+            self.hardsub.setCurrentIndex(self.hardsub.findData("vsr"))
+            QMessageBox.information(self, "Đã cài VSR", f"Đã cài xong VSR tại:\n{path}\n\nĐã chọn chế độ "
+                                    "🧠 Xóa sạch bằng AI.")
+        self.app.run_task(vsr.install, self.app.settings, on_done=done, title="Cài VSR")

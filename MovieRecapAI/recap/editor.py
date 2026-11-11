@@ -145,6 +145,48 @@ def _hardsub_filters(hs: dict | None, mode: str, sw: int, sh: int, src: str) -> 
     return graph, "[hsrc]", ""
 
 
+def plan_fit(voice_s: float, clips: list[tuple[int, float]], target: float) -> dict:
+    """Lên kế hoạch ép video vừa thời lượng mục tiêu.
+
+    voice_s: tổng thời lượng các đoạn thuyết minh; clips: [(chỉ số đoạn, giây)] các đoạn giữ thoại gốc.
+    Thứ tự ưu tiên: co/giãn đoạn thoại gốc (0.5x-1.6x) -> tăng/giảm tốc độ đọc (0.88x-1.2x) -> bỏ bớt đoạn thoại gốc.
+    Trả về {"clip_k", "tempo", "drop": [chỉ số], "estimate"}."""
+    clip_s = sum(d for _i, d in clips)
+    total = voice_s + clip_s
+    plan = {"clip_k": 1.0, "tempo": 1.0, "drop": [], "before": round(total, 1), "estimate": round(total, 1)}
+    if target <= 0 or total <= 0 or abs(total - target) <= max(2.0, 0.02 * target):
+        return plan
+    k = 1.0
+    if clip_s > 0:
+        k = max(0.5, min(1.6, (target - voice_s) / clip_s)) if target > voice_s else 0.5
+    rest = target - clip_s * k
+    tempo = 1.0
+    if voice_s > 0:
+        tempo = max(0.88, min(1.2, voice_s / rest)) if rest > 0 else 1.2
+        if abs(tempo - 1.0) < 0.01:
+            tempo = 1.0
+    est = voice_s / tempo + clip_s * k
+    drop = []
+    if est > target + 2:  # vẫn dài: bỏ đoạn thoại gốc dài nhất trước (giữ đoạn đầu & cuối)
+        for i, d in sorted(clips[1:-1] if len(clips) > 2 else [], key=lambda x: -x[1]):
+            if est <= target + 2:
+                break
+            drop.append(i)
+            est -= d * k
+    plan.update(clip_k=round(k, 3), tempo=round(tempo, 3), drop=sorted(drop), estimate=round(est, 1))
+    return plan
+
+
+def _tempo_voice(voice: Path, tempo: float, out_dir: Path) -> Path:
+    """Đổi tốc độ giọng đọc (giữ nguyên cao độ)."""
+    if not voice or abs(tempo - 1.0) < 0.005:
+        return voice
+    out = out_dir / f"{Path(voice).stem}_t{int(round(tempo * 1000))}.wav"
+    if not out.exists() or out.stat().st_size < 1000:
+        run_ffmpeg(["-i", str(voice), "-af", f"atempo={tempo:.3f}", "-ac", "1", "-ar", "48000", str(out)])
+    return out
+
+
 def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, out_path: Path, work_dir: Path,
            transcript: list[dict] | None, log, progress, cancel, blocked=None, watermark=None,
            hardsub: dict | None = None) -> Path:
@@ -190,14 +232,38 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
     if logo and not Path(logo).exists():
         log(f"Không thấy logo {logo} - bỏ qua.", level="warn")
         logo = ""
+    # Ép vừa thời lượng thành phẩm
+    fit = {"clip_k": 1.0, "tempo": 1.0, "drop": []}
+    target_s = float(opts.get("_target_seconds") or 0)
+    if opts.get("fit_duration") and target_s > 0:
+        v_s, clips = 0.0, []
+        for i, seg in enumerate(segs):
+            v = voices[i] if i < len(voices) else None
+            if v:
+                v_s += media_duration(v) + gap + 0.1
+            else:
+                clips.append((i, max(1.0, min(90.0, float(seg["end"]) - float(seg["start"])))))
+        fit = plan_fit(v_s, clips, target_s)
+        if fit["estimate"] != fit["before"]:
+            log(f"Ép thời lượng {fit['before'] / 60:.1f} → {fit['estimate'] / 60:.1f} phút (mục tiêu "
+                f"{target_s / 60:.1f}): tốc độ đọc x{fit['tempo']:g}, đoạn thoại gốc x{fit['clip_k']:g}"
+                + (f", bỏ {len(fit['drop'])} đoạn thoại gốc" if fit["drop"] else ""))
+        if abs(fit["estimate"] - target_s) > max(5.0, 0.1 * target_s):
+            log(f"Kịch bản {'quá dài' if fit['estimate'] > target_s else 'quá ngắn'} so với mục tiêu - video sẽ dài "
+                f"~{fit['estimate'] / 60:.1f} phút. Muốn khớp hơn: Bước 2 → viết lại kịch bản với độ dài mới.",
+                level="warn")
     all_subs: list[dict] = []
     t_global = 0.0
     part_files = []
     for i, seg in enumerate(segs):
         if cancel.is_set():
             raise Cancelled()
+        if i in fit["drop"]:
+            continue
         progress(i / len(segs), f"Dựng đoạn {i + 1}/{len(segs)}")
         voice = voices[i] if i < len(voices) else None
+        if voice and fit["tempo"] != 1.0:
+            voice = _tempo_voice(voice, fit["tempo"], parts_dir)
         src_start = float(seg["start"])
         src_end = float(seg["end"])
         speed = 1.0
@@ -225,7 +291,7 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
                 pieces = [(footage.place(src_start, need, src_end), need)]
         else:
             vdur = 0.0
-            dur = max(1.0, min(90.0, src_end - src_start))
+            dur = max(1.0, min(90.0, src_end - src_start)) * fit["clip_k"]
             pieces = [(footage.place(src_start, dur, src_end), dur)]
         src_start = pieces[0][0]
         need = sum(d for _a, d in pieces)
@@ -393,7 +459,8 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
     qa = {"segments": len(segs), "sentence_synced_segments": synced, "pieces": st["pieces"],
           "reused_seconds": round(st["reused_s"], 1), "blocked_seconds_used": round(st["blocked_s"], 1),
           "moved_to_fresh_footage": st["moved"], "duration": round(t_global, 1), "delogo": bool(pre_filter),
-          "hardsub": hs_mode if hardsub else "none"}
+          "hardsub": hs_mode if hardsub else "none",
+          "fit": {k: fit[k] for k in ("clip_k", "tempo", "drop")}}
     if opts.get("final_qa", True):
         progress(0.99, "Kiểm tra chất lượng video")
         try:

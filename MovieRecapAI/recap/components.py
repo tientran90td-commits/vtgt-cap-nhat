@@ -183,10 +183,11 @@ def _download(url: str, dest: Path, settings: Settings, progress, cancel, label:
 
 
 # ------------------------------------------------------------------ pip
-def pip_install(packages: list[str], log, progress=None, cancel=None, upgrade: bool = False) -> None:
-    if getattr(sys, "frozen", False):
+def pip_install(packages: list[str], log, progress=None, cancel=None, upgrade: bool = False,
+                python: str | None = None) -> None:
+    if getattr(sys, "frozen", False) and not python:
         raise InstallError("Bản .exe đóng gói sẵn không cài thêm thư viện được - hãy dùng bản chạy bằng Python.")
-    cmd = [python_exe(), "-m", "pip", "install", "--disable-pip-version-check"]
+    cmd = [python or python_exe(), "-m", "pip", "install", "--disable-pip-version-check"]
     if upgrade:
         cmd.append("--upgrade")
     cmd += packages

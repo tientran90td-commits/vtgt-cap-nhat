@@ -274,6 +274,11 @@ class ScriptPage(Page):
                           title="Lấy danh sách model")
 
     def on_show(self):
+        v = float(self.app.settings.get("script", "target_minutes", 5) or 5)
+        if abs(self.minutes.value() - v) > 1e-6:  # đồng bộ với ô Thời lượng ở trang Xuất video
+            self.minutes.blockSignals(True)
+            self.minutes.setValue(v)
+            self.minutes.blockSignals(False)
         self._provider_changed(init=True)
         self.refresh_transcript_label()
 

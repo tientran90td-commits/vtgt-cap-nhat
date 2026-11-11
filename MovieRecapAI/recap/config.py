@@ -132,6 +132,8 @@ DEFAULTS: dict = {
         "hardsub_mode": "blur",  # phụ đề gốc in cứng: blur | vsr | bar | crop | avoid | none
         "vsr_dir": "",  # thư mục video-subtitle-remover (xóa phụ đề bằng AI)
         "vsr_mode": "sttn-auto",
+        "fit_duration": True,  # ép video thành phẩm vừa thời lượng mục tiêu
+        "open_folder_after": True,  # xuất xong tự mở thư mục chứa video
         "transition": "fade",    # cut | fade - chuyển cảnh mềm giữa các đoạn
         "loudnorm": True,        # cân bằng âm lượng tổng (-16 LUFS)
         "final_qa": True,        # kiểm tra màn hình đen / đứng hình / âm lượng sau khi xuất

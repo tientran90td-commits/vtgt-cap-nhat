@@ -220,6 +220,30 @@ class Project:
         log(f"Giọng đọc: {sum(1 for f in files if f)} đoạn ({tts.ENGINES[engine]['name']} / {voice}).")
         return files
 
+    def estimate_seconds(self) -> float:
+        """Ước tính độ dài video từ kịch bản hiện tại (dùng giọng đã đọc nếu có, không thì ước theo số chữ)."""
+        import wave
+
+        segs = (self.script or {}).get("segments") or []
+        vdir = self.dir / "voices"
+        rate = 1 + float(self.settings.get("voice", "rate", 0) or 0) / 100
+        total = 0.0
+        for i, seg in enumerate(segs):
+            text = (seg.get("narration") or "").strip()
+            if not text:
+                total += max(1.0, min(90.0, float(seg.get("end", 0)) - float(seg.get("start", 0))))
+                continue
+            got = None
+            for f in sorted(vdir.glob(f"v{i:03d}_*.wav")) if vdir.exists() else []:
+                try:
+                    with wave.open(str(f)) as w:
+                        got = w.getnframes() / float(w.getframerate())
+                    break
+                except Exception:  # noqa: BLE001
+                    continue
+            total += (got if got else len(text.split()) / (3.6 * max(0.5, rate))) + 0.35
+        return total
+
     def default_output(self) -> Path:
         title = (self.script or {}).get("title") or Path(self.video).stem
         base = self.settings.output_dir() / f"{safe_name(title)}_recap.mp4"
@@ -244,6 +268,9 @@ class Project:
         log("② Dựng video...")
         opts = self.settings.section("render")
         opts["_target_seconds"] = float(self.settings.get("script", "target_minutes", 5) or 5) * 60
+        if opts.get("hardsub_mode") == "vsr":
+            from . import vsr
+            opts["vsr_dir"] = vsr.resolve_dir(opts.get("vsr_dir", ""), self.settings)
         if opts.get("avoid_overlays", True) or opts.get("delogo", True) or opts.get("hardsub_mode", "blur") != "none":
             if self.overlays is None or int(self.overlays.get("version", 1)) < 2:
                 log("Lọc quảng cáo chèn & logo của nguồn...")
