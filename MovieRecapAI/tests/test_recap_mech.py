@@ -261,6 +261,17 @@ subprocess.check_call([{ffmpeg_exe()!r}, "-y", "-loglevel", "error", "-i", a.i, 
                        f"drawbox=x={{x0}}:y={{y0}}:w={{x1 - x0}}:h={{y1 - y0}}:color=gray:t=fill", a.o])
 print("done", a.inpaint_mode)
 """, encoding="utf-8")
+    from recap import vsr
+    py_, root_, main_ = vsr.find(str(TMP / "vsr_pkg"))  # tự tìm sâu bên trong thư mục được chọn
+    assert root_ == pkg and main_.name == "main.py" and py_ == py, (py_, root_, main_)
+    exe_only = TMP / "vsr_exe"  # bản đóng gói chỉ có .exe -> báo rõ cách khác
+    (exe_only / "_internal").mkdir(parents=True, exist_ok=True)
+    (exe_only / "VideoSubtitleRemover.exe").write_bytes(b"MZ")
+    try:
+        vsr.find(str(exe_only / "VideoSubtitleRemover.exe"))
+        raise AssertionError("phải báo lỗi")
+    except vsr.VSRError as e:
+        assert "VideoSubtitleRemover.exe" in str(e) and "_no_sub" in str(e), e
     s.set("render", "hardsub_mode", "vsr")
     s.set("render", "vsr_dir", str(TMP / "vsr_pkg"))
     logs = []

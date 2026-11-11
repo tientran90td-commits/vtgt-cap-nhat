@@ -29,39 +29,74 @@ class VSRError(RuntimeError):
     pass
 
 
-def _python_candidates(root: Path):
-    names = ["python.exe", "python"] if os.name == "nt" else ["python", "python3", "python.exe"]
-    for sub in ("Python", "python", "runtime", ".venv/Scripts", "venv/Scripts", "videoEnv/Scripts",
-                ".venv/bin", "venv/bin", "videoEnv/bin", "Python/bin", ""):
-        for n in names:
-            yield root / sub / n
+SKIP_DIRS = {"site-packages", "Lib", "lib", "models", "__pycache__", ".git", "node_modules", "include", "share",
+             "test", "design", "docker", "inpaint", "interface"}
+PY_NAMES = ("python.exe", "python", "python3")
 
 
-def find(vsr_dir: str) -> tuple[Path, Path]:
-    """Tìm (python, thư mục gốc chứa backend/main.py) trong thư mục VSR người dùng chọn."""
+def _walk(base: Path, depth: int = 4):
+    """Duyệt thư mục VSR (giới hạn độ sâu, bỏ thư mục thư viện/model rất lớn)."""
+    stack = [(base, 0)]
+    while stack:
+        d, lv = stack.pop()
+        try:
+            entries = list(os.scandir(d))
+        except OSError:
+            continue
+        yield d, entries
+        if lv < depth:
+            stack += [(Path(e.path), lv + 1) for e in entries if e.is_dir() and e.name not in SKIP_DIRS]
+
+
+def find(vsr_dir: str) -> tuple[Path, Path, Path]:
+    """Tìm (python, thư mục gốc VSR, file backend/main.py|.pyc) trong thư mục VSR người dùng chọn.
+
+    Hỗ trợ: bản cài Setup.exe, bản giải nén .7z (QPT), bản chạy từ mã nguồn (venv)."""
     if not vsr_dir:
         raise VSRError("Chưa chọn thư mục video-subtitle-remover (VSR) trong mục Dựng video.")
-    base = Path(vsr_dir)
+    base = Path(vsr_dir.strip().strip('"'))
+    if base.is_file():  # chọn nhầm file .exe -> lấy thư mục chứa nó
+        base = base.parent
     if not base.is_dir():
         raise VSRError(f"Không thấy thư mục VSR: {vsr_dir}")
-    roots = [base] + [p for p in base.iterdir() if p.is_dir()]
-    roots += [q for p in roots[1:] for q in p.iterdir() if q.is_dir()] if not (base / "backend" / "main.py").exists() else []
-    root = next((r for r in roots if (r / "backend" / "main.py").exists()), None)
-    if root is None:
-        raise VSRError(f"Thư mục {vsr_dir} không có backend/main.py - hãy chọn thư mục đã giải nén của VSR.")
-    for cand in [*_python_candidates(root), *(_python_candidates(base) if base != root else [])]:
-        if cand.is_file():
-            return cand, root
+    mains, pythons, exes = [], [], []
+    for d, entries in _walk(base):
+        names = {e.name for e in entries}
+        if d.name == "backend" and ("main.py" in names or "main.pyc" in names):
+            mains.append(d / ("main.py" if "main.py" in names else "main.pyc"))
+        for n in PY_NAMES:
+            if n in names and (d / n).is_file():
+                pythons.append(d / n)
+                break
+        exes += [d / n for n in names if n.lower().endswith(".exe") and not n.lower().startswith(("python", "unins"))]
     env_py = os.environ.get("MOVIE_RECAP_VSR_PYTHON")
     if env_py and Path(env_py).is_file():
-        return Path(env_py), root
-    raise VSRError(f"Không thấy Python đi kèm VSR trong {root} (thư mục Python\\python.exe). Hãy mở VSR một lần "
-                   "bằng file khởi động của nó cho cài xong, rồi thử lại.")
+        pythons.insert(0, Path(env_py))
+    if not mains:
+        hint = ""
+        if exes:
+            hint = (f"\n\nThư mục chỉ có chương trình đóng gói ({exes[0].name}), không có mã nguồn backend\\main.py nên "
+                    "app không gọi tự động được. Cách khác: mở VSR, xóa phụ đề cả phim bằng giao diện của VSR (Mở → Chạy), "
+                    "rồi đưa file *_no_sub.mp4 vào Movie Recap AI và chọn 'Không xử lý' ở mục phụ đề gốc.")
+        raise VSRError(f"Không thấy backend\\main.py của VSR trong {base}.{hint}")
+    main = mains[0]
+    root = main.parent.parent
+    if not pythons:
+        raise VSRError(f"Thấy mã nguồn VSR ({root}) nhưng không thấy Python đi kèm. Hãy mở VSR một lần cho cài xong, "
+                       "hoặc cài VSR theo hướng dẫn chạy từ mã nguồn (thư mục videoEnv).")
+
+    def score(py: Path) -> tuple:  # ưu tiên Python nằm cùng thư mục VSR, gần gốc nhất
+        try:
+            rel = py.relative_to(root)
+            return (0, len(rel.parts))
+        except ValueError:
+            return (1, len(py.parts))
+    return sorted(pythons, key=score)[0], root, main
 
 
 def check(vsr_dir: str) -> str:
-    py, root = find(vsr_dir)
-    return f"VSR: {root}\nPython: {py}"
+    py, root, main = find(vsr_dir)
+    return f"VSR: {root}\nMã chạy: {main}\nPython: {py}"
 
 
 def _band_coords(band: dict, w: int, h: int) -> list[str]:
@@ -73,7 +108,7 @@ def _band_coords(band: dict, w: int, h: int) -> list[str]:
 def clean_clip(video: str, start: float, dur: float, band: dict, mode: str, vsr_dir: str, work_dir: Path,
                log, cancel) -> Path:
     """Cắt đoạn [start, start+dur] của phim, xóa phụ đề trong dải `band` bằng VSR, trả về file sạch (bắt đầu từ 0s)."""
-    py, root = find(vsr_dir)
+    py, root, main = find(vsr_dir)
     mode = mode if mode in MODES else "sttn-auto"
     st = os.stat(video)
     key = hashlib.sha1(repr((str(video), st.st_size, int(st.st_mtime), round(start, 3), round(dur, 3),
@@ -90,7 +125,7 @@ def clean_clip(video: str, start: float, dur: float, band: dict, mode: str, vsr_
     info = probe(clip)
     tmp = out_dir / f"tmp_{key}.mp4"
     tmp.unlink(missing_ok=True)
-    cmd = [str(py), str(root / "backend" / "main.py"), "-i", str(clip), "-o", str(tmp),
+    cmd = [str(py), str(main), "-i", str(clip), "-o", str(tmp),
            "-c", *_band_coords(band, info.width, info.height), "--inpaint-mode", mode]
     env = dict(os.environ, PYTHONPATH=str(root) + os.pathsep + os.environ.get("PYTHONPATH", ""),
                PYTHONIOENCODING="utf-8", PYTHONUTF8="1")
