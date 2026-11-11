@@ -93,6 +93,12 @@ class ScriptPage(Page):
         self.web_max.setToolTip("Phim dài hơn mức này sẽ được chia thành nhiều lần copy-dán. "
                                 "ChatGPT/Gemini web: 30.000-60.000 · Google AI Studio: 300.000+")
         f2.addRow("Bản web", self.web_max)
+        self.web_inapp = b.check(QCheckBox("Mở trang AI ngay trong app"), "script", "web_inapp")
+        self.btn_login = button("🔐 Đăng nhập AI web", self.web_login, "primary")
+        self.web_row = hrow(self.btn_login, self.web_inapp, "stretch")
+        f2.addRow(self.web_row)
+        f2.addRow(hrow(button("⚡ Lấy key miễn phí → tự động hoàn toàn", self.key_wizard,
+                              tip="Mở trang lấy key Gemini miễn phí, bấm Copy là app tự lưu & dùng"), "stretch"))
         f2.addRow(hrow(button("② AI viết kịch bản", self.do_script, "primary"),
                        button("⚡ Làm hết + xuất video", self.app.run_all), "stretch"))
         ll.addWidget(g2)
@@ -178,11 +184,29 @@ class ScriptPage(Page):
         if key and not self.app.settings.get("api", key):
             note = "⚠️ Chưa nhập API key - vào mục 🔑 API & Cài đặt. " + note
         self.lb_prov.setText(note)
+        if hasattr(self, "web_row"):
+            self.web_row.setVisible(pid == "web")
         if hasattr(self, "web_max"):
             self.web_max.setVisible(pid == "web")
             lb = self.web_max.parentWidget().layout().labelForField(self.web_max)
             if lb:
                 lb.setVisible(pid == "web")
+
+    def web_login(self):
+        from .web_chat import LoginDialog
+
+        LoginDialog(self, self.model.currentText() or "aistudio").exec()
+
+    def key_wizard(self):
+        from .web_chat import KeyWizard
+
+        dlg = KeyWizard(self.app)
+        dlg.exec()
+        if dlg.got:
+            i = self.provider.findData(dlg.got)
+            self.provider.setCurrentIndex(i)
+            self._provider_changed()
+            self.app.pages[0].on_show()
 
     def refresh_models(self):
         pid = self.provider.currentData()

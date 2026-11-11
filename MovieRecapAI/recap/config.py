@@ -67,7 +67,8 @@ DEFAULTS: dict = {
         "spoiler": True,
         "custom": "",
         "max_chars": 150000,
-        "web_max_chars": 60000,  # chế độ bản web: số ký tự tối đa mỗi lần dán
+        "web_max_chars": 60000,
+        "web_inapp": True,       # chế độ web: mở trang AI ngay trong app (đăng nhập 1 lần)  # chế độ bản web: số ký tự tối đa mỗi lần dán
         "auto_fallback": True,   # AI chính hết tiền/quá tải -> tự chuyển sang AI khác đã nhập key
         "identify": True,        # tự nhận diện phim (tên, nhân vật) trước khi viết kịch bản
         "visual": False,         # AI xem hình ảnh các cảnh để chọn cảnh chính xác hơn

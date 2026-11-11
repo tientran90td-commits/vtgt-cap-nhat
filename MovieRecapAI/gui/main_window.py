@@ -291,10 +291,22 @@ class MainWindow(QMainWindow):
 
         k = PROVIDERS.get(pid, {}).get("key")
         if k and not self.settings.get("api", k):
-            QMessageBox.warning(self, "Thiếu API key",
-                                f"Chưa nhập API key cho {PROVIDERS[pid]['name']}.\n"
-                                "Vào '🔑 API & Cài đặt' để nhập, hoặc chọn AI khác ở bước 2.")
-            self.goto(4)
+            r = QMessageBox.question(self, "Chưa có API key",
+                                     f"Chưa có API key cho {PROVIDERS[pid]['name']}.\n\n"
+                                     "Lấy key Gemini MIỄN PHÍ ngay bây giờ (khoảng 1 phút, bấm Copy là app tự nhận)?\n"
+                                     "Có key thì app chạy tự động hoàn toàn.\n\n"
+                                     "(Chọn No để tự nhập key ở mục 🔑 API & Cài đặt.)")
+            if r == QMessageBox.Yes:
+                from .web_chat import KeyWizard
+
+                dlg = KeyWizard(self)
+                dlg.exec()
+                if dlg.got:
+                    sp.provider.setCurrentIndex(sp.provider.findData(dlg.got))
+                    sp._provider_changed()
+                    return self.run_all()
+            else:
+                self.goto(4)
             return
         v = self.settings.section("voice")
         if v.get("voice") == "clone" and v.get("engine") in ("vieneu", "xtts"):

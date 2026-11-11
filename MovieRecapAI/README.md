@@ -73,7 +73,9 @@ Không cần nhập hết, chỉ cần dịch vụ bạn dùng. Bấm **Kiểm t
 
 Key chỉ lưu trên máy bạn: `%APPDATA%\MovieRecapAI\settings.json` (Windows).
 
-**Không muốn dùng API key?** Chọn nhà cung cấp **🌐 Dùng bản WEB** ở Bước 2. App copy sẵn câu lệnh và mở trang ChatGPT / Gemini / **Google AI Studio** / Claude / DeepSeek / Grok / Copilot, bạn dán vào rồi dán câu trả lời ngược lại vào app (thường 1 lần cho mỗi video, phim rất dài thì vài lần). App không tự đăng nhập hay điều khiển trang web vì làm vậy vi phạm điều khoản của các dịch vụ và dễ bị khóa tài khoản. Nên dùng **Google AI Studio**: miễn phí và đọc được lời thoại cả bộ phim trong 1 lần.
+**Tự động hoàn toàn, miễn phí:** ở Bước 2 bấm **⚡ Lấy key miễn phí**. App mở trang tạo key Gemini, bạn đăng nhập Google, bấm *Create API key* rồi bấm **Copy**: app **tự nhận key, tự lưu, tự chọn Gemini**. Từ đó bấm ⚡ là app làm hết, không phải copy-dán gì. Nếu bấm ⚡ khi chưa có key, app cũng tự mời bạn làm bước này.
+
+**Dùng bản web (ChatGPT / Gemini / AI Studio / Claude...) không cần key:** chọn **🌐 Dùng bản WEB** ở Bước 2, bấm **🔐 Đăng nhập AI web** để đăng nhập ngay trong app (1 lần, app nhớ phiên đăng nhập). Khi cần AI, trang web hiện ngay trong app và câu lệnh đã được copy sẵn: bạn **Ctrl+V → Enter → bấm Copy** dưới câu trả lời, app **tự nhận** rồi chạy tiếp. App không tự gõ, tự gửi hay tự đọc trang web, vì các dịch vụ này cấm tự động hóa giao diện web và có thể khóa tài khoản. Google thường chặn đăng nhập tài khoản Google trong trình duyệt nhúng; khi đó bấm *↗ Mở bằng trình duyệt máy*, app vẫn tự nhận câu trả lời khi bạn bấm Copy.
 
 **AI báo lỗi 429 / hết tiền?** App phân biệt: *hết tiền/hết lượt trong ngày* (báo rõ cách khắc phục, không thử lại vô ích), *quá tải tạm thời* (đợi đúng thời gian nhà cung cấp yêu cầu), *yêu cầu quá dài* (tự chia nhỏ lời thoại). Nếu bạn đã nhập key của nhiều AI, app **tự chuyển sang AI khác** khi AI đang dùng hết tiền hoặc quá tải. Lưu ý: gói ChatGPT Plus **không** bao gồm API, API OpenAI phải nạp tiền riêng.
 
