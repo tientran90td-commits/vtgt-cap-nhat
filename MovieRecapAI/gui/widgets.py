@@ -42,6 +42,9 @@ class Worker(QThread):
 
     def run(self):
         try:
+            from recap import llm
+
+            llm.set_cancel(self.cancel)  # bấm Hủy dừng được cả khi đang chờ AI trả lời
             res = self.fn(*self.args, log=self._log, progress=self._progress, cancel=self.cancel, **self.kwargs)
             self.done.emit(res)
         except Cancelled:

@@ -201,7 +201,7 @@ class ScriptPage(Page):
         self.model.clear()
         self.model.addItems(p.get("models", []))
         self.model.blockSignals(False)
-        if init and cur:
+        if init and cur and llm.model_fits(pid, cur):
             self.model.setCurrentText(cur)
         else:
             self.model.setCurrentText((p.get("models") or [""])[0])

@@ -451,6 +451,51 @@ def check_config_migration():
     print("✓ nâng cấp cấu hình")
 
 
+def check_ai_hang(s: Settings):
+    """AI treo không trả lời: báo 'vẫn đang viết', quá lâu thì chuyển AI khác; bấm Hủy dừng ngay; model lệch nhà cung cấp."""
+    import threading
+    import time as _time
+
+    from recap.ffmpeg_utils import Cancelled
+
+    assert not llm.model_fits("gemini", "openai/gpt-oss-120b") and llm.model_fits("gemini", "gemini-3.8-flash")
+    assert llm.model_fits("groq", "openai/gpt-oss-120b") and not llm.model_fits("anthropic", "gpt-5")
+    old = (llm._chat_gemini, llm._chat_openai, llm.WAIT_LIMIT, llm.HEARTBEAT, llm.resolve_model, dict(llm._DEAD),
+           llm._sleep)
+    llm._DEAD.clear()
+    llm.WAIT_LIMIT, llm.HEARTBEAT = 1.5, 0.5
+    llm.resolve_model = lambda pid, model, *a, **k: "gemini-x" if model in ("", "auto") else model
+    llm._chat_gemini = lambda *a, **k: _time.sleep(30) or "never"
+    llm._chat_openai = lambda pid, model, *a, **k: f"ok từ {pid}/{model}"
+    llm._sleep = lambda sec: None
+    s.set("api", "gemini_key", "g")
+    s.set("api", "openai_key", "o")
+    logs = []
+    try:
+        t0 = _time.time()
+        out = llm.chat("gemini", "openai/gpt-oss-120b", "sys", "user", s, log=lambda m, level="info": logs.append(m))
+        assert out.startswith("ok từ openai"), out  # treo 2 lần -> tự chuyển sang AI khác
+        assert _time.time() - t0 < 10
+        assert any("vẫn đang viết" in m for m in logs) and any("không thuộc" in m for m in logs), logs
+        ev = threading.Event()
+        llm.set_cancel(ev)
+        threading.Timer(0.6, ev.set).start()
+        t0 = _time.time()
+        try:
+            llm.chat("gemini", "auto", "sys", "user", s)
+            raise AssertionError("phải dừng khi bấm Hủy")
+        except Cancelled:
+            assert _time.time() - t0 < 3
+    finally:
+        llm.set_cancel(None)
+        (llm._chat_gemini, llm._chat_openai, llm.WAIT_LIMIT, llm.HEARTBEAT, llm.resolve_model) = old[:5]
+        llm._sleep = old[6]
+        llm._DEAD.clear()
+        llm._DEAD.update(old[5])
+        s.set("api", "openai_key", "")
+    print("✓ AI treo: báo đang viết, tự chuyển AI khác, bấm Hủy dừng ngay, sửa model lệch nhà cung cấp")
+
+
 def check_whisper_gpu(s: Settings):
     """whisper.cpp (Vulkan): gọi whisper-cli, đọc tiến độ + tên card, đọc JSON kết quả đúng định dạng whisper.cpp."""
     import threading
@@ -513,6 +558,7 @@ def main():
     check_rate_limits(s)
     check_components(s)
     check_whisper_gpu(s)
+    check_ai_hang(s)
     check_vision_payloads(s)
     check_tmdb(s)
     check_film_and_script(s)

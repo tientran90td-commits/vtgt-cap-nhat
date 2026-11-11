@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+import threading
 import time
 
 import requests
@@ -276,11 +277,77 @@ def fallback_providers(pid: str, settings: Settings) -> list[str]:
     return out
 
 
+# ---- Hủy & theo dõi khi chờ AI trả lời
+_tls = threading.local()
+WAIT_LIMIT = 420.0   # 1 lần gọi AI quá 7 phút -> coi như treo, thử lại / chuyển AI khác
+HEARTBEAT = 20.0
+
+
+def set_cancel(ev) -> None:
+    """Gắn sự kiện Hủy của tác vụ đang chạy (theo luồng) - để bấm Hủy dừng ngay cả khi đang chờ AI."""
+    _tls.cancel = ev
+
+
+def _cancel_ev():
+    return getattr(_tls, "cancel", None)
+
+
+def _watch(fn, name: str, log):
+    """Chạy lời gọi mạng ở luồng phụ: báo 'vẫn đang viết' định kỳ, bấm Hủy là dừng, quá lâu thì báo treo."""
+    from .ffmpeg_utils import Cancelled
+
+    box: dict = {}
+
+    def run():
+        try:
+            box["v"] = fn()
+        except BaseException as e:  # noqa: BLE001
+            box["e"] = e
+    th = threading.Thread(target=run, daemon=True)
+    t0 = time.time()
+    th.start()
+    ev = _cancel_ev()
+    next_beat = HEARTBEAT
+    while th.is_alive():
+        th.join(0.5)
+        if ev is not None and ev.is_set():
+            raise Cancelled()
+        el = time.time() - t0
+        if el >= next_beat and th.is_alive():
+            next_beat += HEARTBEAT
+            if log:
+                log(f"⏳ {name} vẫn đang viết... {int(el)}s (bấm Hủy nếu muốn dừng)")
+        if el > WAIT_LIMIT and th.is_alive():
+            raise _Retryable(f"{name} không trả lời sau {int(WAIT_LIMIT)} giây", delay=0)
+    if "e" in box:
+        raise box["e"]
+    return box.get("v")
+
+
+def model_fits(pid: str, model: str) -> bool:
+    """Tên model có hợp với nhà cung cấp không (vd chọn Gemini mà ô model còn ghi model của Groq)."""
+    m = (model or "").strip().lower()
+    if m in ("", "auto") or pid not in PROVIDERS:
+        return True
+    kind = PROVIDERS[pid].get("kind")
+    if kind == "gemini":
+        return m.startswith(("gemini", "gemma", "learnlm", "models/"))
+    if kind == "anthropic":
+        return m.startswith("claude")
+    if pid == "openai":
+        return "/" not in m and not m.startswith(("gemini", "claude", "llama", "mixtral", "qwen", "deepseek"))
+    return True
+
+
 def chat(pid: str, model: str, system: str, user: str, settings: Settings, json_mode: bool = True,
          max_tokens: int = 32000, log=None, images: list[tuple[str, bytes]] | None = None) -> str:
     """Gửi 1 yêu cầu, trả về văn bản trả lời. Tự thử lại khi lỗi mạng/quá tải.
     - Model đã ngừng -> tự chuyển model mới.
     - Hết tiền / quá tải kéo dài -> tự chuyển sang AI khác mà bạn đã nhập key (nếu bật)."""
+    if not model_fits(pid, model):
+        if log:
+            log(f"Model '{model}' không thuộc {PROVIDERS[pid]['name']} - tự chọn model phù hợp.", level="warn")
+        model = "auto"
     if pid in _DEAD and settings.get("script", "auto_fallback", True):
         alts = fallback_providers(pid, settings)
         if alts:
@@ -361,35 +428,63 @@ def _chat_once(pid, model, system, user, settings, json_mode, max_tokens, log, i
         return WEB_BRIDGE(model, web_prompt(system, user, json_mode), json_mode)
     last_err: Exception | None = None
     attempts = 6
+    stalls = 0
+    name = PROVIDERS[pid]["name"]
     for attempt in range(attempts):
         try:
             if kind == "anthropic":
-                return _chat_anthropic(model, system, user, settings, max_tokens, log, images)
+                return _watch(lambda: _chat_anthropic(model, system, user, settings, max_tokens, log, images), name, log)
             if kind == "gemini":
-                return _chat_gemini(model, system, user, settings, json_mode, max_tokens, images)
+                return _watch(lambda: _chat_gemini(model, system, user, settings, json_mode, max_tokens, images),
+                              name, log)
             if kind == "openai":
-                return _chat_openai(pid, model, system, user, settings, json_mode, max_tokens, images)
+                return _watch(lambda: _chat_openai(pid, model, system, user, settings, json_mode, max_tokens, images),
+                              name, log)
             raise LLMError("Nhà cung cấp không hỗ trợ chat")
         except LLMError:
             raise
         except _Retryable as e:
             last_err = e
+            if "không trả lời sau" in str(e):
+                stalls += 1
+                if stalls >= 2:  # treo 2 lần liền -> chuyển AI khác luôn, không chờ thêm
+                    break
             if attempt == attempts - 1:
                 break
             wait = min(65.0, max(getattr(e, "delay", 0.0) + 1, 2 ** (attempt + 1)))
             if log:
                 log(f"AI bận/quá tải ({e}). Thử lại sau {wait:.0f}s ({attempt + 1}/{attempts - 1})...", level="warn")
-            time.sleep(wait)
+            _sleep(wait)
         except requests.RequestException as e:
             last_err = e
+            if isinstance(e, requests.Timeout):
+                stalls += 1
+                if stalls >= 2:
+                    last_err = _Retryable(f"{name} không trả lời (hết thời gian chờ)")
+                    break
             wait = 2 ** (attempt + 1)
             if log:
                 log(f"Lỗi mạng ({e}). Thử lại sau {wait}s...", level="warn")
-            time.sleep(wait)
+            _sleep(wait)
     if isinstance(last_err, _Retryable):
         raise RateLimited(f"{PROVIDERS[pid]['name']} đang quá tải / giới hạn tốc độ ({last_err}). "
                           "Hãy thử lại sau ít phút hoặc dùng AI khác.")
     raise LLMError(f"Gọi AI thất bại: {last_err}")
+
+
+def _sleep(sec: float) -> None:
+    """Chờ nhưng vẫn dừng ngay khi bấm Hủy."""
+    from .ffmpeg_utils import Cancelled
+
+    ev = _cancel_ev()
+    if ev is None:
+        time.sleep(sec)
+        return
+    end = time.time() + sec
+    while time.time() < end:
+        if ev is not None and ev.is_set():
+            raise Cancelled()
+        time.sleep(min(0.5, max(0.0, end - time.time())))
 
 
 class _Retryable(Exception):
@@ -513,7 +608,7 @@ def _chat_gemini(model, system, user, settings, json_mode, max_tokens, images=No
     }
     if json_mode:
         body["generationConfig"]["responseMimeType"] = "application/json"
-    r = _session(settings).post(url, params={"key": key}, json=body, timeout=600)
+    r = _session(settings).post(url, params={"key": key}, json=body, timeout=(20, WAIT_LIMIT + 30))
     data = _check(r, "Gemini")
     cands = data.get("candidates") or []
     if not cands:
