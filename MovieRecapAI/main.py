@@ -47,21 +47,53 @@ def run_gui() -> int:
 
     _setup_streams()
     os.environ.setdefault("QT_ENABLE_HIGHDPI_SCALING", "1")
-    from PySide6.QtGui import QIcon
-    from PySide6.QtWidgets import QApplication
-
-    from gui.main_window import MainWindow
-    from gui.theme import QSS
+    from PySide6.QtCore import Qt
+    from PySide6.QtGui import QColor, QFont, QIcon, QPainter, QPixmap
+    from PySide6.QtWidgets import QApplication, QSplashScreen
 
     app = QApplication(sys.argv)
     app.setApplicationName("Movie Recap AI")
     app.setStyle("Fusion")
-    app.setStyleSheet(QSS)
     icon = Path(__file__).resolve().parent / "assets" / "icon.png"
     if icon.exists():
         app.setWindowIcon(QIcon(str(icon)))
+
+    # Màn hình chờ hiện ngay lập tức trong lúc nạp giao diện & thư viện
+    pm = QPixmap(520, 300)
+    pm.fill(QColor("#12141C"))
+    p = QPainter(pm)
+    if icon.exists():
+        p.drawPixmap(30, 80, QPixmap(str(icon)).scaled(140, 140, Qt.KeepAspectRatio, Qt.SmoothTransformation))
+    p.setPen(QColor("#FFFFFF"))
+    f = QFont()
+    f.setPointSize(22)
+    f.setBold(True)
+    p.setFont(f)
+    p.drawText(195, 140, "Movie Recap AI")
+    f.setPointSize(11)
+    f.setBold(False)
+    p.setFont(f)
+    p.setPen(QColor("#9AA3B8"))
+    p.drawText(197, 170, "Tóm tắt phim dài thành video ngắn bằng AI")
+    p.end()
+    splash = QSplashScreen(pm)
+    splash.show()
+
+    def status(msg):
+        splash.showMessage(msg, Qt.AlignBottom | Qt.AlignHCenter, QColor("#B9A8FF"))
+        app.processEvents()
+
+    status("Đang nạp giao diện...")
+    from gui.theme import QSS
+
+    app.setStyleSheet(QSS)
+    status("Đang nạp các công cụ xử lý video & giọng đọc...")
+    from gui.main_window import MainWindow
+
+    status("Đang mở cửa sổ chính...")
     w = MainWindow()
     w.show()
+    splash.finish(w)
     return app.exec()
 
 

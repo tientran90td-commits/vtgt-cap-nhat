@@ -23,6 +23,7 @@ import os
 import re
 import subprocess
 import sys
+import threading
 import time
 import wave
 from dataclasses import asdict, dataclass, field
@@ -1004,17 +1005,41 @@ def _synth_fpt(text, voice, base: Path, opts, settings):
 _VIENEU: dict = {}
 
 
-def _synth_vieneu(text, voice, base: Path, opts, settings):
+_MODEL_LOCK = threading.RLock()  # nạp model 1 lần duy nhất kể cả khi nhiều luồng cùng gọi (nạp sẵn + nghe thử)
+_VIENEU_LOCK = threading.Lock()   # VieNeu không an toàn khi 2 luồng cùng đọc
+
+
+def get_vieneu(mode: str = "v3turbo"):
     try:
         from vieneu import Vieneu
     except ImportError as e:
         raise TTSError("Chưa cài VieNeu-TTS: pip install vieneu  (lần đầu sẽ tự tải model từ HuggingFace)") from e
-    mode = opts.get("model") or "v3turbo"
     mode = mode if mode in ("v3turbo", "v3nano") else "v3turbo"
-    tts = _VIENEU.get(mode)
-    if tts is None:
-        tts = Vieneu(mode=mode)
-        _VIENEU[mode] = tts
+    with _MODEL_LOCK:
+        if mode not in _VIENEU:
+            _VIENEU[mode] = Vieneu(mode=mode)
+        return _VIENEU[mode]
+
+
+def get_piper(model_path: Path):
+    try:
+        from piper import PiperVoice
+    except ImportError as e:
+        raise TTSError("Chưa cài Piper: pip install piper-tts") from e
+    key = str(model_path)
+    with _MODEL_LOCK:
+        if key not in _PIPER_CACHE:
+            _PIPER_CACHE[key] = PiperVoice.load(key)
+        return _PIPER_CACHE[key]
+
+
+def _synth_vieneu(text, voice, base: Path, opts, settings):
+    tts = get_vieneu(opts.get("model") or "v3turbo")
+    with _VIENEU_LOCK:
+        return _vieneu_infer(tts, text, voice, base, opts)
+
+
+def _vieneu_infer(tts, text, voice, base: Path, opts):
     if voice == "clone":
         ref = opts.get("xtts_ref") or ""
         if not ref or not Path(ref).exists():
@@ -1031,18 +1056,11 @@ _PIPER_CACHE: dict = {}
 
 
 def _synth_piper(text, voice, base: Path, opts, settings):
-    try:
-        from piper import PiperVoice
-    except ImportError as e:
-        raise TTSError("Chưa cài Piper: pip install piper-tts") from e
     name, _, sid = voice.partition("#")
     model = piper_dir(settings) / name
     if not model.exists():
-        raise TTSError(f"Chưa tải giọng Piper {name}. Bấm 'Tải giọng Piper'.")
-    pv = _PIPER_CACHE.get(str(model))
-    if pv is None:
-        pv = PiperVoice.load(str(model))
-        _PIPER_CACHE[str(model)] = pv
+        raise TTSError(f"Chưa tải giọng Piper {name}. Bấm '🔌 Kho giọng Piper' để tải.")
+    pv = get_piper(model)
     length_scale = 1.0 / max(0.3, 1 + float(opts.get("rate", 0) or 0) / 100.0)
     # độ biểu cảm theo cách đọc: noise_scale (ngữ điệu), noise_w (nhịp) - None = mặc định của model
     noise, noise_w = opts.get("piper_noise") or (None, None)

@@ -118,7 +118,7 @@ DEFAULTS: dict = {
         "logo_scale": 0.12,
         "gap": 0.25,
     },
-    "ui": {"last_dir": ""},
+    "ui": {"last_dir": "", "auto_install": True, "preload": True},
     "config_version": 3,
 }
 

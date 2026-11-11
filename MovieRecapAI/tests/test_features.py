@@ -261,6 +261,77 @@ def check_model_fallback(s: Settings):
     print("✓ tự đổi model khi Google ngừng model cũ")
 
 
+def check_scenes():
+    """Video có chuyển cảnh thật (lỗi 'FrameTimecode % int' chỉ xảy ra khi có cảnh)."""
+    import threading
+
+    from recap.scenes import detect_scenes
+
+    vid = TMP / "cuts.mp4"
+    srcs = ["testsrc2", "color=c=red", "smptebars", "color=c=blue", "rgbtestsrc"]
+    args, filt = [], ""
+    for i, src in enumerate(srcs):
+        sep = ":" if "=" in src else "="
+        args += ["-f", "lavfi", "-i", f"{src}{sep}size=320x180:rate=25:duration=4"]
+        filt += f"[{i}:v]format=yuv420p,setsar=1[v{i}];"
+    filt += "".join(f"[v{i}]" for i in range(len(srcs))) + f"concat=n={len(srcs)}:v=1:a=0[v]"
+    run_ffmpeg([*args, "-filter_complex", filt, "-map", "[v]", "-c:v", "libx264", "-preset", "ultrafast", str(vid)])
+    prog = []
+    cuts = detect_scenes(str(vid), lambda *a, **k: None, lambda p, m="": prog.append(p), threading.Event(), chunk=6)
+    assert len(cuts) == 5 and all(abs(c - i * 4) < 0.2 for i, c in enumerate(cuts)), cuts
+    assert prog and prog[-1] == 1.0, prog
+    ev = threading.Event()
+    ev.set()
+    try:
+        detect_scenes(str(vid), lambda *a, **k: None, lambda *a: None, ev)
+        raise AssertionError("phải hủy được")
+    except Exception as e:  # noqa: BLE001
+        assert e.__class__.__name__ == "Cancelled", e
+    print("✓ dò chuyển cảnh (scenedetect 0.7)")
+
+
+def check_warmup(s: Settings):
+    """Nạp sẵn khi mở app: model VieNeu được nạp đúng 1 lần, lỗi 1 bước không chặn các bước sau."""
+    import threading
+    import types
+
+    from recap import warmup
+
+    made = []
+
+    class FakeVieneu:
+        def __init__(self, mode="v3turbo", **kw):
+            made.append(mode)
+    real = sys.modules.get("vieneu")
+    sys.modules["vieneu"] = types.SimpleNamespace(Vieneu=FakeVieneu, __spec__=None)
+    old_dl = components.download_whisper
+    components.download_whisper = lambda *a, **k: (_ for _ in ()).throw(RuntimeError("không có mạng"))
+    old_is = components.is_module
+    components.is_module = lambda m: True if m == "vieneu" else old_is(m)
+    try:
+        s.set("voice", "engine", "vieneu")
+        s.set("voice", "model", "v3turbo")
+        s.set("script", "provider", "none")
+        keys = [k for k, _ in warmup.plan(s)]
+        assert "load_vieneu" in keys and "llm" not in keys, keys
+        rep = warmup.run(s, lambda *a, **k: None, lambda *a, **k: None, threading.Event())
+        tts.get_vieneu("v3turbo")  # lần sau dùng lại, không nạp lại
+        assert made == ["v3turbo"], made
+        assert "load_vieneu" in rep["done"] and "encoder" in rep["done"], rep
+        if not components.whisper_model_ready(s):
+            assert any("model" in e.lower() or "mạng" in e for e in rep["errors"]), rep
+    finally:
+        components.download_whisper = old_dl
+        components.is_module = old_is
+        tts._VIENEU.clear()
+        if real is not None:
+            sys.modules["vieneu"] = real
+        else:
+            sys.modules.pop("vieneu", None)
+        s.set("voice", "engine", "edge")
+    print("✓ nạp sẵn khi mở app")
+
+
 def check_config_migration():
     f = TMP / "old.json"
     f.write_text(json.dumps({"render": {"encoder": "libx264"}, "transcribe": {"model": "small"}}), encoding="utf-8")
@@ -280,6 +351,8 @@ def main():
     check_read_styles()
     check_synth_robust(s)
     check_config_migration()
+    check_scenes()
+    check_warmup(s)
     check_model_fallback(s)
     check_components(s)
     check_vision_payloads(s)

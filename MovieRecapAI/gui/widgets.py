@@ -30,7 +30,15 @@ class Worker(QThread):
         self.log.emit(str(msg), level)
 
     def _progress(self, p, msg=""):
-        self.progress.emit(float(p), str(msg))
+        # gửi tối đa ~12 lần/giây để giao diện không bị "nghẽn" khi tác vụ báo tiến độ dày đặc
+        import time
+
+        now = time.monotonic()
+        msg = str(msg)
+        if p < 0.999 and msg == getattr(self, "_last_msg", None) and now - getattr(self, "_last_t", 0) < 0.08:
+            return
+        self._last_t, self._last_msg = now, msg
+        self.progress.emit(float(p), msg)
 
     def run(self):
         try:

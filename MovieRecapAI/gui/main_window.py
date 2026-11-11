@@ -103,10 +103,26 @@ class MainWindow(QMainWindow):
         self.lb_eta = QLabel("")
         self.lb_eta.setObjectName("muted")
         self.btn_cancel = button("⏹ Hủy", self.cancel, "danger")
+        # tiến độ chuẩn bị nền (khi mở app)
+        self.bg_box = QWidget()
+        bgl = QHBoxLayout(self.bg_box)
+        bgl.setContentsMargins(0, 0, 0, 0)
+        self.lb_bg = QLabel("")
+        self.lb_bg.setObjectName("muted")
+        self.bg_prog = QProgressBar()
+        self.bg_prog.setRange(0, 100)
+        self.bg_prog.setFixedWidth(110)
+        self.bg_prog.setTextVisible(False)
+        bgl.addWidget(self.lb_bg)
+        bgl.addWidget(self.bg_prog)
+        self.bg_box.setVisible(False)
+        self.bg_worker = None
+        self._after_warmup: list = []
         self.btn_cancel.setEnabled(False)
         bl.addWidget(self.status)
         bl.addWidget(self.prog, 1)
         bl.addWidget(self.lb_eta)
+        bl.addWidget(self.bg_box)
         bl.addWidget(self.btn_cancel)
         right.addWidget(bar)
         rw = QWidget()
@@ -119,11 +135,57 @@ class MainWindow(QMainWindow):
             self.log("👉 Mẹo: vào '🔑 API & Cài đặt' nhập Gemini API key miễn phí để AI viết kịch bản.", "warn")
         from PySide6.QtCore import QTimer
 
-        QTimer.singleShot(800, self.startup_check)
+        QTimer.singleShot(300, self.startup_check)
 
-    # ------------------------------------------------------------ thành phần
+    # ------------------------------------------------------------ chuẩn bị khi mở app
     def startup_check(self):
-        """Lần đầu mở app: kiểm tra thành phần bắt buộc, hỏi tự cài nếu thiếu."""
+        """Mở app: chạy nền việc kiểm tra, tự cài phần thiếu, tải & nạp sẵn model (không khóa giao diện)."""
+        from recap import warmup
+
+        steps = warmup.plan(self.settings)
+        if len(steps) <= 1 and not self.settings.get("ui", "auto_install", True):
+            return self._legacy_check()
+        self.bg_box.setVisible(True)
+        self.lb_bg.setText("⚙️ Đang chuẩn bị...")
+        w = Worker(warmup.run, self.settings)
+        self.bg_worker = w
+        w.log.connect(self.log)
+        w.progress.connect(self._bg_progress)
+        w.done.connect(self._bg_done)
+        w.failed.connect(lambda m, tb: self._bg_done({"errors": [m]}))
+        self.workers.append(w)
+        w.start()
+
+    def _bg_progress(self, p, msg):
+        self.bg_prog.setValue(int(max(0.0, min(1.0, p)) * 100))
+        if msg:
+            self.lb_bg.setText(f"⚙️ {msg[:60]}")
+
+    def _bg_done(self, report):
+        w = getattr(self, "bg_worker", None)
+        if w in self.workers:
+            self.workers.remove(w)
+        self.bg_worker = None
+        errors = (report or {}).get("errors") or []
+        if errors:
+            self.lb_bg.setText("⚠️ Chuẩn bị xong (có lỗi - xem log / mục 🧩)")
+            self.log("Một số thành phần chưa sẵn sàng - vào '🧩 Thành phần & sửa lỗi' để cài lại.", "warn")
+        else:
+            self.lb_bg.setText("✅ Đã sẵn sàng")
+            self.log("✅ App đã chuẩn bị xong mọi thứ cần thiết.")
+        from PySide6.QtCore import QTimer
+
+        QTimer.singleShot(6000 if not errors else 20000, lambda: self.bg_box.setVisible(False))
+        # các trang dùng dữ liệu vừa tải -> làm mới
+        self.pages[2]._loaded_engine = None
+        cur = self.stack.currentIndex()
+        if cur in (2, PAGE_COMPONENTS):
+            self.pages[cur].on_show()
+        pending, self._after_warmup = self._after_warmup, []
+        for fn in pending:
+            fn()
+
+    def _legacy_check(self):
         from recap import components
 
         s = self.settings
@@ -151,6 +213,11 @@ class MainWindow(QMainWindow):
             if then:
                 then()
             return True
+        if getattr(self, "bg_worker", None) is not None:
+            # app đang tự chuẩn bị ở chế độ nền -> đợi xong rồi làm tiếp, tránh cài trùng
+            self.log("⏳ App đang tự tải/cài phần cần thiết (xem thanh dưới) - sẽ làm tiếp ngay khi xong.", "warn")
+            self._after_warmup.append(lambda: self.ensure(engine, stt, then, include_models))
+            return False
         names = "\n• ".join(components.COMPONENTS[k]["name"] for k in missing)
         if QMessageBox.question(self, "Cần tải thêm",
                                 f"Để dùng chức năng này cần:\n• {names}\n\nTự tải & cài ngay?") == QMessageBox.Yes:

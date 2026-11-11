@@ -126,6 +126,12 @@ class SettingsPage(Page):
             pp.setText(app.settings.get("paths", key, ""))
             pp.changed.connect(lambda val, k=key: b._set("paths", k, val))
             f3.addRow(label, pp)
+        from PySide6.QtWidgets import QCheckBox
+
+        f3.addRow(b.check(QCheckBox("Mở app là tự cài phần còn thiếu (thư viện, FFmpeg, model nhận dạng thoại)"),
+                          "ui", "auto_install"))
+        f3.addRow(b.check(QCheckBox("Mở app là nạp sẵn model giọng đọc & dữ liệu (dùng mượt, bấm là chạy ngay)"),
+                          "ui", "preload"))
         proxy = b.line(QLineEdit(), "api", "proxy")
         proxy.setPlaceholderText("(tùy chọn) http://user:pass@host:port")
         f3.addRow("Proxy mạng", proxy)

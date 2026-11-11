@@ -139,6 +139,10 @@ def write_script(transcript: list[dict], duration: float, settings: Settings, op
         return auto_script(transcript, duration, opts, scene_cuts)
     if not transcript:
         raise RuntimeError("Chưa có lời thoại. Hãy chạy bước nhận dạng thoại hoặc nạp phụ đề trước.")
+    if model in ("", "auto"):
+        from .llm import resolve_model
+
+        model = resolve_model(pid, "auto", settings, log)
     text = transcript_to_text(transcript)
     max_chars = int(opts.get("max_chars") or PROVIDERS[pid].get("max_chars") or 150000)
     max_chars = min(max_chars, PROVIDERS[pid].get("max_chars", max_chars))

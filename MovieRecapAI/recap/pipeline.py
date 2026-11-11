@@ -87,7 +87,13 @@ class Project:
         from .scenes import detect_scenes
 
         cancel = cancel or threading.Event()
-        self.scenes = detect_scenes(self.video, log, progress, cancel)
+        try:
+            self.scenes = detect_scenes(self.video, log, progress, cancel)
+        except Cancelled:
+            raise
+        except Exception as e:  # noqa: BLE001 - dò cảnh chỉ để cắt clip đẹp hơn, lỗi thì bỏ qua
+            log(f"Dò chuyển cảnh lỗi ({e}) - bỏ qua bước này, video vẫn được làm tiếp.", level="warn")
+            self.scenes = []
         self.save()
         return self.scenes
 

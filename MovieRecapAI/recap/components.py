@@ -81,7 +81,26 @@ def ffmpeg_dir() -> Path:
     return app_home() / "ffmpeg" / "bin"
 
 
-def ffmpeg_status() -> tuple[bool, str]:
+_FF_STATUS: dict = {}
+
+
+def ffmpeg_status(refresh: bool = False) -> tuple[bool, str]:
+    """Có cache theo đường dẫn ffmpeg (tránh chạy lại ffmpeg mỗi lần kiểm tra -> giao diện mượt)."""
+    from .ffmpeg_utils import ffmpeg_exe
+
+    try:
+        exe = ffmpeg_exe()
+    except Exception as e:  # noqa: BLE001
+        return False, str(e)
+    if not refresh and exe in _FF_STATUS:
+        return _FF_STATUS[exe]
+    res = _ffmpeg_status_uncached()
+    if res[0]:
+        _FF_STATUS[exe] = res
+    return res
+
+
+def _ffmpeg_status_uncached() -> tuple[bool, str]:
     from .ffmpeg_utils import ffmpeg_exe, ffprobe_exe
 
     try:
@@ -224,15 +243,13 @@ def vieneu_model_ready(settings: Settings) -> bool:
 
 
 def download_vieneu(settings: Settings, log, progress, cancel) -> None:
-    from .tts import _VIENEU
+    from .tts import get_vieneu
 
     mode = settings.get("voice", "model") or "v3turbo"
     mode = mode if mode in ("v3turbo", "v3nano") else "v3turbo"
     log(f"Tải & nạp model VieNeu-TTS ({mode})... lần đầu có thể mất vài phút.")
     progress(0.2, "Tải model VieNeu-TTS")
-    from vieneu import Vieneu
-
-    _VIENEU[mode] = Vieneu(mode=mode)
+    get_vieneu(mode)
     log("✅ Model VieNeu-TTS đã sẵn sàng.")
 
 
