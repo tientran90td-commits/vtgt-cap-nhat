@@ -1,0 +1,14 @@
+# Giao diện
+PySide6>=6.6
+# Mạng, FFmpeg dự phòng
+requests>=2.31
+imageio-ffmpeg>=0.5
+# Nhận dạng lời thoại offline (Whisper chạy CPU; bản card đồ họa app tự tải)
+faster-whisper>=1.1
+# Giọng đọc offline
+vieneu>=3.8
+piper-tts>=1.2
+# Giọng online miễn phí / AI online (chỉ dùng khi tắt chế độ offline)
+edge-tts>=7.0
+gTTS>=2.5
+anthropic>=2.8
