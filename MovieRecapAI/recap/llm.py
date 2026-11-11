@@ -577,8 +577,15 @@ def _chat_openai(pid, model, system, user, settings, json_mode, max_tokens, imag
         body["messages"][1]["content"] = parts
     if json_mode and pid not in ("ollama", "lmstudio", "custom"):
         body["response_format"] = {"type": "json_object"}
+    effort = openai_effort(model, _thinking_level(settings))
+    if effort:
+        body["reasoning_effort"] = effort
     timeout = 900 if pid in ("ollama", "lmstudio") else 600
     r = _session(settings).post(f"{base}/chat/completions", headers=headers, json=body, timeout=timeout)
+    if effort and r.status_code == 400 and "reasoning" in (r.text or "").lower():
+        _NO_THINK.add(model)
+        body.pop("reasoning_effort", None)
+        r = _session(settings).post(f"{base}/chat/completions", headers=headers, json=body, timeout=timeout)
     if r.status_code == 400 and "response_format" in body:
         body.pop("response_format")
         r = _session(settings).post(f"{base}/chat/completions", headers=headers, json=body, timeout=timeout)
@@ -588,6 +595,41 @@ def _chat_openai(pid, model, system, user, settings, json_mode, max_tokens, imag
         return msg.get("content") or ""
     except (KeyError, IndexError):
         raise LLMError(f"Phản hồi lạ: {str(data)[:400]}")
+
+
+# ---- Mức "suy nghĩ" của AI: model đời mới (Gemini 2.5+/3, GPT-5, o-series, gpt-oss) mặc định suy nghĩ rất lâu
+# trước khi viết. Viết kịch bản recap không cần suy luận sâu -> mặc định "low" nhanh gấp nhiều lần.
+THINKING = {"low": "⚡ Nhanh (khuyên dùng)", "auto": "Mặc định của model", "high": "🧠 Kỹ (chậm, viết sâu hơn)"}
+_NO_THINK: set = set()  # model không nhận tham số suy nghĩ
+
+
+def _thinking_level(settings) -> str:
+    v = (settings.get("script", "thinking") or "low") if settings is not None else "low"
+    return v if v in THINKING else "low"
+
+
+def gemini_thinking(model: str, level: str) -> dict | None:
+    if level == "auto" or model in _NO_THINK:
+        return None
+    m = re.match(r"gemini-(\d+)(?:\.(\d+))?", model or "")
+    if not m:
+        return None
+    major, minor = int(m.group(1)), int(m.group(2) or 0)
+    if major >= 3:
+        return {"thinkingLevel": "low" if level == "low" else "high"}
+    if (major, minor) >= (2, 5):
+        if "pro" in model:  # bản pro không tắt hẳn được
+            return {"thinkingBudget": 128 if level == "low" else -1}
+        return {"thinkingBudget": 0 if level == "low" else -1}
+    return None
+
+
+def openai_effort(model: str, level: str) -> str | None:
+    if level == "auto" or model in _NO_THINK:
+        return None
+    if re.match(r"^(openai/)?(o\d|gpt-5|gpt-oss)", (model or "").lower()):
+        return "low" if level == "low" else "high"
+    return None
 
 
 def _chat_gemini(model, system, user, settings, json_mode, max_tokens, images=None) -> str:
@@ -608,7 +650,14 @@ def _chat_gemini(model, system, user, settings, json_mode, max_tokens, images=No
     }
     if json_mode:
         body["generationConfig"]["responseMimeType"] = "application/json"
+    think = gemini_thinking(model, _thinking_level(settings))
+    if think:
+        body["generationConfig"]["thinkingConfig"] = think
     r = _session(settings).post(url, params={"key": key}, json=body, timeout=(20, WAIT_LIMIT + 30))
+    if think and r.status_code == 400 and "think" in (r.text or "").lower():
+        _NO_THINK.add(model)  # model không hỗ trợ -> gửi lại không kèm
+        body["generationConfig"].pop("thinkingConfig", None)
+        r = _session(settings).post(url, params={"key": key}, json=body, timeout=(20, WAIT_LIMIT + 30))
     data = _check(r, "Gemini")
     cands = data.get("candidates") or []
     if not cands:

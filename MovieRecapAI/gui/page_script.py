@@ -112,6 +112,10 @@ class ScriptPage(Page):
         f3.addRow("Góc nhìn người kể", self.persp)
         f3.addRow("Nhân vật", self.focus)
         f3.addRow("Số phương án", self.cands)
+        self.thinking = b.combo(fill_combo(QComboBox(), llm.THINKING), "script", "thinking")
+        self.thinking.setToolTip("Model AI đời mới mặc định 'suy nghĩ' rất lâu trước khi viết (có khi vài phút). "
+                                 "Nhanh = giảm suy nghĩ, kịch bản vẫn tốt và nhanh gấp nhiều lần.")
+        f3.addRow("Tốc độ AI", self.thinking)
         f3.addRow(muted("2-3 phương án: AI viết nhiều bản (mở đầu gắt hơn / kể rõ ràng hơn), chấm điểm độ cuốn hút, "
                         "độ chính xác, độ dài - rồi chọn bản hay nhất."))
         f3.addRow("Học phong cách", hrow(button("🎯 Chọn video recap mẫu", self.pick_style_ref, "primary"),

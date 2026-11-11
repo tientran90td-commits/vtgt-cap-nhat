@@ -208,6 +208,29 @@ def _avoid_block(avoid) -> str:
     return "=== AVOID these time ranges for clips: ===\n" + "; ".join(items)
 
 
+def _llm_cancel():
+    from .llm import _cancel_ev
+
+    return _cancel_ev()
+
+
+def _set_cancel(ev):
+    from .llm import set_cancel
+
+    set_cancel(ev)
+
+
+def _parallel(fn, items: list, workers: int) -> list:
+    """Chạy fn cho từng phần tử, giữ thứ tự kết quả; workers=1 -> lần lượt."""
+    if workers <= 1 or len(items) <= 1:
+        return [fn(x) for x in items]
+    from concurrent.futures import ThreadPoolExecutor
+
+    ev = _llm_cancel()
+    with ThreadPoolExecutor(max_workers=min(workers, len(items))) as ex:
+        return list(ex.map(lambda x: fn(x, ev), items))
+
+
 def write_script(transcript: list[dict], duration: float, settings: Settings, opts: dict, log, progress, cancel,
                  scene_cuts: list[float] | None = None, film: dict | None = None,
                  visual: list[dict] | None = None, episodes: list | None = None, avoid: list | None = None) -> dict:
@@ -237,13 +260,19 @@ def write_script(transcript: list[dict], duration: float, settings: Settings, op
                 # Phim quá dài so với ngữ cảnh/hạn mức của model -> tóm tắt từng phần trước (map-reduce)
                 parts = _split_lines(text, max_chars // 2)
                 log(f"Transcript dài {len(text):,} ký tự > giới hạn {max_chars:,}. Tóm tắt trước {len(parts)} phần...")
-                summaries = []
-                for i, part in enumerate(parts):
+                # tóm tắt các phần SONG SONG (nhanh gấp nhiều lần so với lần lượt)
+                done_n = [0]
+
+                def summarize(part, _ev=_llm_cancel()):
+                    _set_cancel(_ev)
                     if cancel.is_set():
                         raise Cancelled()
-                    progress(0.7 * i / len(parts), f"AI đọc phần {i + 1}/{len(parts)}")
-                    summaries.append(chat(pid, model, CHUNK_SYSTEM, film_context(film) + "\n\n" + part, settings,
-                                          json_mode=False, max_tokens=4000, log=log))
+                    r = chat(pid, model, CHUNK_SYSTEM, film_context(film) + "\n\n" + part, settings,
+                             json_mode=False, max_tokens=4000, log=log)
+                    done_n[0] += 1
+                    progress(0.7 * done_n[0] / len(parts), f"AI đã đọc {done_n[0]}/{len(parts)} phần")
+                    return r
+                summaries = _parallel(summarize, parts, 1 if pid in ("ollama", "lmstudio", "web") else 4)
                 text = "\n".join(summaries)
                 notes = True
             if cancel.is_set():
@@ -271,19 +300,23 @@ def write_script(transcript: list[dict], duration: float, settings: Settings, op
     n_cand = max(1, min(3, int(opts.get("candidates") or 1)))
     if n_cand > 1 and pid != "web" and opts.get("mode", "narrate") != "highlight":
         cands = [script]
-        for k in range(1, n_cand):
+        progress(0.8, f"AI viết thêm {n_cand - 1} phương án (song song)")
+
+        def variant(k, _ev=_llm_cancel()):
+            _set_cancel(_ev)
             if cancel.is_set():
                 raise Cancelled()
-            progress(0.8 + 0.1 * k / n_cand, f"AI viết phương án {k + 1}/{n_cand}")
             o2 = dict(opts, _variant=VARIANTS[k % len(VARIANTS)])
             try:
                 r2 = chat(pid, model, SYSTEM, build_user_prompt(text, duration, o2, notes, film_context(film), vis,
                                                                  episodes, avoid), settings, json_mode=True, log=log)
-                cands.append(normalize_script(extract_json(r2), duration, scene_cuts, opts.get("mode", "narrate")))
+                return normalize_script(extract_json(r2), duration, scene_cuts, opts.get("mode", "narrate"))
             except Cancelled:
                 raise
             except Exception as e:  # noqa: BLE001
                 log(f"Phương án {k + 1} lỗi ({e}) - bỏ qua.", level="warn")
+                return None
+        cands += [c for c in _parallel(variant, list(range(1, n_cand)), n_cand - 1) if c]
         if len(cands) > 1:
             progress(0.93, "AI chấm điểm các phương án")
             script = pick_best(cands, duration, opts, pid, model, settings, log)

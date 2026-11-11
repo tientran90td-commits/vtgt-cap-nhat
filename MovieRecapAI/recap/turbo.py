@@ -48,6 +48,7 @@ def plan(settings: Settings, project=None) -> list[tuple[str, str, object, str]]
     ch.append(("transcribe", "model", "large-v3-turbo", "Model large-v3-turbo (chính xác cao, nhanh nhất họ large)"))
     ch.append(("transcribe", "use_scenes", False, "Bỏ dò chuyển cảnh (khớp hình theo câu vẫn hoạt động)"))
     # 2) AI viết kịch bản
+    ch.append(("script", "thinking", "low", "AI viết ngay, giảm thời gian 'suy nghĩ' (nhanh gấp nhiều lần)"))
     ch.append(("script", "candidates", 1, "Kịch bản: 1 phương án (không viết nhiều bản rồi chấm)"))
     ch.append(("script", "visual", False, "Bỏ AI xem hình ảnh từng cảnh"))
     # 3) Giọng đọc

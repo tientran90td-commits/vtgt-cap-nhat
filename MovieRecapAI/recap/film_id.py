@@ -214,19 +214,35 @@ def visual_notes(video: str, duration: float, film: dict | None, settings: Setti
     ctx = film_context(film)
     notes: list[dict] = []
     batch = 12
-    for i in range(0, len(frames), batch):
+    groups = [frames[i:i + batch] for i in range(0, len(frames), batch)]
+    from .llm import _cancel_ev, set_cancel
+
+    ev = _cancel_ev()
+    done_n = [0]
+
+    def look(part):
+        set_cancel(ev)
         if cancel.is_set():
             raise Cancelled()
-        part = frames[i:i + batch]
-        progress(0.1 + 0.9 * i / max(1, len(frames)), f"AI xem cảnh {i + 1}-{i + len(part)}/{len(frames)}")
         imgs = [(f"[{fmt_ts(t)}]", b) for t, b in part]
         try:
             raw = chat(pid, model, VIS_SYSTEM, (ctx or "") + f"\nDescribe these {len(part)} screenshots.", settings,
                        json_mode=True, max_tokens=4000, log=log, images=imgs)
             items = extract_json(raw).get("frames") or []
+        except Cancelled:
+            raise
         except Exception as e:  # noqa: BLE001
             log(f"AI xem cảnh lỗi ({e}) - bỏ qua nhóm này.", level="warn")
-            continue
+            items = []
+        done_n[0] += 1
+        progress(0.1 + 0.9 * done_n[0] / max(1, len(groups)), f"AI xem cảnh {done_n[0]}/{len(groups)} nhóm")
+        return part, items
+    # các nhóm ảnh gửi SONG SONG (3 nhóm cùng lúc)
+    from concurrent.futures import ThreadPoolExecutor
+
+    with ThreadPoolExecutor(max_workers=max(1, min(3, len(groups)))) as ex:
+        results = list(ex.map(look, groups))
+    for part, items in results:
         for (t, _b), it in zip(part, items):
             d = (it.get("desc") if isinstance(it, dict) else str(it)) or ""
             if d.strip():

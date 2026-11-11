@@ -496,6 +496,69 @@ def check_ai_hang(s: Settings):
     print("✓ AI treo: báo đang viết, tự chuyển AI khác, bấm Hủy dừng ngay, sửa model lệch nhà cung cấp")
 
 
+def check_ai_speed(s: Settings):
+    """AI nhanh: giảm 'suy nghĩ' (Gemini 2.5/3, GPT-5, gpt-oss), model cũ không nhận thì gửi lại; phương án viết song song."""
+    import requests
+    import time as _time
+
+    assert llm.gemini_thinking("gemini-3.8-flash", "low") == {"thinkingLevel": "low"}
+    assert llm.gemini_thinking("gemini-2.5-flash", "low") == {"thinkingBudget": 0}
+    assert llm.gemini_thinking("gemini-2.5-pro", "low") == {"thinkingBudget": 128}
+    assert llm.gemini_thinking("gemini-2.0-flash", "low") is None and llm.gemini_thinking("gemini-3-pro", "auto") is None
+    assert llm.openai_effort("openai/gpt-oss-120b", "low") == "low" and llm.openai_effort("gpt-4o", "low") is None
+    bodies = []
+
+    class R:
+        def __init__(self, code, js):
+            self.status_code, self._js, self.text, self.headers = code, js, json.dumps(js), {}
+
+        def json(self):
+            return self._js
+
+    def post(self, url, **kw):
+        body = json.loads(json.dumps(kw.get("json")))
+        bodies.append(body)
+        if "thinkingConfig" in body.get("generationConfig", {}) and "old-think" in url:
+            return R(400, {"error": {"message": "Thinking is not supported for this model."}})
+        return R(200, {"candidates": [{"content": {"parts": [{"text": "{}"}]}}]})
+    old = requests.Session.post
+    requests.Session.post = post
+    s.set("api", "gemini_key", "k")
+    try:
+        llm._chat_gemini("gemini-3.8-flash", "sys", "u", s, True, 1000)
+        assert bodies[-1]["generationConfig"]["thinkingConfig"] == {"thinkingLevel": "low"}
+        llm._chat_gemini("gemini-3.9-old-think", "sys", "u", s, True, 1000)
+        assert "thinkingConfig" not in bodies[-1]["generationConfig"] and "gemini-3.9-old-think" in llm._NO_THINK
+        s.set("script", "thinking", "auto")
+        llm._chat_gemini("gemini-3.8-flash", "sys", "u", s, True, 1000)
+        assert "thinkingConfig" not in bodies[-1]["generationConfig"]
+    finally:
+        requests.Session.post = old
+        s.set("script", "thinking", "low")
+    # 3 phương án kịch bản: viết song song -> ~2 lần chờ thay vì 3
+    calls = []
+
+    def slow_chat(pid, model, system, user, settings, **kw):
+        calls.append(_time.time())
+        if system == script_writer.JUDGE_SYSTEM:
+            return json.dumps({"scores": [50, 90, 60], "best": 1})
+        _time.sleep(1.0)
+        return json.dumps({"title": "x", "segments": [{"start": "00:00:10", "end": "00:00:20", "narration": "A."}]})
+    old_chat = script_writer.chat
+    script_writer.chat = slow_chat
+    try:
+        t0 = _time.time()
+        tr = [{"start": i * 5.0, "end": i * 5 + 4.0, "text": f"t{i}"} for i in range(20)]
+        script_writer.write_script(tr, 100, s, dict(s.section("script"), provider="gemini", model="gemini-x",
+                                                    candidates=3, mode="narrate"),
+                                   lambda *a, **k: None, lambda *a, **k: None, __import__("threading").Event())
+        took = _time.time() - t0
+        assert took < 2.8, took
+    finally:
+        script_writer.chat = old_chat
+    print(f"✓ AI nhanh: giảm suy nghĩ theo model · 3 phương án song song {took:.1f}s (lần lượt ~3s)")
+
+
 def check_whisper_gpu(s: Settings):
     """whisper.cpp (Vulkan): gọi whisper-cli, đọc tiến độ + tên card, đọc JSON kết quả đúng định dạng whisper.cpp."""
     import threading
@@ -559,6 +622,7 @@ def main():
     check_components(s)
     check_whisper_gpu(s)
     check_ai_hang(s)
+    check_ai_speed(s)
     check_vision_payloads(s)
     check_tmdb(s)
     check_film_and_script(s)

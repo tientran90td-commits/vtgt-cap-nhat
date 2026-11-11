@@ -1,4 +1,4 @@
 """Movie Recap AI - lõi xử lý tóm tắt phim dài thành video ngắn."""
 
 APP_NAME = "Movie Recap AI"
-APP_VERSION = "1.11.1"
+APP_VERSION = "1.12.0"

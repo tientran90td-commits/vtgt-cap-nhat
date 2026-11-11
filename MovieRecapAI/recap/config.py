@@ -74,6 +74,7 @@ DEFAULTS: dict = {
         "auto_fallback": True,
         "perspective": "omniscient",  # góc nhìn người kể
         "focus_character": "",
+        "thinking": "low",        # mức suy nghĩ của AI: low (nhanh) | auto | high
         "candidates": 1,          # số phương án kịch bản (AI chấm & chọn bản hay nhất)
         "style_ref": None,        # phong cách học từ video mẫu   # AI chính hết tiền/quá tải -> tự chuyển sang AI khác đã nhập key
         "identify": True,        # tự nhận diện phim (tên, nhân vật) trước khi viết kịch bản
