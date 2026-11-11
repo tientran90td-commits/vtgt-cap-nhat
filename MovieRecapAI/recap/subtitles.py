@@ -199,6 +199,8 @@ def write_ass(items: list[dict], path: str | Path, width: int, height: int, styl
     margin_v = int((70 if pos != "middle" else 0) * scale)
     if width < height:  # video dọc: nhấc phụ đề lên tránh nút của TikTok/Shorts
         margin_v = int(height * 0.18) if pos == "bottom" else margin_v
+    if style.get("margin_v_px"):  # vị trí do app tính (vd né phụ đề gốc in cứng)
+        margin_v = int(style["margin_v_px"])
     bold = -1 if style.get("bold", True) else 0
     outline = max(0, float(style.get("outline", 3))) * scale
     font = style.get("font") or "Arial"

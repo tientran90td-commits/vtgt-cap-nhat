@@ -315,6 +315,33 @@ def check_hardsub(s: Settings):
     s.set("render", "hardsub_mode", "crop")
     out2 = p.run_render(TMP / "out" / "crop.mp4", log=NOLOG)
     assert band_edges(out2, 0.88, 0.99) < before
+    # Phóng to để đẩy phụ đề gốc ra ngoài khung: giữ nguyên khung 16:9, dải dưới không còn chữ
+    s.set("render", "hardsub_mode", "zoom")
+    outz = p.run_render(TMP / "out" / "zoom.mp4", log=NOLOG)
+    iz = probe(outz)
+    assert (iz.width, iz.height) == (640, 360) or iz.width / iz.height > 1.7, (iz.width, iz.height)
+    assert band_edges(outz, hs["y0"], hs["y1"]) < before * 0.5, band_edges(outz, hs["y0"], hs["y1"])
+    from recap import editor as _ed
+    assert _ed.zoom_factor({"y0": 0.88, "y1": 0.99}) < 1.2 and _ed.zoom_factor({"y0": 0.6, "y1": 0.7}) is None
+    # Né: phụ đề của app đặt ngay trên dải phụ đề gốc (không đè lên, không đẩy lên tận trên cùng)
+    m = _ed.avoid_margin({"y0": 0.88, "y1": 0.99}, 1920, 1080, 1920, 1080, "blur")
+    assert 0.12 * 1080 < m < 0.2 * 1080, m
+    mv = _ed.avoid_margin({"y0": 0.88, "y1": 0.99}, 1920, 1080, 1080, 1920, "blur")  # dọc 9:16 nền mờ
+    assert 1920 * 0.3 < mv < 1920 * 0.45, mv
+    s.set("render", "subtitles", True)
+    s.set("render", "hardsub_mode", "avoid")
+    p.script = {"title": "t", "segments": [{"start": 2, "end": 12, "narration": "Anh ta bước vào căn phòng tối."}]}
+    import recap.tts as _tts
+    _tts._synth_edge = lambda text, voice, base, opts, settings: (run_ffmpeg(
+        ["-f", "lavfi", "-i", "sine=duration=3", str(base.with_suffix(".wav"))]) or base.with_suffix(".wav"))
+    s.set("voice", "engine", "edge")
+    s.set("voice", "voice", "vi-VN-HoaiMyNeural")
+    p.run_render(TMP / "out" / "avoid.mp4", log=NOLOG)
+    ass = next((p.dir / "render_parts").glob("seg_000.ass")).read_text(encoding="utf-8")
+    style_line = next(ln for ln in ass.splitlines() if ln.startswith("Style: Default"))
+    assert int(style_line.split(",")[-2]) > 30 and style_line.split(",")[-5] == "2", style_line  # dưới + nhấc lên
+    p.script = {"title": "t", "segments": [{"start": 2, "end": 12, "narration": ""}]}
+    s.set("render", "subtitles", False)
     # Xóa bằng AI qua video-subtitle-remover: dùng 1 bản VSR giả (cùng dòng lệnh) tô kín vùng được giao
     pkg = TMP / "vsr_pkg" / "vsr-v1.4.0"
     (pkg / "backend").mkdir(parents=True, exist_ok=True)

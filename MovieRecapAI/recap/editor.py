@@ -130,10 +130,36 @@ HARDSUB_MODES = {
     "blur": "Làm mờ dải phụ đề gốc (khuyên dùng)",
     "vsr": "🧠 Xóa sạch bằng AI (video-subtitle-remover, cần cài VSR)",
     "bar": "Phủ dải tối lên phụ đề gốc",
+    "zoom": "🔍 Phóng to để đẩy phụ đề gốc ra ngoài khung (giữ nguyên tỉ lệ, không nhòe)",
     "crop": "Cắt bỏ phần dưới chứa phụ đề gốc",
-    "avoid": "Giữ nguyên, chỉ đưa phụ đề của app lên trên để không đè",
+    "avoid": "Né: giữ phụ đề gốc, đặt phụ đề của app ngay PHÍA TRÊN để không đè",
     "none": "Không xử lý",
 }
+
+
+ZOOM_MAX = 1.4  # phóng to tối đa 1.4 lần (hơn nữa mất nhiều hình)
+
+
+def zoom_factor(hs: dict | None) -> float | None:
+    """Mức phóng to để đẩy dải phụ đề ra khỏi khung; None nếu phải phóng quá ZOOM_MAX."""
+    if not hs:
+        return None
+    z = 1.0 / max(0.05, float(hs["y0"]) - 0.01)
+    return round(z, 4) if z <= ZOOM_MAX else None
+
+
+def avoid_margin(hs: dict | None, sw: int, sh: int, W: int, H: int, fill: str) -> int | None:
+    """Khoảng cách (px, tính từ đáy video xuất) để đặt phụ đề của app ngay phía trên dải phụ đề gốc."""
+    if not hs or not sw or not sh:
+        return None
+    if fill in ("crop", "face"):
+        sc = max(W / sw, H / sh)
+    else:
+        sc = min(W / sw, H / sh)
+    top = (H - sh * sc) / 2
+    band_top = top + float(hs["y0"]) * sh * sc
+    m = int(H - band_top + 0.02 * H)
+    return m if 0 < m < H * 0.6 else None
 
 
 def _hardsub_filters(hs: dict | None, mode: str, sw: int, sh: int, src: str) -> tuple[str, str, str]:
@@ -142,6 +168,13 @@ def _hardsub_filters(hs: dict | None, mode: str, sw: int, sh: int, src: str) -> 
         return "", src, ""
     y = max(0, int(hs["y0"] * sh) // 2 * 2)
     hh = max(2, min(sh - y, int((hs["y1"] - hs["y0"]) * sh)) // 2 * 2)
+    if mode == "zoom":
+        z = zoom_factor(hs)
+        if z:  # phóng to (cắt giữ phần trên, đúng tỉ lệ gốc) -> dải phụ đề nằm ngoài khung
+            ch = max(2, int(sh / z) // 2 * 2)
+            cw = max(2, int(sw / z) // 2 * 2)
+            return "", src, f"crop={cw}:{ch}:{(sw - cw) // 4 * 2}:0,"
+        mode = "blur"  # phụ đề nằm quá cao, phóng to quá nhiều sẽ mất hình -> làm mờ
     if mode == "crop" and hs["y1"] > 0.8 and y > sh * 0.6:
         return "", src, f"crop=iw:{y}:0:0,"
     if mode == "bar" or (mode == "crop"):
@@ -228,7 +261,17 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
         "position": opts.get("sub_position", "bottom"), "bold": opts.get("sub_bold", True),
     }
     if hardsub and opts.get("hardsub_mode", "blur") == "avoid" and style["position"] == "bottom":
-        style["position"] = "top"  # né phụ đề gốc nằm ở dưới
+        # né phụ đề gốc: đặt phụ đề của app ngay phía trên dải phụ đề gốc (không được thì đưa lên trên cùng)
+        m = avoid_margin(hardsub, info.width, info.height, W, H, opts.get("fill", "blur"))
+        if m:
+            style["margin_v_px"] = m
+        else:
+            style["position"] = "top"
+    if hardsub and hs_mode == "zoom":
+        z = zoom_factor(hardsub)
+        log(f"Phóng to {z:.2f} lần để đẩy phụ đề gốc ra ngoài khung." if z else
+            "Phụ đề gốc nằm quá cao - phóng to sẽ mất nhiều hình, chuyển sang làm mờ dải phụ đề.",
+            level="info" if z else "warn")
     max_chars = int(opts.get("sub_max_chars", 42))
     if W < H:
         max_chars = min(max_chars, 28)
