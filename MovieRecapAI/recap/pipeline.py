@@ -87,8 +87,9 @@ class Project:
         """Mọi khoảng không nên dùng làm cảnh: [start, end, loại]."""
         out = [[a, b, "user"] for a, b, *_ in (self.exclusions or [])]
         for a, b, *_ in self.season_exclusions or []:
-            ep = next((e for e in self.episodes if abs(e["start"] - a) < 0.5), None)
-            out.append([a, b, "opening" if ep else "ending"])
+            ep = next((e for e in self.episodes if e["start"] - 0.5 <= a < e["end"]), None)
+            mid = (ep["start"] + ep["end"]) / 2 if ep else a + 1
+            out.append([a, b, "opening" if a < mid else "ending"])
         for a, b in (self.overlays or {}).get("ranges", []):
             out.append([a, b, "overlay"])
         return out
@@ -278,7 +279,7 @@ class Project:
         res = editor.render(self.script, self.video, self.info, voices, opts, out_path, self.dir, self.transcript,
                             log, lambda p, m="": progress((0.4 if has_narr else 0) + p * (0.6 if has_narr else 1), m),
                             cancel, blocked=self.blocked(), watermark=(self.overlays or {}).get("watermark"),
-                            hardsub=(self.overlays or {}).get("hardsub"))
+                            hardsub=(self.overlays or {}).get("hardsub"), episodes=self.episodes)
         txt = out_path.with_suffix(".txt")
         txt.write_text(script_writer.script_to_text(self.script), encoding="utf-8")
         if opts.get("publish_thumbs", True) or opts.get("publish_meta", True):

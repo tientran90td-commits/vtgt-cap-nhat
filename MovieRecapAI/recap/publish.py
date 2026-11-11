@@ -328,7 +328,20 @@ def chapters_from(meta_chapters: list[dict], timeline: list, total: float) -> li
     return out if len(out) >= 3 else []
 
 
-def make_metadata(script: dict, film: dict | None, timeline: list, total: float, settings: Settings, log=None) -> dict:
+def episode_chapters(script: dict, episodes: list) -> list[dict]:
+    """Recap nhiều tập: mỗi chương = 1 tập (đoạn đầu tiên kể về tập đó)."""
+    out, last = [], None
+    for i, seg in enumerate((script or {}).get("segments") or []):
+        st = float(seg.get("start", 0))
+        ep = next((e for e in episodes if e["start"] - 0.5 <= st < e["end"]), None)
+        if ep and ep.get("index") != last:
+            last = ep.get("index")
+            out.append({"seg": i, "title": ep["title"]})
+    return out
+
+
+def make_metadata(script: dict, film: dict | None, timeline: list, total: float, settings: Settings, log=None,
+                  episodes: list | None = None) -> dict:
     sc = settings.section("script")
     lang = sc.get("language", "Tiếng Việt")
     meta = None
@@ -344,7 +357,9 @@ def make_metadata(script: dict, film: dict | None, timeline: list, total: float,
             lines = [f"[{i}] " + ((s.get("narration") or s.get("scene") or "").strip()[:220]) for i, s in enumerate(segs)]
             f = film or {}
             user = (f"Language: {lang}\nFilm: {f.get('title') or ''} ({f.get('original_title') or ''}, {f.get('year') or ''})\n"
-                    f"Recap title: {(script or {}).get('title') or ''}\nVideo length: {fmt_chapter(total)}\n\n"
+                    f"Recap title: {(script or {}).get('title') or ''}\nVideo length: {fmt_chapter(total)}\n"
+                    + (f"This video recaps {len(episodes)} episodes (a whole season) in one video.\n"
+                       if episodes and len(episodes) > 1 else "") + "\n"
                     "Segments:\n" + "\n".join(lines)[:24000])
             meta = extract_json(chat(pid, model, META_SYSTEM, user, settings, json_mode=True, max_tokens=3000, log=log))
         except Exception as e:  # noqa: BLE001
@@ -357,7 +372,9 @@ def make_metadata(script: dict, film: dict | None, timeline: list, total: float,
         if not meta.get(k):
             meta[k] = v
     meta["hashtags"] = [h if str(h).startswith("#") else "#" + str(h).replace(" ", "") for h in meta["hashtags"]][:15]
-    meta["chapter_marks"] = chapters_from(meta.get("chapters") or base["chapters"], timeline, total) or \
+    ep_marks = chapters_from(episode_chapters(script, episodes), timeline, total) if episodes and len(episodes) > 1 \
+        else []
+    meta["chapter_marks"] = ep_marks or chapters_from(meta.get("chapters") or base["chapters"], timeline, total) or \
         chapters_from(base["chapters"], timeline, total)
     return meta
 
@@ -388,7 +405,8 @@ def prepare(project, out_video: Path, log=None, thumbs: bool = True, meta: bool 
     res: dict = {"thumbs": [], "meta": None}
     m = None
     if meta:
-        m = make_metadata(project.script, project.film, timeline, total, project.settings, log)
+        m = make_metadata(project.script, project.film, timeline, total, project.settings, log,
+                          episodes=getattr(project, "episodes", None))
         txt = metadata_text(m)
         out_video.with_suffix(".youtube.txt").write_text(txt, encoding="utf-8")
         out_video.with_suffix(".publish.json").write_text(json.dumps(m, ensure_ascii=False, indent=2), encoding="utf-8")

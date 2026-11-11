@@ -59,6 +59,10 @@ QSlider::sub-page:horizontal {{ background: {ACCENT}; border-radius: 3px; }}
 QSlider::handle:horizontal {{ background: white; width: 16px; margin: -6px 0; border-radius: 8px; }}
 QCheckBox::indicator {{ width: 18px; height: 18px; border-radius: 5px; border: 1px solid #3A4058; background: #0F121A; }}
 QCheckBox::indicator:checked {{ background: {ACCENT}; border: 1px solid {ACCENT}; }}
+QRadioButton {{ spacing: 8px; padding: 3px 0; }}
+QRadioButton::indicator {{ width: 16px; height: 16px; border-radius: 9px; border: 2px solid #4A5170; background: #0F121A; }}
+QRadioButton::indicator:checked {{ background: {ACCENT}; border: 2px solid #C9BEFF; }}
+QRadioButton:checked {{ color: #FFFFFF; font-weight: 600; }}
 QScrollArea {{ border: none; }}
 QScrollBar:vertical {{ background: transparent; width: 10px; }}
 QScrollBar::handle:vertical {{ background: #2E3448; border-radius: 5px; min-height: 30px; }}

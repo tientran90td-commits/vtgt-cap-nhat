@@ -193,7 +193,7 @@ def _tempo_voice(voice: Path, tempo: float, out_dir: Path) -> Path:
 
 def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, out_path: Path, work_dir: Path,
            transcript: list[dict] | None, log, progress, cancel, blocked=None, watermark=None,
-           hardsub: dict | None = None) -> Path:
+           hardsub: dict | None = None, episodes: list | None = None) -> Path:
     """voices[i] = đường dẫn WAV giọng đọc của đoạn i, hoặc None nếu đoạn giữ âm thanh gốc.
     blocked: các khoảng không được dùng (quảng cáo chèn, OP/ED, đoạn người dùng bỏ).
     watermark: {"box": [...]} logo cố định của nguồn để che mờ."""
@@ -260,6 +260,7 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
     t_global = 0.0
     part_files = []
     timeline: list[list] = []  # [chỉ số đoạn, giây bắt đầu trong video xuất, thời lượng]
+    last_ep = None
     for i, seg in enumerate(segs):
         if cancel.is_set():
             raise Cancelled()
@@ -319,6 +320,13 @@ def render(script: dict, video: str, info: MediaInfo, voices: list, opts: dict, 
         if i == 0 and (opts.get("title_text") or "").strip():
             title = {"text": opts["title_text"].strip(), "start": 0.0,
                      "end": min(dur, float(opts.get("title_seconds", 4)))}
+        # recap nhiều tập: hiện "Tập N" khi câu chuyện chuyển sang tập mới
+        if episodes and len(episodes) > 1 and opts.get("episode_labels", True):
+            ep = next((e for e in episodes if e["start"] - 0.5 <= src_start < e["end"]), None)
+            if ep and ep.get("index") != last_ep:
+                last_ep = ep.get("index")
+                if title is None:
+                    title = {"text": ep["title"], "start": 0.0, "end": min(dur, 2.5)}
         for s in subs:
             all_subs.append({"start": s["start"] + t_global, "end": s["end"] + t_global, "text": s["text"]})
 

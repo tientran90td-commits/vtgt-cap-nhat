@@ -173,6 +173,8 @@ class RenderPage(Page):
         self.lscale = b.spin(spin(0.03, 0.5, 0.01, decimals=2), "render", "logo_scale")
         f.addRow("Tiêu đề mở đầu", hrow(self.title, button("Lấy từ kịch bản", self.title_from_script),
                                        QLabel("hiện trong"), self.tsec, stretch_last=False))
+        f.addRow(b.check(QCheckBox("Video nhiều tập: hiện chữ \"Tập N\" khi câu chuyện chuyển sang tập mới"), "render",
+                         "episode_labels"))
         f.addRow("Logo", self.logo)
         f.addRow("Vị trí / kích thước", hrow(self.lpos, self.lscale, "stretch"))
 

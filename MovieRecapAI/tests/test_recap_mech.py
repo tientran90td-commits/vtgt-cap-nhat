@@ -161,6 +161,77 @@ def check_season(s: Settings):
     print(f"✓ recap season: {titles} · {total:.0f}s · {len(meta['exclusions'])} đoạn OP/ED bị tránh")
 
 
+def check_season_auto(s: Settings):
+    """Tự dò OP/ED: cùng 1 đoạn nhạc mở đầu/kết thúc ở vị trí khác nhau trong từng tập (có tập mở màn trước OP)."""
+    sr = 16000
+
+    def music(seed, secs):
+        r = np.random.default_rng(seed)
+        out = []
+        t = np.arange(sr // 2) / sr
+        for _k in range(int(secs * 2)):
+            fr = r.choice([220, 247, 262, 294, 330, 349, 392, 440, 494, 523], 3)
+            out.append(sum(np.sin(2 * np.pi * x * t) for x in fr) / 3)
+        return np.concatenate(out) * 0.5
+
+    def talk(seed, secs):
+        r = np.random.default_rng(seed)
+        x = r.normal(0, 0.15, int(sr * secs))
+        return x * np.repeat(r.random(int(secs * 4) + 1) > 0.4, sr // 4)[:len(x)]
+    op, ed = music(1, 60), music(2, 45)
+    files, truth = [], []
+    for i, (cold, mid) in enumerate([(40, 150), (0, 170), (95, 120)]):
+        a = np.concatenate([talk(10 + i, cold) if cold else np.zeros(0), op, talk(20 + i, mid), ed, talk(30 + i, 15)])
+        wav = TMP / f"ss{i}.wav"
+        with wave.open(str(wav), "wb") as w:
+            w.setnchannels(1)
+            w.setsampwidth(2)
+            w.setframerate(sr)
+            w.writeframes((np.clip(a, -1, 1) * 32000).astype(np.int16).tobytes())
+        f = TMP / f"Bộ Phim Tập {i + 1:02d}.mp4"
+        run_ffmpeg(["-f", "lavfi", "-i", f"testsrc2=size=320x180:rate=10:duration={len(a) / sr:.2f}", "-i", str(wav),
+                    "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac", "-b:a", "96k", "-shortest", str(f)])
+        files.append(str(f))
+        truth.append(((cold, cold + 60), (cold + 60 + mid, cold + 105 + mid)))
+    meta = season.build_season(files, TMP / "season2", 90, 90, NOLOG, NOLOG, threading.Event())
+    for ep, (top, ted) in zip(meta["episodes"], truth):
+        assert ep["op"] and abs(ep["op"][0] - top[0]) < 2 and abs(ep["op"][1] - top[1]) < 2, (ep, top)
+        assert ep["ed"] and abs(ep["ed"][0] - ted[0]) < 2 and abs(ep["ed"][1] - ted[1]) < 2, (ep, ted)
+    assert meta["auto_detected"] == 3
+    # tập 3 mở màn 95s trước OP: phần mở màn KHÔNG bị bỏ (khác cách cắt cố định 90s đầu)
+    ep3 = meta["episodes"][2]
+    assert not any(a <= ep3["start"] + 30 <= b for a, b in meta["exclusions"])
+    # chế độ chỉ nối: bỏ OP/ED, ra 1 video dài
+    total_in = sum(probe(f).duration for f in files)
+    j = season.join_episodes(files, TMP / "out" / "full.mp4", 90, 90, NOLOG, NOLOG, threading.Event())
+    dj = probe(j["video"]).duration
+    cut = sum(c["op"][1] - c["op"][0] + c["ed"][1] - c["ed"][0] for c in j["cuts"])
+    assert 300 < cut < 330 and abs(dj - (total_in - cut)) < 20, (dj, total_in, cut)  # sao chép nhanh: theo keyframe
+    je = season.join_episodes(files, TMP / "out" / "full_exact.mp4", 90, 90, NOLOG, NOLOG, threading.Event(), exact=True)
+    assert abs(probe(je["video"]).duration - (total_in - cut)) < 2
+    # recap: hiện "Tập N" khi chuyển tập + mốc chương theo tập
+    from recap import publish
+
+    p = Project(meta["video"], s)
+    eps = p.episodes
+    p.overlays = {"ranges": [], "watermark": None, "hardsub": None, "version": 2}
+    p.script = {"title": "Cả season", "segments": [
+        {"start": eps[0]["start"] + 110, "end": eps[0]["start"] + 116, "narration": ""},
+        {"start": eps[0]["start"] + 150, "end": eps[0]["start"] + 156, "narration": ""},
+        {"start": eps[1]["start"] + 100, "end": eps[1]["start"] + 106, "narration": ""},
+        {"start": eps[2]["start"] + 170, "end": eps[2]["start"] + 176, "narration": ""}]}
+    s.set("render", "fit_duration", False)
+    p.run_render(TMP / "out" / "season_recap.mp4", log=NOLOG)
+    ass = {f.name: f.read_text(encoding="utf-8") for f in (p.dir / "render_parts").glob("seg_*.ass")}
+    labels = [n for n, t in sorted(ass.items()) if "Tập" in t]
+    assert len(labels) == 3 and "Tập 2" in ass[labels[1]] and "Tập 3" in ass[labels[2]], labels
+    chs = publish.episode_chapters(p.script, eps)
+    assert [c["title"] for c in chs] == ["Tập 1", "Tập 2", "Tập 3"] and [c["seg"] for c in chs] == [0, 2, 3], chs
+    s.set("render", "subtitles", True)
+    print(f"✓ tự dò OP/ED 3/3 tập (lệch < 2s) · nối {len(files)} tập: {total_in / 60:.1f} → {dj / 60:.1f} phút · "
+          "nhãn 'Tập N' + chương theo tập")
+
+
 def check_candidates_style(vid: Path, s: Settings):
     """Nhiều phương án + AI chấm chọn bản hay nhất; góc nhìn người kể; học phong cách video mẫu."""
     from recap import style_ref, transcribe as tr_mod
@@ -351,6 +422,7 @@ def main():
     check_overlays(vid)
     check_render_sync(vid, s)
     check_season(s)
+    check_season_auto(s)
     check_candidates_style(vid, s)
     check_hardsub(s)
     check_reframe(s)

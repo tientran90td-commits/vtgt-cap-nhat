@@ -17,10 +17,10 @@ VIDEO_EXT = (".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".m4v", ".
 
 class DropArea(QFrame):
     dropped = Signal(str)
-    season = Signal()
+    season = Signal(list)  # nhiều tập (danh sách file) -> hộp gộp nhiều tập
 
     def season_request(self):
-        self.season.emit()
+        self.season.emit([])
 
     def __init__(self):
         super().__init__()
@@ -31,11 +31,12 @@ class DropArea(QFrame):
         t = QLabel("🎬  Kéo & thả file phim vào đây")
         t.setAlignment(Qt.AlignCenter)
         t.setStyleSheet("font-size:14pt; font-weight:600;")
-        s = muted("MP4, MKV, AVI, MOV, WEBM... phim dài 1-3 tiếng đều được")
+        s = muted("MP4, MKV, AVI, MOV, WEBM... phim dài 1-3 tiếng đều được · kéo NHIỀU tập hoặc cả THƯ MỤC → gộp thành 1 video")
         s.setAlignment(Qt.AlignCenter)
         b = hrow(button("📂 Chọn 1 phim", self.browse, "primary"),
-                 button("📚 Gộp nhiều tập (recap cả season)", self.season_request,
-                        tip="Chọn nhiều tập phim bộ/anime -> làm 1 video recap chung"), stretch_last=False)
+                 button("📚 Nhiều tập → 1 video", self.season_request,
+                        tip="Phim bộ / anime nhiều tập: làm 1 video recap cả bộ, hoặc nối thành 1 video dài bỏ OP/ED"),
+                 stretch_last=False)
         lay.addStretch(1)
         lay.addWidget(t)
         lay.addWidget(s)
@@ -61,11 +62,18 @@ class DropArea(QFrame):
     def dropEvent(self, e):
         self.setProperty("hover", False)
         self.style().polish(self)
-        for u in e.mimeData().urls():
-            p = u.toLocalFile()
-            if p:
-                self.dropped.emit(p)
-                break
+        paths = [u.toLocalFile() for u in e.mimeData().urls() if u.toLocalFile()]
+        videos = []
+        for p in paths:
+            pp = Path(p)
+            if pp.is_dir():  # thả cả thư mục -> lấy mọi tập phim bên trong
+                videos += [str(x) for x in pp.iterdir() if x.suffix.lower() in VIDEO_EXT]
+            elif pp.suffix.lower() in VIDEO_EXT or len(paths) == 1:
+                videos.append(p)
+        if len(videos) > 1 or any(Path(p).is_dir() for p in paths):
+            self.season.emit(videos)
+        elif videos:
+            self.dropped.emit(videos[0])
 
 
 class SourcePage(Page):
@@ -151,7 +159,9 @@ class SourcePage(Page):
         ql.addWidget(self.lb_quick, 0, 0)
         self.btn_auto = button("⚡  TỰ ĐỘNG LÀM TẤT CẢ  →  XUẤT VIDEO", self.app.run_all, "big")
         ql.addWidget(self.btn_auto, 0, 1, Qt.AlignRight)
-        ql.addWidget(button("Đi từng bước: Kịch bản AI →", lambda: self.app.goto(1)), 1, 1, Qt.AlignRight)
+        ql.addWidget(hrow(button("📚 Nhiều tập → 1 video", self.open_season_dialog),
+                          button("Đi từng bước: Kịch bản AI →", lambda: self.app.goto(1)), stretch_last=False),
+                     1, 1, Qt.AlignRight)
         ql.setColumnStretch(0, 1)
         self.root.addWidget(quick)
 
@@ -262,8 +272,10 @@ class SourcePage(Page):
                              "Thiết lập & xuất video › Làm sạch hình phim gốc")
         self.lb_guard.setText(" · ".join(parts))
 
-    def open_season_dialog(self):
+    def open_season_dialog(self, files=None):
         dlg = SeasonDialog(self.app, self)
+        if files:
+            dlg._add(files)
         dlg.exec()
 
     def set_project(self, proj):
@@ -303,42 +315,64 @@ class SourcePage(Page):
 
 
 class SeasonDialog(QDialog):
-    """Chọn nhiều tập -> gộp thành 1 nguồn -> làm 1 video recap cả season."""
+    """Nhiều tập -> 1 video: recap tóm tắt cả bộ (AI kể lại), hoặc nối thành 1 video dài bỏ OP/ED."""
 
     def __init__(self, app, parent=None):
         super().__init__(parent)
-        from PySide6.QtWidgets import QListWidget
+        from PySide6.QtWidgets import QButtonGroup, QListWidget, QRadioButton
 
-        self.app = app
-        self.setWindowTitle("📚 Recap cả season - gộp nhiều tập")
-        self.resize(720, 560)
-        lay = QVBoxLayout(self)
-        lay.addWidget(muted("Thêm các tập phim (app tự sắp xếp theo số tập trong tên file). App gộp thành 1 nguồn, giữ mốc "
-                            "từng tập, rồi AI kể lại cả season theo thứ tự tập. Gộp nhanh không mã hóa lại nếu các tập "
-                            "cùng định dạng (cần ổ cứng trống bằng tổng dung lượng các tập)."))
-        self.list = QListWidget()
-        self.list.setSelectionMode(QListWidget.ExtendedSelection)
-        lay.addWidget(self.list, 1)
-        lay.addWidget(hrow(button("➕ Thêm tập", self.add_files, "primary"), button("📁 Thêm cả thư mục", self.add_dir),
-                           button("➖ Bỏ tập đã chọn", self.remove), "stretch"))
         from .widgets import spin
 
+        self.app = app
+        self.setWindowTitle("📚 Nhiều tập → 1 video")
+        self.resize(780, 680)
+        lay = QVBoxLayout(self)
+        lay.addWidget(muted("Thêm các tập (hoặc kéo thả nhiều file / cả thư mục vào khung chọn phim). App tự sắp theo số "
+                            "tập trong tên file và tự dò nhạc mở đầu (OP) / kết thúc (ED) lặp lại ở mỗi tập để bỏ đi."))
+        self.list = QListWidget()
+        self.list.setSelectionMode(QListWidget.ExtendedSelection)
+        self.list.setAcceptDrops(False)
+        lay.addWidget(self.list, 1)
+        self.lb_total = muted("")
+        lay.addWidget(hrow(button("➕ Thêm tập", self.add_files, "primary"), button("📁 Thêm cả thư mục", self.add_dir),
+                           button("➖ Bỏ tập đã chọn", self.remove), "stretch", self.lb_total))
+        # kết quả muốn có
+        self.r_recap = QRadioButton("📚 1 video RECAP tóm tắt cả bộ (AI xem hết các tập rồi kể lại theo thứ tự)")
+        self.r_join = QRadioButton("🔗 Chỉ NỐI các tập thành 1 video dài (bỏ OP/ED, không tóm tắt)")
+        grp = QButtonGroup(self)
+        grp.addButton(self.r_recap)
+        grp.addButton(self.r_join)
+        self.r_recap.setChecked(True)
+        lay.addWidget(self.r_recap)
+        lay.addWidget(self.r_join)
+        f = QFormLayout()
+        self.auto = QCheckBox("Tự dò OP/ED bằng âm thanh (khuyên dùng - đúng cả khi tập có cảnh mở màn trước OP)")
+        self.auto.setChecked(True)
         self.op = spin(0, 300, 5, " giây")
         self.op.setValue(90)
         self.ed = spin(0, 300, 5, " giây")
         self.ed.setValue(90)
-        self.mins = spin(1, 120, 1, " phút")
+        f.addRow(self.auto)
+        f.addRow("Không dò được thì bỏ", hrow(QLabel("đầu"), self.op, QLabel("cuối"), self.ed, "stretch"))
+        self.mins = spin(1, 180, 1, " phút")
         self.mins.setValue(15)
-        f = QFormLayout()
-        f.addRow("Bỏ đầu mỗi tập (OP/intro)", self.op)
-        f.addRow("Bỏ cuối mỗi tập (ED/credit)", self.ed)
-        f.addRow("Độ dài video recap", self.mins)
+        self.go_all = QCheckBox("Gộp xong tự làm luôn: nhận dạng thoại → AI viết kịch bản → giọng → xuất video")
+        self.go_all.setChecked(True)
+        self.row_recap = hrow(self.mins, self.go_all, "stretch")
+        f.addRow("Độ dài video recap", self.row_recap)
+        self.exact = QCheckBox("Cắt chính xác từng giây (mã hóa lại, lâu hơn) - không tick: nối nhanh không mã hóa")
+        f.addRow("Nối tập", self.exact)
         w = QWidget()
         w.setLayout(f)
         lay.addWidget(w)
-        lay.addWidget(muted("Anime thường có OP ~90 giây và ED ~90 giây. Đặt 0 nếu phim không có. Gợi ý độ dài: "
-                            "khoảng 1-2 phút cho mỗi tập."))
-        lay.addWidget(hrow("stretch", button("📚 Gộp && mở", self.build, "big"), button("Hủy", self.reject)))
+        self.r_recap.toggled.connect(self._mode)
+        self._mode()
+        lay.addWidget(hrow("stretch", button("▶ Bắt đầu", self.build, "big"), button("Hủy", self.reject)))
+
+    def _mode(self, *_):
+        recap = self.r_recap.isChecked()
+        self.row_recap.setEnabled(recap)
+        self.exact.setEnabled(not recap)
 
     def _paths(self) -> list[str]:
         return [self.list.item(i).data(Qt.UserRole) for i in range(self.list.count())]
@@ -355,7 +389,9 @@ class SeasonDialog(QDialog):
             it.setData(Qt.UserRole, p)
             it.setToolTip(p)
             self.list.addItem(it)
-        self.mins.setValue(max(self.mins.value(), min(120, int(round(len(allp) * 1.5)))))
+        self.mins.setValue(max(self.mins.value(), min(180, int(round(len(allp) * 1.5)))))
+        gb = sum(Path(p).stat().st_size for p in allp if Path(p).exists()) / 1e9
+        self.lb_total.setText(f"{len(allp)} tập · {gb:.1f} GB")
 
     def add_files(self):
         fs, _ = QFileDialog.getOpenFileNames(self, "Chọn các tập", "",
@@ -375,16 +411,38 @@ class SeasonDialog(QDialog):
     def build(self):
         files = self._paths()
         if len(files) < 2:
-            QMessageBox.information(self, "Recap season", "Hãy thêm ít nhất 2 tập.")
+            QMessageBox.information(self, "Nhiều tập → 1 video", "Hãy thêm ít nhất 2 tập.")
             return
-        from recap.season import build_season
+        from recap import season
 
-        out_dir = self.app.settings.workspace() / "seasons"
-        op, ed, mins = self.op.value(), self.ed.value(), self.mins.value()
+        op, ed, mins, auto = self.op.value(), self.ed.value(), self.mins.value(), self.auto.isChecked()
+        s = self.app.settings
+        if self.r_join.isChecked():
+            from recap.editor import encoder_args
+            from recap.pipeline import safe_name
+
+            out = s.output_dir() / f"{safe_name(Path(sorted(files, key=season.natural_key)[0]).stem)}_full_{len(files)}tap.mp4"
+            enc = encoder_args(s.get("render", "encoder", "auto"), int(s.get("render", "quality", 21)))
+
+            def done_join(res):
+                self.accept()
+                from .widgets import reveal
+                reveal(res["video"])
+                QMessageBox.information(self.parent(), "Đã nối xong",
+                                        f"Đã nối {len(files)} tập thành 1 video ({res['duration'] / 60:.0f} phút):\n"
+                                        f"{res['video']}")
+            self.app.run_task(season.join_episodes, files, out, op, ed, auto_detect=auto, exact=self.exact.isChecked(),
+                              encoder=enc, on_done=done_join, title="Nối các tập")
+            return
+        out_dir = s.workspace() / "seasons"
+        go_all = self.go_all.isChecked()
 
         def done(meta):
-            self.app.settings.set("script", "target_minutes", float(mins))
-            self.app.settings.save()
+            s.set("script", "target_minutes", float(mins))
+            s.save()
             self.app.open_video(meta["video"])
             self.accept()
-        self.app.run_task(build_season, files, out_dir, op, ed, on_done=done, title="Gộp các tập")
+            if go_all:
+                self.app.run_all()
+        self.app.run_task(season.build_season, files, out_dir, op, ed, auto_detect=auto, on_done=done,
+                          title="Gộp các tập")
