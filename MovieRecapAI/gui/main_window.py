@@ -92,12 +92,22 @@ class MainWindow(QMainWindow):
         self.logbox.setObjectName("log")
         self.logbox.setReadOnly(True)
         self.logbox.setMaximumBlockCount(5000)
+        from .steps import StepTracker
+
+        self.steps = StepTracker(self)
+        bottom = QWidget()
+        bl0 = QVBoxLayout(bottom)
+        bl0.setContentsMargins(0, 0, 0, 0)
+        bl0.setSpacing(4)
+        bl0.addWidget(self.steps)
+        self.logbox.setMinimumHeight(80)
+        bl0.addWidget(self.logbox, 1)
         split = QSplitter(Qt.Vertical)
         split.addWidget(self.stack)
-        split.addWidget(self.logbox)
+        split.addWidget(bottom)
         split.setStretchFactor(0, 5)
         split.setStretchFactor(1, 1)
-        split.setSizes([700, 130])
+        split.setSizes([600, 230])
         right.addWidget(split, 1)
 
         bar = QFrame()
@@ -404,6 +414,7 @@ class MainWindow(QMainWindow):
         def ok(res):
             finish()
             if not quiet:
+                self.steps.finish()
                 self.status.setText(f"✅ {title} - xong ({time.time() - self._t0:.0f}s)")
                 self.prog.setValue(1000)
             if on_done:
@@ -411,6 +422,8 @@ class MainWindow(QMainWindow):
 
         def bad(msg, tb):
             finish()
+            if not quiet:
+                self.steps.fail_running(msg)
             if tb:
                 self.log(tb, "debug")
             self.log(f"❌ {title}: {msg}", "error")
@@ -443,6 +456,11 @@ class MainWindow(QMainWindow):
             self.status.setText("⏹ Đang hủy...")
 
     def log(self, msg, level="info"):
+        if level == "step":
+            text = self.steps.event_msg(str(msg))
+            if not text:
+                return
+            msg, level = text, ("error" if text.startswith("❌") else "info")
         if level == "debug":
             if not self.settings.get("ui", "debug", False):
                 return

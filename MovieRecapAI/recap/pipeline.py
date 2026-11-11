@@ -12,8 +12,32 @@ from .config import Settings
 from .ffmpeg_utils import Cancelled, MediaInfo, probe, set_ffmpeg_path
 
 
+# ---- Các bước của quá trình làm video (giao diện hiện thành thanh tiến trình từng bước)
+STEP_TAG = "§step§"
+STEPS = {"identify": "🔍 Nhận diện phim", "transcribe": "🎧 Nhận dạng lời thoại", "scenes": "🎞️ Dò chuyển cảnh",
+         "overlays": "🛡️ Lọc quảng cáo / logo / phụ đề cứng", "visual": "👁️ AI xem cảnh",
+         "script": "✍️ AI viết kịch bản", "voice": "🎙️ Lồng tiếng", "render": "🎬 Dựng video",
+         "publish": "📣 Thumbnail & tiêu đề"}
+
+
+def step(log, sid: str, state: str, note: str = "") -> None:
+    """Báo trạng thái 1 bước: start | done | skip | fail (giao diện vẽ thành thanh các bước)."""
+    log(f"{STEP_TAG}{sid}§{state}§{note}", level="step")
+
+
+def step_text(msg: str) -> str:
+    """Chuyển tin báo bước thành câu dễ đọc (cho dòng lệnh / nhật ký)."""
+    try:
+        sid, state, note = msg[len(STEP_TAG):].split("§", 2)
+    except ValueError:
+        return msg
+    name = STEPS.get(sid, sid)
+    icon = {"start": "▶", "done": "✅", "skip": "⏭", "fail": "❌"}.get(state, "•")
+    return f"{icon} {name}" + (f" - {note}" if note else "")
+
+
 def _noop_log(msg, level="info"):
-    print(msg)
+    print(step_text(msg) if level == "step" else msg)
 
 
 def _noop_progress(p, msg=""):
@@ -287,12 +311,14 @@ class Project:
             raise RuntimeError("Chưa có kịch bản để dựng.")
         has_narr = any((s.get("narration") or "").strip() for s in self.script["segments"])
         if has_narr:
-            log("① Tạo giọng đọc...")
+            step(log, "voice", "start")
             voices = self.run_voices(log, lambda p, m="": progress(p * 0.4, m), cancel)
+            step(log, "voice", "done", f"{sum(1 for v in voices if v)} đoạn")
         else:
             voices = [None] * len(self.script["segments"])
+            step(log, "voice", "skip", "giữ thoại gốc")
         out_path = Path(out_path) if out_path else self.default_output()
-        log("② Dựng video...")
+        step(log, "render", "start")
         opts = self.settings.section("render")
         opts["_target_seconds"] = float(self.settings.get("script", "target_minutes", 5) or 5) * 60
         if opts.get("hardsub_mode") == "vsr":
@@ -306,17 +332,23 @@ class Project:
                             log, lambda p, m="": progress((0.4 if has_narr else 0) + p * (0.6 if has_narr else 1), m),
                             cancel, blocked=self.blocked(), watermark=(self.overlays or {}).get("watermark"),
                             hardsub=(self.overlays or {}).get("hardsub"), episodes=self.episodes)
+        step(log, "render", "done", Path(res).name)
         txt = out_path.with_suffix(".txt")
         txt.write_text(script_writer.script_to_text(self.script), encoding="utf-8")
+        if not (opts.get("publish_thumbs", True) or opts.get("publish_meta", True)):
+            step(log, "publish", "skip", "tắt")
         if opts.get("publish_thumbs", True) or opts.get("publish_meta", True):
             progress(0.995, "Tạo thumbnail & tiêu đề")
+            step(log, "publish", "start")
             try:
                 self.run_publish(res, log, thumbs=opts.get("publish_thumbs", True),
                                  meta=opts.get("publish_meta", True))
+                step(log, "publish", "done")
             except Cancelled:
                 raise
             except Exception as e:  # noqa: BLE001
                 log(f"Chưa tạo được thumbnail/tiêu đề ({e}) - video vẫn đã xuất xong.", level="warn")
+                step(log, "publish", "skip", "lỗi, bỏ qua")
         if opts.get("only_video", True):
             from . import publish
 
@@ -338,17 +370,23 @@ class Project:
         sc = self.settings.section("script")
         ai = sc.get("provider") != "none"
         web = sc.get("provider") == "web"  # bản web: bớt số lần copy-dán (bỏ tự nhận diện & AI xem cảnh)
+        step(log, "plan", "start", ",".join(STEPS))
         if ai and not web and sc.get("identify", True) and not self.film:
-            log("Bước 1/6: Nhận diện phim")
+            step(log, "identify", "start")
             try:
                 self.run_identify(log, lambda p, m="": progress(p * 0.04, m), cancel)
+                step(log, "identify", "done", (self.film or {}).get("title") or "")
             except Cancelled:
                 raise
             except Exception as e:  # noqa: BLE001
                 log(f"Không nhận diện được phim ({e}) - tiếp tục.", level="warn")
+                step(log, "identify", "skip", "lỗi, bỏ qua")
+        else:
+            step(log, "identify", "skip", "đã có" if self.film else "tắt")
         if not self.transcript:
-            log("Bước 2/6: Nhận dạng lời thoại")
+            step(log, "transcribe", "start")
             self.run_transcribe(log, lambda p, m="": progress(0.04 + p * 0.32, m), cancel, subtitle_file)
+            step(log, "transcribe", "done", f"{len(self.transcript)} câu")
             # Nhận diện lại bằng lời thoại nếu lần đầu chưa chắc chắn
             if ai and not web and sc.get("identify", True) and float((self.film or {}).get("confidence") or 0) < 0.6:
                 try:
@@ -357,25 +395,37 @@ class Project:
                     raise
                 except Exception as e:  # noqa: BLE001
                     log(f"Nhận diện lại lỗi ({e}).", level="warn")
+        else:
+            step(log, "transcribe", "skip", f"đã có {len(self.transcript)} câu")
         if self.settings.get("transcribe", "use_scenes", True) and self.scenes is None:
-            log("Bước 3/6: Dò chuyển cảnh")
+            step(log, "scenes", "start")
             self.run_scenes(log, lambda p, m="": progress(0.38 + p * 0.1, m), cancel)
+            step(log, "scenes", "done", f"{len(self.scenes or [])} cảnh")
+        else:
+            step(log, "scenes", "skip", "đã có" if self.scenes is not None else "tắt")
         ro = self.settings.section("render")
         if (ro.get("avoid_overlays", True) or ro.get("delogo", True) or ro.get("hardsub_mode", "blur") != "none") and \
                 (self.overlays is None or int(self.overlays.get("version", 1)) < 2):
-            log("Lọc quảng cáo chèn & logo của nguồn")
+            step(log, "overlays", "start")
             self.run_overlays(log, lambda p, m="": progress(0.47 + p * 0.03, m), cancel)
+            step(log, "overlays", "done")
+        else:
+            step(log, "overlays", "skip", "đã có" if self.overlays is not None else "tắt")
         if ai and not web and sc.get("visual") and not self.visual:
-            log("Bước 4/6: AI xem hình ảnh các cảnh")
+            step(log, "visual", "start")
             try:
                 self.run_visual(log, lambda p, m="": progress(0.48 + p * 0.07, m), cancel)
+                step(log, "visual", "done")
             except Cancelled:
                 raise
             except Exception as e:  # noqa: BLE001
                 log(f"AI xem cảnh lỗi ({e}) - bỏ qua.", level="warn")
-        log("Bước 5/6: AI viết kịch bản")
+                step(log, "visual", "skip", "lỗi, bỏ qua")
+        else:
+            step(log, "visual", "skip", "đã có" if self.visual else "tắt")
+        step(log, "script", "start")
         self.run_script(log, lambda p, m="": progress(0.55 + p * 0.07, m), cancel)
-        log("Bước 6/6: Lồng tiếng & dựng video")
+        step(log, "script", "done", f"{len((self.script or {}).get('segments', []))} đoạn")
         return self.run_render(out_path, log, lambda p, m="": progress(0.62 + p * 0.38, m), cancel)
 
 

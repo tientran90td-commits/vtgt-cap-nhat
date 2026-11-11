@@ -59,6 +59,14 @@ QSlider::sub-page:horizontal {{ background: {ACCENT}; border-radius: 3px; }}
 QSlider::handle:horizontal {{ background: white; width: 16px; margin: -6px 0; border-radius: 8px; }}
 QCheckBox::indicator {{ width: 18px; height: 18px; border-radius: 5px; border: 1px solid #3A4058; background: #0F121A; }}
 QCheckBox::indicator:checked {{ background: {ACCENT}; border: 1px solid {ACCENT}; }}
+QFrame#steps {{ background: #121621; border: 1px solid #262C3D; border-radius: 10px; }}
+QLabel#stepsTitle {{ font-weight: 700; color: #C9BEFF; }}
+QLabel#stepChip {{ background: #181C28; border: 1px solid #2A3043; border-radius: 8px; padding: 4px 6px; color: #8C93A8;
+                   font-size: 9pt; }}
+QLabel#stepChip[state="start"] {{ background: #2A2160; border: 1px solid {ACCENT}; color: #FFFFFF; font-weight: 600; }}
+QLabel#stepChip[state="done"] {{ background: #12302A; border: 1px solid #1E7A63; color: #9BF0D6; }}
+QLabel#stepChip[state="skip"] {{ color: #5A6075; }}
+QLabel#stepChip[state="fail"] {{ background: #3A1F29; border: 1px solid #A0405A; color: #FF9AAE; }}
 QRadioButton {{ spacing: 8px; padding: 3px 0; }}
 QRadioButton::indicator {{ width: 16px; height: 16px; border-radius: 9px; border: 2px solid #4A5170; background: #0F121A; }}
 QRadioButton::indicator:checked {{ background: {ACCENT}; border: 2px solid #C9BEFF; }}

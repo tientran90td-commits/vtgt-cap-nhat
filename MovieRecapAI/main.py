@@ -130,7 +130,11 @@ def run_cli(argv: list[str]) -> int:
 
     def prog(x, m=""):
         print(f"\r[{x * 100:5.1f}%] {m[:70]:70s}", end="", flush=True)
-    out = p.run_all(progress=prog, subtitle_file=sub, out_path=a.output)
+    from recap.pipeline import step_text
+
+    def log(m, level="info"):
+        print("\n" + (step_text(m) if level == "step" else str(m)), flush=True)
+    out = p.run_all(log=log, progress=prog, subtitle_file=sub, out_path=a.output)
     print(f"\nXong: {out}")
     return 0
 
