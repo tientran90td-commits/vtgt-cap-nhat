@@ -11,8 +11,9 @@ from .media import Cancelled, MediaInfo, duration, encoder_args, run
 
 ASPECTS = {"16:9": "Ngang 16:9 (YouTube)", "9:16": "Dọc 9:16 (TikTok, Reels, Shorts)", "1:1": "Vuông 1:1",
            "source": "Giữ như phim gốc"}
-FILLS = {"blur": "Nền mờ lấp chỗ trống", "crop": "Cắt cho đầy khung"}
-COVERS = {"none": "Không che", "blur": "Làm mờ phụ đề gốc ở dưới", "zoom": "Phóng to để đẩy phụ đề gốc ra ngoài",
+FILLS = {"face": "Cắt đầy khung, bám theo nhân vật", "blur": "Nền mờ lấp chỗ trống", "crop": "Cắt giữa cho đầy khung"}
+COVERS = {"auto": "⚡ Tự dò phụ đề gốc (Vietsub) & làm mờ", "none": "Không che",
+          "blur": "Làm mờ phụ đề gốc ở dưới", "zoom": "Phóng to để đẩy phụ đề gốc ra ngoài",
           "bar": "Phủ dải đen lên phụ đề gốc"}
 POSITIONS = {"bottom": "Dưới", "middle": "Giữa", "top": "Trên"}
 
@@ -91,22 +92,40 @@ def write_srt(path: Path, items: list[tuple[float, float, str]]) -> None:
 
 
 # ------------------------------------------------------------------ bộ lọc hình
-def video_filter(W: int, H: int, fill: str, cover: str, cover_pct: float, fps: int, src_w: int, src_h: int) -> str:
-    """Đồ thị lọc từ [0:v] -> [vb] (đã che phụ đề gốc + đúng khung)."""
-    p = max(0.03, min(0.4, cover_pct / 100))
+def video_filter(W: int, H: int, fill: str, cover: str, cover_pct: float, fps: int, src_w: int, src_h: int,
+                 band: tuple | None = None, center: tuple = (0.5, 0.5), dur: float = 0.0) -> str:
+    """Đồ thị lọc từ [0:v] -> [vb] (đã che phụ đề gốc + đúng khung).
+
+    band: dải phụ đề gốc (trên, dưới) theo tỉ lệ chiều cao (tự dò); không có thì dùng `cover_pct` % dưới cùng.
+    center: vị trí nhân vật (đầu đoạn, cuối đoạn) cho kiểu lấp khung 'face'."""
+    if cover == "auto":
+        cover = "blur" if band else "none"
+    if not band:
+        p = max(0.03, min(0.4, cover_pct / 100))
+        band = (1 - p, 1.0)
+    y0, y1 = float(band[0]), float(band[1])
     g, cur = "", "[0:v]"
     if cover == "zoom":
-        keep = 1 - p
-        g += f"{cur}crop=iw*{keep:.4f}:ih*{keep:.4f}:iw*{p / 2:.4f}:0[cz];"
+        if y0 >= 0.5:   # phụ đề ở dưới: giữ phần trên
+            keep, top = y0, 0.0
+        else:           # phụ đề ở trên: giữ phần dưới
+            keep, top = 1 - y1, y1
+        g += f"{cur}crop=iw*{keep:.4f}:ih*{keep:.4f}:iw*{(1 - keep) / 2:.4f}:ih*{top:.4f}[cz];"
         cur = "[cz]"
     elif cover == "blur":
-        g += (f"{cur}split=2[c0][c1];[c1]crop=iw:ih*{p:.4f}:0:ih*{1 - p:.4f},gblur=sigma=22:steps=2,"
-              f"eq=brightness=-0.1[cb];[c0][cb]overlay=0:H*{1 - p:.4f}[cv];")
+        g += (f"{cur}split=2[c0][c1];[c1]crop=iw:ih*{y1 - y0:.4f}:0:ih*{y0:.4f},gblur=sigma=22:steps=2,"
+              f"eq=brightness=-0.1[cb];[c0][cb]overlay=0:H*{y0:.4f}[cv];")
         cur = "[cv]"
     elif cover == "bar":
-        g += f"{cur}drawbox=x=0:y=ih*{1 - p:.4f}:w=iw:h=ih*{p:.4f}:color=black@0.9:t=fill[cv];"
+        g += f"{cur}drawbox=x=0:y=ih*{y0:.4f}:w=iw:h=ih*{y1 - y0:.4f}:color=black@0.9:t=fill[cv];"
         cur = "[cv]"
-    if fill == "crop":
+    wide_src = src_w and src_h and src_w / src_h > W / H + 0.02
+    if fill == "face" and wide_src:
+        a, b = (float(center[0]), float(center[1])) if center else (0.5, 0.5)
+        cx = f"{a:.3f}" if abs(b - a) < 1e-3 or dur <= 0 else f"({a:.3f}+({b - a:.3f})*min(1\\,t/{dur:.2f}))"
+        g += (f"{cur}crop=w=trunc(ih*{W}/{H}/2)*2:h=ih:x='max(0\\,min(iw-ow\\,{cx}*iw-ow/2))':y=0,"
+              f"scale={W}:{H}[fit];")
+    elif fill in ("crop", "face"):
         g += f"{cur}scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H}[fit];"
     else:
         bw, bh = even(W / 4), even(H / 4)
@@ -119,26 +138,40 @@ def video_filter(W: int, H: int, fill: str, cover: str, cover_pct: float, fps: i
 
 # ------------------------------------------------------------------ dựng
 def render(segments: list[dict], voices: list, video: str, info: MediaInfo, opts: dict, out: Path, work: Path,
-           log, progress, cancel) -> Path:
-    """segments[i] + voices[i] (file WAV hoặc None khi giữ tiếng gốc) -> video hoàn chỉnh tại `out`."""
+           log, progress, cancel, band: tuple | None = None) -> Path:
+    """segments[i] + voices[i] (file WAV hoặc None khi giữ tiếng gốc) -> video hoàn chỉnh tại `out`.
+    band: dải phụ đề gốc đã dò (cho kiểu che 'auto')."""
     W, H = output_size(info, opts.get("aspect", "16:9"), int(opts.get("height", 1080)))
     fps = 30
     enc = encoder_args(opts.get("encoder", "auto"), int(opts.get("quality", 21)))
     parts_dir = work / "parts"
     parts_dir.mkdir(parents=True, exist_ok=True)
     max_chars = 28 if W < H else 44
-    vf = video_filter(W, H, opts.get("fill", "blur"), opts.get("cover", "none"), float(opts.get("cover_height", 14)),
-                      fps, info.width, info.height)
-    jobs, parts, all_subs, t_global = [], [], [], 0.0
+    fill_mode = opts.get("fill", "blur")
+    spans = []
     for i, seg in enumerate(segments):
         voice = voices[i] if i < len(voices) else None
-        if voice:
-            dur = duration(voice) + 0.35
-        else:
-            dur = max(1.5, min(30.0, seg["end"] - seg["start"]))
+        dur = duration(voice) + 0.35 if voice else max(1.5, min(30.0, seg["end"] - seg["start"]))
         start = seg["start"]
         if start + dur > info.duration:
             start = max(0.0, info.duration - dur - 0.1)
+        spans.append((start, dur))
+    centers = [(0.5, 0.5)] * len(spans)
+    if fill_mode == "face" and info.width and info.height and info.width / info.height > W / H + 0.02:
+        from . import reframe
+
+        if reframe.available():
+            log("Bám theo nhân vật cho khung " + ("dọc" if W < H else "vuông") + "...")
+            centers = reframe.track(video, info, spans, work, cancel, log,
+                                    lambda p, m="": progress(0.15 * p, m))
+        else:
+            log("Chưa cài OpenCV - cắt giữa khung (pip install opencv-python-headless).", "warn")
+    jobs, parts, all_subs, t_global = [], [], [], 0.0
+    for i, seg in enumerate(segments):
+        voice = voices[i] if i < len(voices) else None
+        start, dur = spans[i]
+        vf = video_filter(W, H, fill_mode, opts.get("cover", "none"), float(opts.get("cover_height", 14)),
+                          fps, info.width, info.height, band=band, center=centers[i], dur=dur)
         subs = chunks(seg["narration"], dur - 0.2, max_chars) if (voice and opts.get("subtitles", True)) else []
         all_subs += [(a + t_global, b + t_global, t) for a, b, t in subs]
         t_global += dur
@@ -185,7 +218,7 @@ def render(segments: list[dict], voices: list, video: str, info: MediaInfo, opts
             raise Cancelled()
         run(job[1], cancel=cancel, cwd=str(parts_dir))
         done[0] += 1
-        progress(0.9 * done[0] / len(jobs), f"Dựng đoạn {done[0]}/{len(jobs)}")
+        progress(0.15 + 0.75 * done[0] / len(jobs), f"Dựng đoạn {done[0]}/{len(jobs)}")
     if jobs:
         with ThreadPoolExecutor(max_workers=workers) as ex:
             futs = [ex.submit(one, j) for j in jobs]

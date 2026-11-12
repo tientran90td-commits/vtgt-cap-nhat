@@ -19,6 +19,8 @@ from .config import Settings
 from .media import Cancelled
 
 PROVIDERS = {
+    "auto": {"name": "⚡ Tự chọn (online nếu có key, không thì AI trên máy)", "key": None, "default": "",
+             "models": [""], "max_chars": 24_000},
     "gemini": {"name": "Google Gemini (có gói miễn phí)", "key": "gemini", "default": "auto",
                "models": ["auto"], "max_chars": 600_000},
     "claude": {"name": "Anthropic Claude", "key": "claude", "default": "claude-opus-5-5",
@@ -32,7 +34,7 @@ PROVIDERS = {
                    "models": ["google/gemini-2.5-flash"], "base": "https://openrouter.ai/api/v1", "max_chars": 300_000},
     "deepseek": {"name": "DeepSeek", "key": "deepseek", "default": "deepseek-chat", "models": ["deepseek-chat"],
                  "base": "https://api.deepseek.com/v1", "max_chars": 150_000},
-    "ollama": {"name": "Ollama - AI chạy trên máy (offline, miễn phí)", "key": None, "default": "qwen2.5:7b",
+    "ollama": {"name": "Ollama - AI chạy trên máy (miễn phí)", "key": None, "default": "qwen2.5:7b",
                "models": ["qwen2.5:7b", "qwen2.5:3b", "gemma3:4b", "llama3.1:8b"], "max_chars": 24_000},
     "none": {"name": "Không dùng AI (tự cắt cảnh nổi bật)", "key": None, "default": "", "models": [""],
              "max_chars": 0},
@@ -186,6 +188,8 @@ def pick_openai(models: list[str]) -> str | None:
 
 
 def resolve_model(provider: str, settings: Settings, log=None) -> str:
+    if provider == "ollama":
+        return (settings.get("ai", "ollama_model") or PROVIDERS["ollama"]["default"]).strip()
     model = (settings.get("ai", "model") or "auto").strip() if settings.get("ai", "provider") == provider else "auto"
     if model and model != "auto" and model_fits(provider, model):
         return model
@@ -367,12 +371,24 @@ def ollama_pull(model: str, settings: Settings, log, progress, cancel) -> None:
     log(f"✅ Đã có model {model}.")
 
 
-def _ollama(model, system, user, settings, json_mode, max_tokens):
-    ok, models = ollama_status(settings)
+def prepare_ollama(settings: Settings, log=None, cancel=None) -> str:
+    """Bảo đảm Ollama đang chạy và có model: tự mở Ollama, tự tải model nếu có mạng. Trả về tên model."""
+    from . import hybrid
+
+    model = resolve_model("ollama", settings)
+    ok, models = hybrid.ensure_ollama(settings, log)
     if not ok:
-        raise AIError("Chưa mở Ollama (AI chạy trên máy). Cài Ollama từ ollama.com rồi mở lại app.")
-    if not any(m == model or m.split(":")[0] == model or m == model + ":latest" for m in models):
-        raise AIError(f"Chưa tải model AI '{model}'. Bấm '⬇ Tải model AI' trong Cài đặt.")
+        raise AIError("Chưa có Ollama (AI chạy trên máy): cài từ ollama.com (hoặc chạy install.bat) - "
+                      "hoặc nhập API key AI online trong ⚙️ Cài đặt.")
+    if not hybrid.ollama_has(models, model):
+        if settings.mode != "offline" and hybrid.net_ok(settings):
+            ollama_pull(model, settings, log or (lambda *_a, **_k: None), lambda *_a, **_k: None, cancel)
+        else:
+            raise AIError(f"Chưa tải model AI '{model}' về máy. Bấm '⬇ Tải model AI' trong ⚙️ Cài đặt (cần mạng 1 lần).")
+    return model
+
+
+def _ollama(model, system, user, settings, json_mode, max_tokens):
     n_ctx = int(min(32768, max(8192, (len(system) + len(user)) / 2.5 + max_tokens)))
     body = {"model": model, "stream": False, "options": {"num_ctx": n_ctx, "temperature": 0.7,
                                                          "num_predict": max_tokens},
@@ -400,29 +416,41 @@ def available(provider: str, settings: Settings) -> bool:
     return provider == "ollama" or bool(k and settings.key(k))
 
 
+def max_chars(settings: Settings) -> int:
+    from . import hybrid
+
+    chain = hybrid.ai_chain(settings)
+    return PROVIDERS[chain[0]]["max_chars"] if chain else 24_000
+
+
 def chat(settings: Settings, system: str, user: str, json_mode: bool = True, max_tokens: int = 16000,
          log=None, cancel=None, provider: str | None = None) -> str:
-    """Gửi 1 yêu cầu; lỗi tạm thời thì thử lại, treo/hết lượt thì tự chuyển sang AI khác đã có key."""
-    first = provider or settings.get("ai", "provider") or "ollama"
-    if settings.offline:  # chế độ offline: chỉ AI chạy trên máy
-        first = "ollama"
-    chain = [first]
-    if settings.get("ai", "fallback", True) and not settings.offline:
-        chain += [p for p in FALLBACK_ORDER if p != first and available(p, settings)]
+    """Gửi 1 yêu cầu theo chuỗi dự phòng (online <-> trên máy); lỗi tạm thời thì thử lại, treo / hết lượt / mất
+    mạng thì tự chuyển sang AI kế tiếp."""
+    from . import hybrid
+
+    if provider:
+        chain = [provider]
+    else:
+        chain = hybrid.ai_chain(settings, log)
+    if not chain:
+        raise AIError("Đang chọn 'Không dùng AI'.")
     last: Exception | None = None
     for pi, prov in enumerate(chain):
-        if prov == "none":
-            continue
         if PROVIDERS[prov]["key"] and not settings.key(PROVIDERS[prov]["key"]):
-            last = AIError(f"Chưa nhập API key cho {PROVIDERS[prov]['name']} (mục ⚙️ Cài đặt & API).")
+            last = AIError(f"Chưa nhập API key cho {PROVIDERS[prov]['name']} (mục ⚙️ Cài đặt).")
             continue
         name = PROVIDERS[prov]["name"]
         if pi and log:
             log(f"🔀 Chuyển sang {name}.", "warn")
         try:
-            model = resolve_model(prov, settings, log)
+            model = prepare_ollama(settings, log, cancel) if prov == "ollama" else resolve_model(prov, settings, log)
+        except Cancelled:
+            raise
         except Exception as e:  # noqa: BLE001
             last = e
+            if log and pi + 1 < len(chain):
+                log(f"{name}: {e}", "warn")
             continue
         for attempt in range(3):
             t0 = time.time()
@@ -447,6 +475,11 @@ def chat(settings: Settings, system: str, user: str, json_mode: bool = True, max
                     log(f"{e} - thử lại sau {e.delay:.0f}s...", "warn")
                 if cancel is not None and cancel.wait(e.delay):
                     raise Cancelled()
+            except requests.ConnectionError as e:  # mất mạng / dịch vụ không kết nối được -> sang AI kế tiếp ngay
+                last = e
+                if log and pi + 1 < len(chain):
+                    log(f"{name}: không kết nối được.", "warn")
+                break
             except requests.RequestException as e:
                 last = e
                 if attempt == 2:

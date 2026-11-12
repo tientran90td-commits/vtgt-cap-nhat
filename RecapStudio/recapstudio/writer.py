@@ -3,6 +3,7 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 
+from . import hybrid
 from .ai import PROVIDERS, chat, extract_json
 from .config import Settings
 from .media import Cancelled
@@ -130,11 +131,13 @@ def auto_highlights(transcript: list[dict], duration: float, minutes: float) -> 
 
 def write(transcript: list[dict], duration: float, settings: Settings, log, progress, cancel) -> dict:
     opts = settings.section("ai")
-    provider = "ollama" if (settings.offline and opts.get("provider") != "none") else opts.get("provider", "ollama")
-    if provider == "none":
+    chain = hybrid.ai_chain(settings, log)
+    if not chain:
         return auto_highlights(transcript, duration, float(opts.get("minutes", 5)))
     if not transcript:
         raise RuntimeError("Chưa có lời thoại của phim.")
+    provider = chain[0]
+    log("AI viết kịch bản: " + " → ".join(PROVIDERS[p]["name"].split(" (")[0].split(" - ")[0] for p in chain))
     text = to_prompt_text(transcript)
     max_chars = PROVIDERS[provider]["max_chars"]
     summarized = False

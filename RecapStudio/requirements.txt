@@ -8,7 +8,13 @@ faster-whisper>=1.1
 # Giọng đọc offline
 vieneu>=3.8
 piper-tts>=1.2
-# Giọng online miễn phí / AI online (chỉ dùng khi tắt chế độ offline)
+# Xử lý hình: dò phụ đề cứng, bám nhân vật (khung dọc), ảnh bìa
+numpy>=1.26
+opencv-python-headless>=4.8,<5
+Pillow>=10.1
+# Tải phim từ link (YouTube, TikTok, Facebook...)
+yt-dlp>=2025.1.1
+# Giọng online miễn phí / AI online (dùng khi có mạng, chế độ Tự động / Ưu tiên online)
 edge-tts>=7.0
 gTTS>=2.5
 anthropic>=2.8

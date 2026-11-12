@@ -1,11 +1,13 @@
-"""Cài đặt: chế độ chạy trên máy / dùng API, Ollama, khóa API, thư mục."""
+"""Cài đặt: chế độ chạy (tự động / trên máy / online), Ollama, khóa API, thư mục, cập nhật."""
 from __future__ import annotations
 
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import QCheckBox, QComboBox, QDialog, QFormLayout, QLineEdit, QMessageBox, QVBoxLayout
+from PySide6.QtWidgets import (QCheckBox, QComboBox, QDialog, QFormLayout, QLineEdit, QMessageBox, QScrollArea,
+                               QVBoxLayout, QWidget)
 
-from recapstudio import ai
+from recapstudio import VERSION, ai, hybrid, updater
+from recapstudio.config import MODES
 
 from .common import PathPicker, button, card, fill, label, row
 
@@ -24,16 +26,24 @@ class SettingsDialog(QDialog):
         self.win = win
         b = win.binder
         self.setWindowTitle("⚙️ Cài đặt")
-        self.resize(760, 760)
-        lay = QVBoxLayout(self)
+        self.resize(780, 820)
+        outer = QVBoxLayout(self)
+        inner = QWidget()
+        inner.setObjectName("root")
+        lay = QVBoxLayout(inner)
+        sc = QScrollArea()
+        sc.setWidgetResizable(True)
+        sc.setWidget(inner)
+        sc.viewport().setStyleSheet("background: transparent;")
+        outer.addWidget(sc, 1)
 
-        c, cl = card("🔒 Chế độ chạy")
-        self.offline = b.check(QCheckBox("Chỉ dùng trên máy (offline) - không cần API key, không cần mạng khi làm phim"),
-                               None, "offline")
-        cl.addWidget(self.offline)
-        cl.addWidget(label("Offline: lời thoại = phụ đề có sẵn hoặc Whisper trên máy (card đồ họa/CPU) · kịch bản = "
-                           "Ollama (AI chạy trên máy) · giọng = VieNeu / Piper / Windows. Lần đầu cần mạng để tải model "
-                           "(một lần). Bỏ tick để dùng thêm AI/giọng online bằng API key.", "muted"))
+        c, cl = card("⚡ Chế độ chạy")
+        self.mode = b.combo(fill(QComboBox(), MODES), None, "mode")
+        cl.addWidget(self.mode)
+        cl.addWidget(label("⚡ Tự động: mỗi bước tự chọn chạy trên máy hay qua mạng - cái nào có sẵn & nhanh thì dùng, "
+                           "lỗi / mất mạng thì tự chuyển cách kia (vd AI online hết lượt → AI trên máy; Ollama chưa mở → "
+                           "AI online).\n🔒 Chỉ trên máy: không dùng mạng (Whisper + Ollama + VieNeu).\n"
+                           "🌐 Ưu tiên online: dùng AI / giọng online trước, máy là dự phòng.", "muted"))
         lay.addWidget(c)
 
         c, cl = card("🧠 AI trên máy (Ollama)")
@@ -42,7 +52,7 @@ class SettingsDialog(QDialog):
         f.addRow("Địa chỉ Ollama", self.url)
         self.lb_status = label("", "muted")
         f.addRow("Trạng thái", row(self.lb_status, button("🔄 Kiểm tra", self.check_ollama)))
-        cur = win.settings.get("ai", "model") or "qwen2.5:7b"
+        cur = hybrid.ollama_model(win.settings)
         models = dict(ai.OLLAMA_MODELS)
         if cur not in models and ":" in cur:
             models[cur] = cur
@@ -57,7 +67,7 @@ class SettingsDialog(QDialog):
                                "muted")))
         lay.addWidget(c)
 
-        self.keys_card, kl = card("🔑 API key (chỉ khi tắt chế độ offline)")
+        self.keys_card, kl = card("🔑 API key AI / giọng online (không bắt buộc - có thì nhanh hơn)")
         f = QFormLayout()
         for k, name, url in KEYS:
             e = b.line(QLineEdit(), "keys", k)
@@ -77,40 +87,77 @@ class SettingsDialog(QDialog):
         self.ff.setText(win.settings.get("paths", "ffmpeg", ""))
         self.ff.changed.connect(lambda v: b.set("paths", "ffmpeg", v))
         f.addRow("Lưu video vào", self.out)
+        self.dl = PathPicker("dir", placeholder=str(win.settings.downloads_dir()))
+        self.dl.setText(win.settings.get("paths", "downloads", ""))
+        self.dl.changed.connect(lambda v: b.set("paths", "downloads", v))
+        f.addRow("Phim tải từ link", self.dl)
         f.addRow("FFmpeg", self.ff)
         f.addRow("Proxy mạng", b.line(QLineEdit(), "net", "proxy"))
         cl.addLayout(f)
         lay.addWidget(c)
+
+        c, cl = card(f"🔄 Cập nhật (đang dùng {VERSION})")
+        cl.addWidget(b.check(QCheckBox("Tự kiểm tra bản mới khi mở app"), "update", "auto_check"))
+        cl.addWidget(row(button("🔄 Kiểm tra & cập nhật ngay", self.update_now, "primary"),
+                         button("↩ Quay lại bản trước", self.rollback)))
+        lay.addWidget(c)
         lay.addStretch(1)
-        lay.addWidget(row("stretch", button("Xong", self.accept, "primary")))
-        self.offline.toggled.connect(self._mode)
+        outer.addWidget(row("stretch", button("Xong", self.accept, "primary")))
+        self.mode.currentIndexChanged.connect(self._mode)
         self._mode()
         self.check_ollama()
 
     def _mode(self, *_):
-        self.keys_card.setEnabled(not self.offline.isChecked())
+        self.keys_card.setEnabled(self.mode.currentData() != "offline")
+
+    def update_now(self):
+        self.accept()
+        self.win.check_update(silent=False)
+
+    def rollback(self):
+        if QMessageBox.question(self, "Quay lại bản trước", "Khôi phục bản sao lưu trước lần cập nhật gần nhất?") \
+                != QMessageBox.Yes:
+            return
+        try:
+            v = updater.rollback(lambda m, level="info": None)
+        except updater.UpdateError as e:
+            QMessageBox.information(self, "Quay lại bản trước", str(e))
+            return
+        if QMessageBox.question(self, "Đã khôi phục", f"Đã quay lại bản {v}. Khởi động lại app ngay?") == \
+                QMessageBox.Yes:
+            self.win.restart()
 
     def check_ollama(self):
-        ok, models = ai.ollama_status(self.win.settings)
-        self.lb_status.setText(("● Đang chạy · model đã có: " + (", ".join(models) or "chưa có")) if ok else
-                               "○ Chưa mở Ollama (cài từ ollama.com rồi mở lại)")
+        from .common import Bg
+
+        self.lb_status.setText("⏳ Đang kiểm tra...")
+
+        def done(r):
+            ok, models = r
+            try:
+                self.lb_status.setText(("● Đang chạy · model đã có: " + (", ".join(models) or "chưa có")) if ok else
+                                       ("○ Đã cài nhưng chưa mở (app sẽ tự mở khi cần)" if hybrid.ollama_exe() else
+                                        "○ Chưa cài Ollama (bấm Tải Ollama, hoặc chạy install.bat)"))
+            except RuntimeError:  # hộp thoại đã đóng
+                pass
+        Bg(lambda: hybrid.ensure_ollama(self.win.settings, wait=8), done)
 
     def pull(self):
         model = self.model.currentData() or "qwen2.5:7b"
-        ok, _m = ai.ollama_status(self.win.settings)
+        ok, _m = hybrid.ensure_ollama(self.win.settings, wait=8)
         if not ok:
-            QMessageBox.warning(self, "Chưa có Ollama", "Hãy cài và mở Ollama trước (nút Tải Ollama).")
+            QMessageBox.warning(self, "Chưa có Ollama", "Hãy cài Ollama trước (nút Tải Ollama hoặc chạy install.bat).")
             return
-        self.win.binder.set("ai", "model", model)
+        self.win.binder.set("ai", "ollama_model", model)
 
         def job(log, progress, cancel):
             ai.ollama_pull(model, self.win.settings, log, progress, cancel)
             return model
-        self.win.run_task(job, "Tải model AI", on_done=lambda _m: (self.check_ollama(), self.win.refresh_ai()))
+        self.win.run_task(job, "Tải model AI", on_done=lambda _m: self.win.refresh_status(force=True))
 
     def accept(self):
         m = self.model.currentData()
-        if m and self.win.settings.get("ai", "provider") == "ollama":
-            self.win.binder.set("ai", "model", m)
+        if m:
+            self.win.binder.set("ai", "ollama_model", m)
         self.win.settings.save()
         super().accept()

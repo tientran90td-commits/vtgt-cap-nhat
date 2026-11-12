@@ -36,6 +36,33 @@ class Worker(QThread):
             self.failed.emit(str(e) or e.__class__.__name__, traceback.format_exc())
 
 
+class Bg(QObject):
+    """Việc nhỏ chạy nền không chặn giao diện (kiểm tra trạng thái, kiểm tra bản mới...).
+    Dùng luồng daemon nên đóng app lúc đang kiểm tra cũng không bị treo/lỗi."""
+    done = Signal(object)
+    failed = Signal(str)
+    _alive: set = set()
+
+    def __init__(self, fn, on_done=None, on_fail=None):
+        super().__init__()
+        if on_done:
+            self.done.connect(on_done)
+        if on_fail:
+            self.failed.connect(on_fail)
+        self.done.connect(lambda _r: Bg._alive.discard(self))
+        self.failed.connect(lambda _m: Bg._alive.discard(self))
+        Bg._alive.add(self)
+
+        def run():
+            try:
+                res = fn()
+            except Exception as e:  # noqa: BLE001
+                self.failed.emit(str(e) or e.__class__.__name__)
+                return
+            self.done.emit(res)
+        threading.Thread(target=run, daemon=True).start()
+
+
 class Binder(QObject):
     """Đồng bộ ô nhập <-> cài đặt; tự lưu sau 0.6 giây."""
     changed = Signal(str, str)

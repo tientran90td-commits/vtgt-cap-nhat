@@ -113,10 +113,16 @@ def probe(path: str | Path) -> MediaInfo:
 
 
 def run(args: list, cancel: threading.Event | None = None, total: float = 0.0, on_progress=None,
-        cwd: str | None = None) -> None:
-    """Chạy ffmpeg; báo tiến độ 0..1 theo thời lượng (nếu biết); bấm Hủy là dừng ngay."""
+        cwd: str | None = None, low_priority: bool = False) -> str:
+    """Chạy ffmpeg; báo tiến độ 0..1 theo thời lượng (nếu biết); bấm Hủy là dừng ngay. Trả về log của ffmpeg."""
     cmd = [ffmpeg_exe(), "-hide_banner", "-nostdin", "-y", *[str(a) for a in args]]
-    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, cwd=cwd, **no_window())
+    kw = no_window()
+    if low_priority:  # việc nền: nhường CPU cho các bước chính
+        if os.name == "nt":
+            kw["creationflags"] = kw.get("creationflags", 0) | 0x00004000  # BELOW_NORMAL_PRIORITY_CLASS
+        else:
+            kw["preexec_fn"] = lambda: os.nice(10)
+    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, cwd=cwd, **kw)
     tail: list[str] = []
     buf = b""
 
@@ -145,6 +151,33 @@ def run(args: list, cancel: threading.Event | None = None, total: float = 0.0, o
     if proc.returncode != 0:
         tail = buf.decode("utf-8", "replace").strip().splitlines()[-8:]
         raise MediaError("FFmpeg lỗi:\n" + "\n".join(tail))
+    return buf.decode("utf-8", "replace")
+
+
+def frames(video: str, start: float, length: float | None, width: int, height: int, fps: float | None = None,
+           pix: str = "gray", cancel=None, count: int | None = None) -> list:
+    """Đọc khung hình (numpy uint8) đã thu nhỏ về width x height. pix: gray | rgb24."""
+    import numpy as np
+
+    ch = 3 if pix == "rgb24" else 1
+    args = [ffmpeg_exe(), "-hide_banner", "-nostdin", "-loglevel", "error", "-ss", f"{max(0.0, start):.3f}"]
+    if length is not None:
+        args += ["-t", f"{length:.3f}"]
+    vf = (f"fps={fps}," if fps else "") + f"scale={width}:{height},format={pix}"
+    args += ["-i", str(video), "-an", "-sn", "-vf", vf]
+    if count:
+        args += ["-frames:v", str(count)]
+    args += ["-f", "rawvideo", "-"]
+    if cancel is not None and cancel.is_set():
+        raise Cancelled()
+    r = subprocess.run(args, capture_output=True, timeout=600, **no_window())
+    size = width * height * ch
+    data = r.stdout
+    out = []
+    for i in range(len(data) // size):
+        a = np.frombuffer(data, np.uint8, size, i * size)
+        out.append(a.reshape(height, width, ch) if ch == 3 else a.reshape(height, width))
+    return out
 
 
 def duration(path: str | Path) -> float:

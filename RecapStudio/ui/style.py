@@ -37,6 +37,12 @@ QLabel#chip[state="start"] {{ background: #2A2160; border-color: {ACCENT}; color
 QLabel#chip[state="done"] {{ background: #12302A; border-color: #1E7A63; color: #9BF0D6; }}
 QLabel#chip[state="skip"] {{ color: #5A6075; }}
 QLabel#chip[state="fail"] {{ background: #3A1F29; border-color: #A0405A; color: #FF9AAE; }}
+QPushButton#update {{ background: #12302A; border: 1px solid #1E7A63; color: #9BF0D6; font-weight: 700; }}
+QPushButton#preset {{ background: #1A1F30; border: 1px solid #343B57; border-radius: 9px; padding: 6px 10px; }}
+QPushButton#preset:hover {{ border-color: {ACCENT}; }}
+QLabel#status {{ background: #121623; border: 1px solid #262C3D; border-radius: 10px; padding: 4px 10px; color: #AEB4C8; }}
+QFrame#player {{ background: #000000; border: 1px solid #262C3D; border-radius: 10px; }}
+QLabel#thumb {{ background: #000000; border: 1px solid #262C3D; border-radius: 10px; }}
 QScrollArea {{ border: none; background: transparent; }}
 QScrollBar:vertical {{ background: transparent; width: 10px; }}
 QScrollBar::handle:vertical {{ background: #2F3650; border-radius: 5px; min-height: 30px; }}

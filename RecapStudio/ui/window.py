@@ -1,4 +1,6 @@
-"""Cửa sổ chính: 1 màn hình duy nhất - ① Phim · ② Thiết lập · ③ Kịch bản - và nút TẠO VIDEO."""
+"""Cửa sổ chính: 1 màn hình duy nhất - ① Phim · ② Thiết lập · ③ Kịch bản - và nút TẠO VIDEO.
+
+Mọi việc kiểm tra (mạng, Ollama, bản mới) chạy nền nên giao diện không bao giờ bị đơ."""
 from __future__ import annotations
 
 import os
@@ -13,16 +15,28 @@ from PySide6.QtWidgets import (QAbstractItemView, QCheckBox, QComboBox, QFrame, 
                                QLineEdit, QMainWindow, QMessageBox, QPlainTextEdit, QProgressBar, QScrollArea,
                                QSizePolicy, QTableWidget, QTableWidgetItem, QVBoxLayout, QWidget)
 
-from recapstudio import APP_NAME, VERSION, ai, render, transcript, voices, writer
-from recapstudio.config import Settings
+from recapstudio import APP_NAME, VERSION, ai, download, hybrid, render, transcript, updater, voices, writer
+from recapstudio.config import MODES, Settings
 from recapstudio.media import ENCODERS, MediaError
 from recapstudio.project import STEPS, Project
 from recapstudio.transcript import fmt
 
-from .common import Binder, PathPicker, Worker, button, card, fill, label, row, spin
+from .common import Bg, Binder, PathPicker, Worker, button, card, fill, label, row, spin
+
+try:
+    from PySide6.QtMultimedia import QAudioOutput, QMediaPlayer
+    from PySide6.QtMultimediaWidgets import QVideoWidget
+except ImportError:  # thiếu QtMultimedia -> mở bằng trình phát của máy
+    QMediaPlayer = None
 
 VIDEO_EXT = (".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".wmv", ".m4v", ".ts", ".mpg", ".mpeg")
 OFFLINE_VOICES = ("vieneu", "piper", "sapi")
+PRESETS = [  # (nút, gợi ý, thiết lập)
+    ("📱 TikTok 1′", "Dọc 9:16, 1 phút, bám nhân vật", {"video.aspect": "9:16", "video.fill": "face", "ai.minutes": 1.0}),
+    ("📱 Shorts 3′", "Dọc 9:16, 3 phút", {"video.aspect": "9:16", "video.fill": "face", "ai.minutes": 3.0}),
+    ("▶ YouTube 5′", "Ngang 16:9, 5 phút", {"video.aspect": "16:9", "video.fill": "blur", "ai.minutes": 5.0}),
+    ("🎞 YouTube 10′", "Ngang 16:9, 10 phút", {"video.aspect": "16:9", "video.fill": "blur", "ai.minutes": 10.0}),
+]
 
 
 class DropZone(QFrame):
@@ -90,9 +104,19 @@ class MainWindow(QMainWindow):
         main.setSpacing(12)
 
         # ---------------- đầu trang
-        self.badge = label("", "badge", wrap=False)
+        self.mode_box = fill(QComboBox(), MODES)
+        self.mode_box.setMinimumWidth(210)
+        self.mode_box.setSizePolicy(QSizePolicy.Fixed, QSizePolicy.Fixed)
+        self._select(self.mode_box, self.settings.mode)
+        self.mode_box.setToolTip("Tự động: mỗi bước tự chọn chạy trên máy hay qua mạng (cái nào có sẵn & nhanh),\n"
+                                 "lỗi thì tự chuyển cách kia.\nChỉ trên máy: không dùng mạng.\n"
+                                 "Ưu tiên online: dùng AI/giọng online trước, máy là dự phòng.")
+        self.mode_box.currentIndexChanged.connect(self._mode_changed)
+        self.status = label("⏳ Đang kiểm tra...", "status", wrap=False)
+        self.btn_update = button("🔄 Cập nhật", self.do_update, tip="Kiểm tra & cập nhật bản mới trực tiếp")
         main.addWidget(row(label(f"🎬 {APP_NAME}", "title", wrap=False), label(f"v{VERSION}", "muted", wrap=False),
-                           self.badge, "stretch", button("⚙️ Cài đặt", self.open_settings)))
+                           self.mode_box, self.status, "stretch", self.btn_update,
+                           button("⚙️ Cài đặt", self.open_settings)))
 
         body = QHBoxLayout()
         body.setSpacing(12)
@@ -101,14 +125,50 @@ class MainWindow(QMainWindow):
         body.addWidget(self._col_script(), 1)
         main.addLayout(body, 1)
         main.addWidget(self._bottom())
+        self._status: dict = {}
+        self._update_info: dict | None = None
         self.refresh_mode()
-        QTimer.singleShot(300, self.refresh_ai)
+        self.refresh_status()
+        self._timer = QTimer(self)
+        self._timer.timeout.connect(self.refresh_status)
+        self._timer.start(60_000)
+        if self.settings.get("update", "auto_check", True) and self.settings.mode != "offline":
+            QTimer.singleShot(2500, lambda: self.check_update(silent=True))
 
     # ================================================================ cột ① phim
     def _col_film(self) -> QWidget:
         c, lay = card("① Phim")
         c.setFixedWidth(340)
-        lay.addWidget(DropZone(self.open_video))
+        self.drop = DropZone(self.open_video)
+        lay.addWidget(self.drop)
+        self.link = QLineEdit()
+        self.link.setPlaceholderText("hoặc dán link YouTube / TikTok / Facebook...")
+        self.link.returnPressed.connect(self.do_download)
+        b_dl = button("⬇ Tải", self.do_download, tip="Tải phim từ link (yt-dlp) rồi mở luôn")
+        b_dl.setFixedWidth(64)
+        lay.addWidget(row(self.link, b_dl, stretch=False))
+        self.player = None
+        if QMediaPlayer is not None:
+            self.video_w = QVideoWidget()
+            self.video_w.setFixedHeight(172)
+            self.video_w.setStyleSheet("background:#000; border-radius:10px;")
+            self.player = QMediaPlayer(self)
+            self.audio = QAudioOutput(self)
+            self.audio.setVolume(0.6)
+            self.player.setAudioOutput(self.audio)
+            self.player.setVideoOutput(self.video_w)
+            self.btn_pp = button("▶", self.toggle_play, tip="Phát / dừng")
+            self.btn_pp.setFixedWidth(42)
+            self.lb_pos = label("", "muted", wrap=False)
+            self.player.positionChanged.connect(lambda ms: self.lb_pos.setText(fmt(ms / 1000)))
+            self.player.playbackStateChanged.connect(
+                lambda st: self.btn_pp.setText("⏸" if st == QMediaPlayer.PlayingState else "▶"))
+            self.video_w.hide()
+            lay.addWidget(self.video_w)
+            self.player_bar = row(self.btn_pp, self.lb_pos, "stretch",
+                                  button("⛶", self._open_current_media, tip="Mở bằng trình phát của máy"))
+            self.player_bar.hide()
+            lay.addWidget(self.player_bar)
         self.lb_film = label("Chưa chọn phim", "muted")
         lay.addWidget(self.lb_film)
         lay.addWidget(label("Phụ đề của phim (không bắt buộc - có thì nhanh & chính xác nhất)", "muted"))
@@ -124,7 +184,6 @@ class MainWindow(QMainWindow):
                                                           "ja": "日本語", "en": "English", "zh": "中文", "ko": "한국어"}),
                                        "speech", "language")
         lay.addWidget(row(label("Whisper", "muted", wrap=False), self.wmodel, self.wlang, stretch=False))
-        lay.addWidget(label("large-v3-turbo: chính xác cao. small: nhanh hơn nhiều, kém chính xác hơn.", "muted"))
         self.btn_stt = button("🎧 Lấy lời thoại", self.do_transcript)
         lay.addWidget(self.btn_stt)
         self.lb_tr = label("", "muted")
@@ -140,6 +199,17 @@ class MainWindow(QMainWindow):
         col.setContentsMargins(0, 0, 6, 0)
         col.setSpacing(12)
 
+        c, lay = card("⚡ Mẫu nhanh")
+        pres = []
+        for name, tip, vals in PRESETS:
+            pb = button(name, lambda _=False, v=vals, n=name: self.apply_preset(v, n), "preset", tip)
+            pres.append(pb)
+        g = QGridLayout()
+        for i, pb in enumerate(pres):
+            g.addWidget(pb, i // 2, i % 2)
+        lay.addLayout(g)
+        col.addWidget(c)
+
         c, lay = card("② Kịch bản AI")
         self.provider = fill(QComboBox(), {})
         self.provider.currentIndexChanged.connect(self._provider_changed)
@@ -147,7 +217,7 @@ class MainWindow(QMainWindow):
         self.model.setEditable(True)
         self.model.setMinimumContentsLength(6)
         self.model.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        self.model.currentTextChanged.connect(lambda t: b.set("ai", "model", t.strip()) if t.strip() else None)
+        self.model.currentTextChanged.connect(self._model_changed)
         self.lb_ai = label("", "muted")
         g = QGridLayout()
         g.addWidget(label("AI", "muted"), 0, 0)
@@ -216,21 +286,32 @@ class MainWindow(QMainWindow):
         self.ov = b.spin(spin(0, 1, 0.05, "", 2), "video", "orig_volume")
         self.encoder = b.combo(fill(QComboBox(), ENCODERS), "video", "encoder")
         self.parallel = b.spin(spin(1, 6, 1, " đoạn"), "video", "parallel")
+        self.snap = b.check(QCheckBox("Khớp đầu đoạn vào điểm chuyển cảnh"), "video", "snap_scenes")
         items = [("Khung hình", row(self.aspect, self.height_, stretch=False)), ("Lấp khung", self.fill_),
                  ("Phụ đề", row(self.subs, self.sub_size, self.sub_pos, stretch=False)),
                  ("Phụ đề gốc", row(self.cover, self.cover_h, stretch=False)), ("Nhạc nền", self.music),
                  ("Tiếng phim gốc", row(self.ov, label("khi thuyết minh (0 = tắt)", "muted", wrap=False), stretch=False)),
+                 ("Cắt cảnh", self.snap),
                  ("Mã hóa", row(self.encoder, self.parallel, label("cùng lúc", "muted", wrap=False), stretch=False))]
         for i, (k, w) in enumerate(items):
             g.addWidget(label(k, "muted"), i, 0)
             g.addWidget(w, i, 1)
         lay.addLayout(g)
         col.addWidget(c)
+
+        c, lay = card("📤 Đăng bài")
+        lay.addWidget(b.check(QCheckBox("Tạo ảnh bìa (thumbnail) từ khung hình đẹp nhất"), "publish", "thumbnail"))
+        lay.addWidget(b.check(QCheckBox("AI viết tiêu đề, mô tả, hashtag"), "publish", "info"))
+        lay.addWidget(b.check(QCheckBox("Lưu ảnh bìa + mô tả cạnh video (mặc định chỉ để video)"), "publish",
+                              "save_next_to_video"))
+        col.addWidget(c)
         col.addStretch(1)
         sc = QScrollArea()
         sc.setWidgetResizable(True)
         sc.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         sc.setWidget(box)
+        box.setObjectName("root")
+        sc.viewport().setStyleSheet("background: transparent;")
         sc.setFixedWidth(500)
         box.setMaximumWidth(488)
         return sc
@@ -252,10 +333,12 @@ class MainWindow(QMainWindow):
         self.table.setWordWrap(True)
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.itemChanged.connect(lambda _it: self._table_changed())
+        self.table.currentCellChanged.connect(lambda r, _c, _pr, _pc: self._seek_row(r))
         lay.addWidget(self.table, 1)
         self.lb_est = label("", "muted")
         self.btn_script = button("✍️ AI viết kịch bản", self.do_script, "primary")
-        lay.addWidget(row(self.btn_script, button("➕ Thêm đoạn", self.add_row), button("➖ Xóa đoạn", self.del_row),
+        self.btn_prev = button("👁 Xem trước đoạn", self.do_preview, tip="Dựng thử đoạn đang chọn (giọng + phụ đề)")
+        lay.addWidget(row(self.btn_script, self.btn_prev, button("➕ Thêm", self.add_row), button("➖ Xóa", self.del_row),
                           "stretch", self.lb_est))
         return c
 
@@ -270,7 +353,7 @@ class MainWindow(QMainWindow):
         for sid, name in STEPS.items():
             lb = label(name + "\nchờ", "chip", wrap=False)
             lb.setAlignment(Qt.AlignCenter)
-            lb.setMinimumWidth(130)
+            lb.setMinimumWidth(118)
             self.chips[sid] = lb
             chips.append(lb)
         self.prog = QProgressBar()
@@ -283,7 +366,9 @@ class MainWindow(QMainWindow):
         self.btn_cancel = button("⏹ Hủy", self.cancel, "danger")
         self.btn_cancel.setEnabled(False)
         lay.addWidget(row(*chips, self.prog, self.lb_status, stretch=False))
-        lay.addWidget(row(self.btn_all, self.btn_render, self.btn_cancel, "stretch",
+        self.btn_pub = button("📤 Đăng video", self.open_publish, tip="Ảnh bìa, tiêu đề, mô tả, hashtag để đăng")
+        self.btn_pub.setEnabled(False)
+        lay.addWidget(row(self.btn_all, self.btn_render, self.btn_cancel, "stretch", self.btn_pub,
                           button("📂 Mở thư mục video", self.open_folder), button("▶ Xem video", self.play)))
         self.log = QPlainTextEdit()
         self.log.setObjectName("log")
@@ -293,33 +378,96 @@ class MainWindow(QMainWindow):
         lay.addWidget(self.log)
         return w
 
-    # ================================================================ chế độ / danh sách
+    # ================================================================ chế độ / trạng thái
+    def _mode_changed(self, *_a):
+        self.binder.set(None, "mode", self.mode_box.currentData())
+        self.settings.save()
+        self.refresh_mode()
+        self.refresh_status(force=True)
+
     def refresh_mode(self):
-        off = self.settings.offline
-        self.badge.setText("🔒 Offline - chạy hoàn toàn trên máy" if off else "🌐 Dùng thêm AI/giọng online")
-        self.badge.setObjectName("badge" if off else "badgeOnline")
-        self.badge.style().polish(self.badge)
-        stt = {"auto": "Tự động (phụ đề có sẵn → Whisper card đồ họa → CPU)" if off else transcript.ENGINES["auto"],
-               "gpu": transcript.ENGINES["gpu"], "local": transcript.ENGINES["local"],
-               "subtitle": transcript.ENGINES["subtitle"]}
+        mode = self.settings.mode
+        off = mode == "offline"
+        stt = {"auto": transcript.ENGINES["auto"], "gpu": transcript.ENGINES["gpu"],
+               "local": transcript.ENGINES["local"], "subtitle": transcript.ENGINES["subtitle"]}
         if not off:
             stt.update({"groq": transcript.ENGINES["groq"], "openai": transcript.ENGINES["openai"]})
+        try:
+            self.stt.currentIndexChanged.disconnect()
+        except (RuntimeError, TypeError):
+            pass
         fill(self.stt, stt)
         self._select(self.stt, self.settings.get("speech", "engine"))
         self.stt.currentIndexChanged.connect(lambda _i: self.binder.set("speech", "engine", self.stt.currentData()))
-        provs = {"ollama": ai.PROVIDERS["ollama"]["name"], "none": ai.PROVIDERS["none"]["name"]} if off else \
-            {k: v["name"] for k, v in ai.PROVIDERS.items()}
+        provs = {"auto": ai.PROVIDERS["auto"]["name"] if not off else "⚡ Tự chọn (AI trên máy)",
+                 "ollama": ai.PROVIDERS["ollama"]["name"]}
+        if not off:
+            provs.update({k: v["name"] for k, v in ai.PROVIDERS.items() if k not in ("auto", "ollama", "none")})
+        provs["none"] = ai.PROVIDERS["none"]["name"]
+        self.provider.blockSignals(True)
         fill(self.provider, provs)
         self._select(self.provider, self.settings.get("ai", "provider"))
+        self.provider.blockSignals(False)
         if self.provider.currentData() != self.settings.get("ai", "provider"):
             self.binder.set("ai", "provider", self.provider.currentData())
         engines = {k: v["name"] for k, v in voices.ENGINES.items() if not off or k in OFFLINE_VOICES}
+        self.engine.blockSignals(True)
         fill(self.engine, engines)
         self._select(self.engine, self.settings.get("voice", "engine"))
+        self.engine.blockSignals(False)
         if self.engine.currentData() != self.settings.get("voice", "engine"):
             self.binder.set("voice", "engine", self.engine.currentData())
         self._provider_changed(init=True)
         self._engine_changed(init=True)
+
+    def refresh_status(self, force: bool = False):
+        """Kiểm tra mạng / Ollama / key ở luồng nền rồi cập nhật đèn trạng thái."""
+        if getattr(self, "_status_busy", False):
+            return
+        self._status_busy = True
+
+        def done(st):
+            self._status_busy = False
+            self._status = st
+            self._show_status()
+
+        def fail(_m):
+            self._status_busy = False
+        Bg(lambda: hybrid.status(self.settings, force=force), done, fail)
+
+    def _show_status(self):
+        st = self._status
+        if not st:
+            return
+        parts, tips = [], []
+        for name, ok, tip in hybrid.describe(st):
+            parts.append(f"<span style='color:{'#3DDC97' if ok else '#6C7489'}'>●</span> {name}")
+            tips.append(("✅ " if ok else "⚪ ") + f"{name}: {tip}")
+        chain = self._ai_chain_text()
+        if chain:
+            tips.append(f"\nAI viết kịch bản sẽ dùng: {chain}")
+        self.status.setText("&nbsp;&nbsp;".join(parts))
+        self.status.setToolTip("\n".join(tips))
+        self.refresh_ai()
+
+    def _ai_chain_text(self) -> str:
+        st = self._status
+        pid = self.provider.currentData() or "auto"
+        if pid == "none":
+            return ""
+        online = [k for k in ai.FALLBACK_ORDER if k in st.get("keys", [])] if st.get("net") and \
+            self.settings.mode != "offline" else []
+        if self.settings.mode == "offline":
+            chain = ["ollama"]
+        elif pid == "ollama":
+            chain = ["ollama", *online] if st.get("ollama_ready") else [*online, "ollama"]
+        elif pid == "auto":
+            chain = [*online, "ollama"]
+        else:
+            chain = [pid, *[k for k in online if k != pid], "ollama"]
+        names = {"ollama": "AI trên máy", "gemini": "Gemini", "claude": "Claude", "openai": "OpenAI",
+                 "groq": "Groq", "openrouter": "OpenRouter", "deepseek": "DeepSeek"}
+        return " → ".join(names[c] for c in dict.fromkeys(chain))
 
     @staticmethod
     def _select(combo: QComboBox, value):
@@ -327,35 +475,74 @@ class MainWindow(QMainWindow):
         combo.setCurrentIndex(i if i >= 0 else 0)
 
     def _provider_changed(self, *_a, init=False):
-        pid = self.provider.currentData() or "ollama"
+        pid = self.provider.currentData() or "auto"
         if not init:
             self.binder.set("ai", "provider", pid)
-        cur = self.settings.get("ai", "model") or ""
         self.model.blockSignals(True)
         self.model.clear()
-        models = list(ai.OLLAMA_MODELS) if pid == "ollama" else ai.PROVIDERS[pid]["models"]
-        self.model.addItems(models)
-        keep = cur if (cur and ai.model_fits(pid, cur) and (pid != "ollama" or ":" in cur or cur in models)) else \
-            ai.PROVIDERS[pid]["default"]
+        if pid == "ollama":
+            self.model.addItems(list(dict.fromkeys([*ai.OLLAMA_MODELS, *self._status.get("ollama_models", [])])))
+            keep = hybrid.ollama_model(self.settings)
+        elif pid in ("auto", "none"):
+            keep = ""
+        else:
+            cur = self.settings.get("ai", "model") or ""
+            self.model.addItems(ai.PROVIDERS[pid]["models"])
+            keep = cur if (cur and ai.model_fits(pid, cur) and not cur.startswith(tuple(ai.OLLAMA_MODELS))) else \
+                ai.PROVIDERS[pid]["default"]
+            self.binder.set("ai", "model", keep)
         self.model.setEditText(keep)
         self.model.blockSignals(False)
-        self.binder.set("ai", "model", keep)
-        self.model.setEnabled(pid != "none")
+        self.model.setEnabled(pid not in ("auto", "none"))
+        self.model.lineEdit().setPlaceholderText("tự chọn model tốt nhất" if pid == "auto" else "")
         self.refresh_ai()
 
+    def _model_changed(self, text: str):
+        t = text.strip()
+        pid = self.provider.currentData() or "auto"
+        if not t or pid in ("auto", "none"):
+            return
+        self.binder.set("ai", "ollama_model" if pid == "ollama" else "model", t)
+
     def refresh_ai(self):
-        pid = self.provider.currentData() or "ollama"
-        if pid == "ollama":
-            ok, models = ai.ollama_status(self.settings)
-            m = self.model.currentText().strip()
-            has = any(x == m or x.split(":")[0] == m or x == m + ":latest" for x in models)
-            self.lb_ai.setText("● Ollama đang chạy" + ("" if has else f" · chưa tải {m} → ⚙️ Cài đặt → Tải model AI")
-                               if ok else "○ Chưa mở Ollama → ⚙️ Cài đặt để cài & tải model (một lần)")
-        elif pid == "none":
+        """Chỉ đọc trạng thái đã kiểm tra sẵn (không gọi mạng) -> không làm đơ giao diện."""
+        pid = self.provider.currentData() or "auto"
+        st = self._status
+        if not st:
+            self.lb_ai.setText("⏳ Đang kiểm tra AI...")
+            return
+        if pid == "none":
             self.lb_ai.setText("Không dùng AI: app tự cắt các cảnh nổi bật, giữ tiếng gốc.")
+            return
+        chain = self._ai_chain_text()
+        if pid == "ollama" or (pid == "auto" and chain == "AI trên máy"):
+            m = hybrid.ollama_model(self.settings)
+            if st.get("ollama_ready"):
+                msg = f"● AI trên máy sẵn sàng ({m})"
+            elif st.get("ollama"):
+                msg = f"⚠️ Chưa tải {m} → ⚙️ Cài đặt → Tải model AI" + (" (hoặc app tự tải khi chạy)"
+                                                                       if st.get("net") else "")
+            elif st.get("ollama_installed"):
+                msg = "○ Ollama chưa mở - app sẽ tự mở khi cần"
+            else:
+                msg = "○ Chưa cài Ollama → ⚙️ Cài đặt (hoặc nhập API key AI online)"
+            self.lb_ai.setText(msg + (f"\nDự phòng: {chain}" if "→" in chain else ""))
         else:
-            k = ai.PROVIDERS[pid]["key"]
-            self.lb_ai.setText("✓ Đã có API key" if self.settings.key(k) else "⚠️ Chưa nhập API key (⚙️ Cài đặt)")
+            k = ai.PROVIDERS[pid]["key"] if pid != "auto" else None
+            if k and not self.settings.key(k):
+                self.lb_ai.setText("⚠️ Chưa nhập API key (⚙️ Cài đặt) - sẽ tự dùng AI khác: " + chain)
+            else:
+                self.lb_ai.setText(f"Thứ tự: {chain}" + ("" if st.get("net") or self.settings.mode == "offline"
+                                                          else " (đang mất mạng)"))
+
+    def apply_preset(self, vals: dict, name: str):
+        for k, v in vals.items():
+            sec, key = k.split(".")
+            self.binder.set(sec, key, v)
+        self._select(self.aspect, self.settings.get("video", "aspect"))
+        self._select(self.fill_, self.settings.get("video", "fill"))
+        self.minutes.setValue(float(self.settings.get("ai", "minutes")))
+        self.log_msg(f"Mẫu {name}: {', '.join(f'{k.split(chr(46))[1]}={v}' for k, v in vals.items())}")
 
     def _engine_changed(self, *_a, init=False):
         eng = self.engine.currentData() or "vieneu"
@@ -378,7 +565,64 @@ class MainWindow(QMainWindow):
         from .settings_dialog import SettingsDialog
 
         SettingsDialog(self).exec()
+        self.mode_box.blockSignals(True)
+        self._select(self.mode_box, self.settings.mode)
+        self.mode_box.blockSignals(False)
         self.refresh_mode()
+        self.refresh_status(force=True)
+
+    # ================================================================ cập nhật trực tiếp
+    def check_update(self, silent: bool = False):
+        def done(info):
+            self._update_info = info
+            if info.get("newer"):
+                self.btn_update.setText(f"⬆ Có bản mới {info['latest']}")
+                self.btn_update.setObjectName("update")
+                self.btn_update.style().unpolish(self.btn_update)
+                self.btn_update.style().polish(self.btn_update)
+                if not silent:
+                    self._ask_update(info)
+            elif not silent:
+                QMessageBox.information(self, "Cập nhật", f"Bạn đang dùng bản mới nhất ({VERSION}).")
+
+        def fail(msg):
+            if not silent:
+                QMessageBox.warning(self, "Cập nhật", msg)
+        Bg(lambda: updater.check(self.settings), done, fail)
+
+    def do_update(self):
+        if self._update_info and self._update_info.get("newer"):
+            self._ask_update(self._update_info)
+        else:
+            self.check_update(silent=False)
+
+    def _ask_update(self, info: dict):
+        ch = "\n".join("• " + c for c in info.get("changes", [])[:6])
+        r = QMessageBox.question(self, "Có bản mới", f"Bản hiện tại: {info['current']}\nBản mới: {info['latest']}\n\n"
+                                 + (f"Thay đổi gần đây:\n{ch}\n\n" if ch else "")
+                                 + "Cập nhật ngay? (cài đặt, dự án và model của bạn được giữ nguyên)")
+        if r != QMessageBox.Yes:
+            return
+
+        def job(log, progress, cancel):
+            return updater.update(self.settings, log, progress, cancel)
+
+        def done(res):
+            if not res.get("updated"):
+                return
+            if QMessageBox.question(self, "Đã cập nhật", f"Đã cập nhật lên {res['latest']}.\nKhởi động lại app ngay?") \
+                    == QMessageBox.Yes:
+                self.restart()
+        self.run_task(job, "Cập nhật app", on_done=done)
+
+    def restart(self):
+        from PySide6.QtCore import QProcess
+        from PySide6.QtWidgets import QApplication
+
+        cmd = updater.restart_command()
+        self.settings.save()
+        if QProcess.startDetached(cmd[0], cmd[1:]):
+            QApplication.quit()
 
     # ================================================================ phim & kịch bản
     def open_video(self, path: str):
@@ -396,7 +640,90 @@ class MainWindow(QMainWindow):
         self.sub_file.setText(str(side) if side else "")
         self._update_tr_label()
         self.load_script()
+        self._load_media(path)
+        self.btn_pub.setEnabled(bool(p.publish_info) or p.thumbnail.exists())
         self.log_msg(f"Đã mở phim: {Path(path).name}")
+        p.start_analysis(lambda m, level="info": None)  # dò chuyển cảnh / phụ đề cứng sẵn từ bây giờ (chạy nền)
+
+    # ================================================================ tải phim từ link
+    def do_download(self):
+        url = self.link.text().strip()
+        if not download.is_url(url):
+            QMessageBox.information(self, "Dán link", "Dán link video (https://...) vào ô rồi bấm Tải.")
+            return
+        if self.settings.offline:
+            QMessageBox.information(self, "Đang ở chế độ Chỉ trên máy",
+                                    "Đổi chế độ (góc trên) sang ⚡ Tự động để tải phim từ link.")
+            return
+
+        def job(log, progress, cancel):
+            return download.download(url, self.settings, log, progress, cancel)
+
+        def done(path):
+            self.link.clear()
+            self.open_video(str(path))
+        self.run_task(job, "Tải phim từ link", on_done=done)
+
+    # ================================================================ xem phim / xem trước
+    def _load_media(self, path: str, play: bool = False, start: float = 0.0):
+        self._media = Path(path)
+        if self.player is None:
+            if play:
+                QDesktopServices.openUrl(QUrl.fromLocalFile(str(path)))
+            return
+        self.video_w.show()
+        self.player_bar.show()
+        self.player.setSource(QUrl.fromLocalFile(str(path)))
+        if start:
+            self.player.setPosition(int(start * 1000))
+        if play:
+            self.player.play()
+        else:
+            self.player.pause()
+
+    def toggle_play(self):
+        if self.player is None:
+            return
+        if self.player.playbackState() == QMediaPlayer.PlayingState:
+            self.player.pause()
+        else:
+            self.player.play()
+
+    def _open_current_media(self):
+        m = getattr(self, "_media", None)
+        if m and Path(m).exists():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(m)))
+
+    def _seek_row(self, r: int):
+        if r < 0 or not self.project or self.player is None or self._loading_table:
+            return
+        it = self.table.item(r, 0)
+        if not it:
+            return
+        if getattr(self, "_media", None) != Path(self.project.video):
+            self._load_media(self.project.video)
+        self.player.setPosition(int(transcript._ts(it.text()) * 1000))
+
+    def do_preview(self):
+        if not self.need_project():
+            return
+        r = self.table.currentRow()
+        sc = self.collect()
+        if r < 0 or r >= len(sc["segments"]):
+            QMessageBox.information(self, "Chọn đoạn", "Bấm chọn 1 dòng trong bảng kịch bản để xem trước.")
+            return
+        p = self.project
+        p.save_script(sc)
+        self.run_task(lambda log, progress, cancel: p.preview_segment(r, log, progress, cancel),
+                      f"Xem trước đoạn {r + 1}", on_done=lambda f: self._load_media(str(f), play=True))
+
+    # ================================================================ đăng bài
+    def open_publish(self):
+        if not self.need_project():
+            return
+        from .publish_dialog import PublishDialog
+
+        PublishDialog(self, self.project).exec()
 
     def _sub_changed(self, v):
         if self.project:
@@ -479,14 +806,14 @@ class MainWindow(QMainWindow):
         w.step.connect(self._step)
         self.prog.setValue(0)
         self.lb_status.setText(f"⏳ {title}...")
-        for b in (self.btn_all, self.btn_render, self.btn_script, self.btn_stt):
+        for b in (self.btn_all, self.btn_render, self.btn_script, self.btn_stt, self.btn_prev):
             b.setEnabled(False)
         self.btn_cancel.setEnabled(True)
         self.log_msg(f"▶ {title}")
 
         def finish():
             self.worker = None
-            for b in (self.btn_all, self.btn_render, self.btn_script, self.btn_stt):
+            for b in (self.btn_all, self.btn_render, self.btn_script, self.btn_stt, self.btn_prev):
                 b.setEnabled(True)
             self.btn_cancel.setEnabled(False)
 
@@ -611,6 +938,8 @@ class MainWindow(QMainWindow):
 
     def finished(self, out):
         self.last_output = Path(out)
+        self.btn_pub.setEnabled(True)
+        self._load_media(str(out))
         self.open_folder()
 
     def preview_voice(self):
@@ -643,3 +972,15 @@ class MainWindow(QMainWindow):
     def play(self):
         if self.last_output and self.last_output.exists():
             QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.last_output)))
+
+    def closeEvent(self, e):
+        if self.worker is not None:
+            if QMessageBox.question(self, "Đang làm việc", "App đang làm việc. Hủy và thoát?") != QMessageBox.Yes:
+                e.ignore()
+                return
+            self.worker.cancel.set()
+            self.worker.wait(3000)
+        if self.player is not None:
+            self.player.stop()
+        self.settings.save()
+        super().closeEvent(e)

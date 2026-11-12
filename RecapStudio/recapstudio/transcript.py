@@ -1,7 +1,8 @@
 """Lời thoại của phim: phụ đề có sẵn (file cạnh phim / nhúng trong video) hoặc nhận dạng giọng nói.
 
-Chế độ "auto" chọn cách nhanh nhất có thể: phụ đề cạnh phim -> phụ đề nhúng -> Groq Whisper API (nhanh,
-có gói miễn phí) -> OpenAI Whisper API -> Whisper offline trên máy (faster-whisper).
+Chế độ "auto" chọn cách nhanh nhất đang dùng được: phụ đề cạnh phim -> phụ đề nhúng -> (có mạng + key) Groq /
+OpenAI Whisper -> Whisper card đồ họa (whisper.cpp Vulkan) -> Whisper CPU. Cách nào lỗi thì tự chuyển cách kế tiếp,
+kể cả từ trên máy sang online và ngược lại.
 """
 from __future__ import annotations
 
@@ -12,11 +13,12 @@ from pathlib import Path
 
 import requests
 
+from . import hybrid
 from .config import Settings
 from .media import Cancelled, extract_audio, probe, run
 
 ENGINES = {
-    "auto": "Tự động (phụ đề có sẵn → Groq → OpenAI → Whisper trên máy)",
+    "auto": "⚡ Tự động (phụ đề có sẵn → cách nhanh nhất đang có)",
     "subtitle": "Dùng file phụ đề (.srt / .vtt / .ass)",
     "groq": "Groq Whisper API (rất nhanh, có gói miễn phí)",
     "openai": "OpenAI Whisper API",
@@ -272,21 +274,6 @@ def _gpu_whisper(video: str, work: Path, duration: float, settings: Settings, la
     return segs
 
 
-def _offline_whisper(video, work, duration, settings, lang, prompt, log, progress, cancel) -> tuple[list, str]:
-    """Card đồ họa trước (nhanh), lỗi thì Whisper CPU."""
-    import os
-
-    if os.name == "nt" and settings.get("speech", "engine") in ("auto", "gpu"):
-        try:
-            return _gpu_whisper(video, work, duration, settings, lang, prompt, log, progress, cancel), \
-                "Whisper card đồ họa"
-        except Cancelled:
-            raise
-        except Exception as e:  # noqa: BLE001
-            log(f"Whisper card đồ họa chưa dùng được ({e}) - chuyển sang Whisper CPU.", "warn")
-    return _local_whisper(video, work, duration, settings, lang, prompt, log, progress, cancel), "Whisper offline (CPU)"
-
-
 def _wait(sec: float, cancel) -> None:
     ev = cancel or threading.Event()
     if ev.wait(sec):
@@ -314,20 +301,42 @@ def transcribe(video: str, work: Path, settings: Settings, log, progress, cancel
         emb = embedded(video, work, cancel)
         if len(emb) >= 10:
             return emb, "phụ đề nhúng trong video"
-        for p in () if settings.offline else ("groq", "openai"):
-            if settings.key(p):
-                try:
-                    return _api_whisper(video, work, duration, settings, p, lang, prompt, log, progress,
-                                        cancel), f"{p.capitalize()} Whisper"
-                except Cancelled:
-                    raise
-                except Exception as e:  # noqa: BLE001
-                    log(f"{p.capitalize()} Whisper lỗi ({e}) - thử cách khác.", "warn")
-        return _offline_whisper(video, work, duration, settings, lang, prompt, log, progress, cancel)
-    if engine in ("groq", "openai") and not settings.offline:
-        return _api_whisper(video, work, duration, settings, engine, lang, prompt, log, progress, cancel), \
-            f"{engine.capitalize()} Whisper"
-    return _offline_whisper(video, work, duration, settings, lang, prompt, log, progress, cancel)
+    # chuỗi dự phòng: online (nhanh, nếu có mạng + key) <-> trên máy
+    online = hybrid.stt_online(settings)
+    if engine in ("groq", "openai"):
+        chain = [engine, *[p for p in online if p != engine], "gpu", "local"]
+    elif engine in ("gpu", "local"):
+        chain = [engine, *(["local"] if engine == "gpu" else []), *online]
+    elif settings.mode == "offline":
+        chain = ["gpu", "local"]
+    else:
+        chain = [*online, "gpu", "local"]
+    chain = list(dict.fromkeys(chain))
+    last: Exception | None = None
+    for i, eng in enumerate(chain):
+        if eng in ("groq", "openai") and not (settings.key(eng) and hybrid.online_allowed(settings)):
+            continue
+        if eng == "gpu":
+            import os
+
+            if os.name != "nt":
+                continue
+        try:
+            if eng in ("groq", "openai"):
+                return _api_whisper(video, work, duration, settings, eng, lang, prompt, log, progress, cancel), \
+                    f"{eng.capitalize()} Whisper (online)"
+            if eng == "gpu":
+                return _gpu_whisper(video, work, duration, settings, lang, prompt, log, progress, cancel), \
+                    "Whisper card đồ họa (trên máy)"
+            return _local_whisper(video, work, duration, settings, lang, prompt, log, progress, cancel), \
+                "Whisper trên máy (CPU)"
+        except Cancelled:
+            raise
+        except Exception as e:  # noqa: BLE001
+            last = e
+            if i + 1 < len(chain):
+                log(f"{ENGINES.get(eng, eng)} lỗi ({e}) - tự chuyển cách khác.", "warn")
+    raise TranscriptError(f"Không lấy được lời thoại: {last}")
 
 
 def fmt(t: float) -> str:
