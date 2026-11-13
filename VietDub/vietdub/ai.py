@@ -56,10 +56,22 @@ class _Retry(Exception):
 
 _RESOLVED: dict = {}
 _NO_THINK: set = set()
+USED: dict = {}                    # AI nào đã thực sự trả lời trong lần dịch này (để cảnh báo chất lượng)
+OLLAMA_OVERRIDE: str | None = None  # model trên máy hợp ngôn ngữ gốc hơn (vd Qwen cho phim Trung)
+
+# model trên máy dịch kém tiếng Trung / Nhật / Hàn (chủ yếu học tiếng Anh)
+_WEAK_CJK = ("llama", "gemma", "mistral", "phi")
+CJK_LOCAL = "qwen2.5:7b"
 
 
 # ------------------------------------------------------------------ tiện ích
 def _check(r: requests.Response, name: str) -> dict:
+    low = r.text.lower() if r.status_code == 429 else ""
+    # hết tiền (OpenAI: insufficient_quota) / hết lượt cả ngày (Gemini: ...PerDay) -> thử lại vô ích, sang AI khác ngay;
+    # còn giới hạn theo phút (PerMinute) thì vẫn chờ rồi thử lại
+    if "insufficient_quota" in low or ("perday" in low and "perminute" not in low):
+        raise AIError(f"{name}: hết hạn mức (gói miễn phí hết lượt hôm nay hoặc tài khoản hết tiền) - "
+                      "nạp thêm / đợi sang ngày / dùng key AI khác.")
     if r.status_code in (429, 500, 502, 503, 504, 529):
         delay = 5.0
         m = re.search(r'retry(?:Delay|-after)"?\s*[:=]\s*"?(\d+)', r.text, re.I)
@@ -189,7 +201,7 @@ def pick_openai(models: list[str]) -> str | None:
 
 def resolve_model(provider: str, settings: Settings, log=None) -> str:
     if provider == "ollama":
-        return (settings.get("ai", "ollama_model") or PROVIDERS["ollama"]["default"]).strip()
+        return OLLAMA_OVERRIDE or (settings.get("ai", "ollama_model") or PROVIDERS["ollama"]["default"]).strip()
     model = (settings.get("ai", "model") or "auto").strip() if settings.get("ai", "provider") == provider else "auto"
     if model and model != "auto" and model_fits(provider, model):
         return model
@@ -330,8 +342,20 @@ OLLAMA_MODELS = {
     "qwen2.5:7b": "Qwen2.5 7B - tiếng Việt tốt (khuyên dùng, ~4.7 GB)",
     "qwen2.5:3b": "Qwen2.5 3B - nhanh hơn, máy yếu (~1.9 GB)",
     "gemma3:4b": "Gemma 3 4B - đa ngôn ngữ (~3.3 GB)",
-    "llama3.1:8b": "Llama 3.1 8B (~4.9 GB)",
+    "qwen2.5:14b": "Qwen2.5 14B - dịch hay hơn, cần máy mạnh, RAM 16 GB+ (~9 GB)",
+    "llama3.1:8b": "Llama 3.1 8B - dịch tiếng Trung/Nhật/Hàn kém (~4.9 GB)",
 }
+
+
+def better_local_model(settings: Settings, lang: str, log=None) -> str | None:
+    """Phim Trung/Nhật/Hàn mà đang chọn model trên máy yếu tiếng châu Á (Llama, Gemma...) -> dùng Qwen."""
+    cur = (settings.get("ai", "ollama_model") or PROVIDERS["ollama"]["default"]).strip()
+    if lang not in ("zh", "ja", "ko") or not cur.lower().startswith(_WEAK_CJK):
+        return None
+    if log:
+        log(f"⚠ {cur} dịch tiếng Trung/Nhật/Hàn rất kém → lần này dùng {CJK_LOCAL} (giỏi tiếng Trung hơn; "
+            "lần đầu tự tải ~4.7 GB). Đổi hẳn trong ⚙️ Cài đặt → Model AI trên máy.", "warn")
+    return CJK_LOCAL
 
 
 def ollama_url(settings: Settings) -> str:
@@ -442,7 +466,8 @@ def chat(settings: Settings, system: str, user: str, json_mode: bool = True, max
             continue
         name = PROVIDERS[prov]["name"]
         if pi and log:
-            log(f"🔀 Chuyển sang {name}.", "warn")
+            why = f" (vì: {str(last)[:160]})" if last else ""
+            log(f"🔀 Chuyển sang {name}{why}.", "warn")
         try:
             model = prepare_ollama(settings, log, cancel) if prov == "ollama" else resolve_model(prov, settings, log)
         except Cancelled:
@@ -459,6 +484,7 @@ def chat(settings: Settings, system: str, user: str, json_mode: bool = True, max
                              name, log, cancel, limit=1800 if prov == "ollama" else WAIT_LIMIT)
                 if log:
                     log(f"AI trả lời sau {time.time() - t0:.0f}s ({name} / {model}).")
+                USED[prov] = USED.get(prov, 0) + 1
                 return out
             except Cancelled:
                 raise

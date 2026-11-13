@@ -3,9 +3,10 @@
 Quy trình (AI theo chuỗi dự phòng online <-> trên máy, xem hybrid.py):
 1. Đọc lướt cả video -> bảng tên riêng (Hán-Việt cho tên Trung, giữ tên Tây...), xưng hô giữa các nhân vật,
    thể loại. Mọi phần dịch sau dùng chung bảng này nên tên & xưng hô nhất quán từ đầu đến cuối.
-2. Dịch từng lô ~40 câu (giữ đúng số câu), kèm vài câu trước đó để mạch văn liền; câu nào cũng có giới hạn số
+2. Dịch từng lô 30 câu (giữ đúng số câu), kèm vài câu trước đó để mạch văn liền; câu nào cũng có giới hạn số
    chữ theo thời gian nói để giọng đọc kịp, không bị tua nhanh.
-3. Kiểm tra: câu thiếu / chưa dịch (còn chữ Hán, Nhật, Hàn...) -> dịch lại; câu quá dài -> AI rút gọn.
+3. Kiểm tra: câu thiếu / chưa dịch (còn chữ Hán, Nhật, Hàn...) -> dịch lại.
+4. Tối ưu cho thuyết minh: câu đọc quá nhanh -> AI rút gọn, đo lại, còn dài thì rút chặt hơn (tối đa 3 vòng).
 """
 from __future__ import annotations
 
@@ -13,13 +14,14 @@ import json
 import re
 from concurrent.futures import ThreadPoolExecutor
 
-from . import hybrid
+from . import ai, hybrid
 from .ai import PROVIDERS, chat, extract_json
 from .config import Settings
 from .media import Cancelled
 
 CPS = 16.0          # số ký tự tiếng Việt đọc được mỗi giây (tốc độ nói bình thường, thoải mái)
-BATCH = 40
+BATCH = 30          # 30 câu / lô: AI giữ mạch tốt, ít sót câu
+MAX_CPS = 20.0      # đọc nhanh hơn mức này là quá tải -> rút gọn (đo lại sau khi rút, tối đa 3 vòng)
 
 STYLES = {
     "natural": ("Tự nhiên, đời thường (phim hiện đại)",
@@ -36,12 +38,23 @@ STYLES = {
 }
 
 GLOSSARY_SYSTEM = (
-    "You prepare a translation brief for dubbing a video into Vietnamese. Read the transcript (any language) and "
-    "reply ONLY with JSON: {\"genre\": \"short genre\", \"names\": {\"original name\": \"Vietnamese form\"}, "
-    "\"pronouns\": \"1-3 sentences: who is who and how they should address each other in Vietnamese (xưng hô)\"}. "
-    "Chinese names -> Sino-Vietnamese (Hán-Việt) reading (e.g. 林动 -> Lâm Động, 萧炎 -> Tiêu Viêm). "
-    "Korean/Japanese names -> common Vietnamese spelling (e.g. 김민준 -> Kim Min Jun, 田中 -> Tanaka). "
-    "Western names unchanged. At most 40 names.")
+    "You prepare a translation brief for dubbing a video into Vietnamese. You get the video title (often with "
+    "hashtags naming the show) and the transcript (any language). First identify the work: which anime, manga, "
+    "donghua, drama, film, game or novel this is, and whether it is a narrator recap (third-person storytelling) "
+    "or character dialogue. Reply ONLY with JSON: {\"work\": \"title of the work as known in Vietnam + origin "
+    "(e.g. anime Nhật, phim Trung), or empty if unknown\", \"genre\": \"short genre\", \"narration\": true/false, "
+    "\"names\": {\"original name or term\": \"Vietnamese form\"}, \"pronouns\": \"1-3 sentences: who is who and how "
+    "they address each other in Vietnamese (xưng hô); for a recap, how the narrator refers to characters\"}.\n"
+    "Name rules (most important):\n"
+    "- If the work is a known Japanese/Korean/Western franchise retold in Chinese (very common in Chinese recap "
+    "videos), use the ORIGINAL names and terms Vietnamese fans use, NOT a Sino-Vietnamese reading of the Chinese "
+    "transliteration. E.g. 路飞 -> Luffy, 鸣人 -> Naruto, 佐助 -> Sasuke, 炭治郎 -> Tanjiro, 五条悟 -> Gojo Satoru.\n"
+    "- Chinese-origin works (donghua, xianxia, Chinese dramas/novels): Sino-Vietnamese (Hán-Việt) reading "
+    "(e.g. 林动 -> Lâm Động, 萧炎 -> Tiêu Viêm, 斗气 -> đấu khí).\n"
+    "- Korean/Japanese names -> common Vietnamese spelling (김민준 -> Kim Min Jun, 田中 -> Tanaka). "
+    "Western names unchanged.\n"
+    "- Include special terms of the work (powers, races, ranks, places) with their usual Vietnamese fan terms.\n"
+    "- If unsure of a name, leave it out rather than guess. At most 50 entries.")
 
 SYSTEM = (
     "You are an expert Vietnamese subtitle translator and dubbing adapter. Translate every numbered line into "
@@ -56,8 +69,12 @@ SYSTEM = (
     "Reply ONLY with JSON: {\"lines\": {\"<id>\": \"<Vietnamese>\", ...}}")
 
 SHORTEN_SYSTEM = (
-    "You shorten Vietnamese dubbing lines so they can be spoken in the given time. Keep the meaning and tone, "
-    "natural Vietnamese, stay within max characters. Reply ONLY with JSON: {\"lines\": {\"<id>\": \"<shorter>\"}}")
+    "You shorten Vietnamese dubbing lines so a voice actor can say them in the given time. Keep the key meaning, "
+    "names and tone; natural Vietnamese with full diacritics; drop filler words, merge clauses, use shorter "
+    "synonyms. Each line MUST be at most its max characters. Reply ONLY with JSON: "
+    "{\"lines\": {\"<id>\": \"<shorter Vietnamese>\"}}")
+SHORTEN_STRICT = ("\nSTRICT: these lines were already shortened once and are STILL too long. Cut harder: keep only "
+                  "the essential meaning in as few words as possible. Never exceed max characters.")
 
 _FOREIGN = re.compile(r"[぀-ヿ㐀-鿿가-힯฀-๿Ѐ-ӿ]")
 
@@ -88,10 +105,21 @@ def _brief_text(brief: dict, settings: Settings) -> str:
     style = STYLES.get(opts.get("style", "natural"), STYLES["natural"])[1]
     names = {**(brief.get("names") or {}), **parse_glossary(opts.get("glossary", ""))}  # tên người dùng nhập được ưu tiên
     parts = [f"STYLE: {style}"]
+    if brief.get("title"):
+        parts.append(f"VIDEO TITLE: {brief['title']}")
+    if brief.get("work"):
+        parts.append(f"WORK: {brief['work']}")
+    if brief.get("narration"):
+        parts.append("FORMAT: narrator recap - keep the storyteller voice (third person: 'Ichigo đẩy cửa...'), "
+                     "lines in quotes are characters speaking")
     if brief.get("genre"):
         parts.append(f"GENRE: {brief['genre']}")
     if opts.get("context"):
         parts.append(f"CONTEXT FROM USER: {opts['context']}")
+    if opts.get("safe"):
+        parts.append("PLATFORM SAFETY (TikTok/YouTube): soften profanity and slurs, avoid graphic gore/sexual "
+                     "wording, no drug/weapon/gambling promotion, no brand names, prices, links or calls to buy/sell; "
+                     "keep the story meaning with milder Vietnamese words")
     if brief.get("pronouns"):
         parts.append(f"PRONOUNS: {brief['pronouns']}")
     if names:
@@ -99,7 +127,23 @@ def _brief_text(brief: dict, settings: Settings) -> str:
     return "\n".join(parts)
 
 
-def make_brief(lines: list[dict], settings: Settings, log, cancel) -> dict:
+def source_lang(lines: list[dict]) -> str:
+    """Đoán chữ viết của lời gốc: zh / ja / ko / other."""
+    t = "".join(x.get("text", "") for x in lines[:200])
+    kana = len(re.findall(r"[぀-ヿ]", t))
+    han = len(re.findall(r"[㐀-鿿]", t))
+    hangul = len(re.findall(r"[가-힯]", t))
+    n = max(1, len(re.sub(r"\s", "", t)))
+    if hangul / n > 0.2:
+        return "ko"
+    if kana / n > 0.05:
+        return "ja"
+    if han / n > 0.2:
+        return "zh"
+    return "other"
+
+
+def make_brief(lines: list[dict], settings: Settings, log, cancel, title: str = "") -> dict:
     text = "\n".join(x["text"] for x in lines)
     limit = 12000 if (hybrid.ai_chain(settings) or ["ollama"])[0] == "ollama" else 60000
     if len(text) > limit:  # lấy đều đầu - giữa - cuối
@@ -107,16 +151,21 @@ def make_brief(lines: list[dict], settings: Settings, log, cancel) -> dict:
         mid = len(text) // 2
         text = text[:k] + "\n...\n" + text[mid - k // 2: mid + k // 2] + "\n...\n" + text[-k:]
     try:
-        d = extract_json(chat(settings, GLOSSARY_SYSTEM, text, json_mode=True, max_tokens=3000, log=log,
+        user = (f"VIDEO TITLE: {title}\n\nTRANSCRIPT:\n{text}" if title else text)
+        d = extract_json(chat(settings, GLOSSARY_SYSTEM, user, json_mode=True, max_tokens=3000, log=log,
                               cancel=cancel))
     except Cancelled:
         raise
     except Exception as e:  # noqa: BLE001
         log(f"Không lập được bảng tên riêng ({e}) - vẫn dịch tiếp.", "warn")
-        return {}
+        return {"title": title[:200]}
     names = d.get("names") if isinstance(d.get("names"), dict) else {}
-    brief = {"genre": str(d.get("genre") or "")[:80], "pronouns": str(d.get("pronouns") or "")[:600],
+    brief = {"title": title[:200], "work": str(d.get("work") or "")[:120],
+             "narration": d.get("narration") in (True, "true", "yes", 1),
+             "genre": str(d.get("genre") or "")[:80], "pronouns": str(d.get("pronouns") or "")[:600],
              "names": {str(k): str(v) for k, v in names.items() if str(k).strip() and str(v).strip()}}
+    if brief["work"]:
+        log(f"AI nhận ra phim: {brief['work']}")
     if brief["names"]:
         log("Tên riêng: " + ", ".join(f"{k} → {v}" for k, v in list(brief["names"].items())[:8])
             + (" ..." if len(brief["names"]) > 8 else ""))
@@ -155,7 +204,8 @@ def _bad(src: str, vi: str | None) -> bool:
     return bool(_FOREIGN.search(vi)) or (vi.strip().lower() == src.strip().lower() and len(src) > 3)
 
 
-def translate(lines: list[dict], settings: Settings, log, progress, cancel, brief: dict | None = None) -> list[dict]:
+def translate(lines: list[dict], settings: Settings, log, progress, cancel, brief: dict | None = None,
+              title: str = "", on_brief=None) -> list[dict]:
     """lines: [{start, end, text}] -> [{start, end, text, vi}]"""
     if not lines:
         return []
@@ -163,12 +213,32 @@ def translate(lines: list[dict], settings: Settings, log, progress, cancel, brie
     if not chain:
         raise RuntimeError("Không có AI nào để dịch: mở Ollama (AI trên máy) hoặc nhập API key trong ⚙️ Cài đặt.")
     log("AI dịch: " + " → ".join(PROVIDERS[p]["name"].split(" (")[0].split(" - ")[0] for p in chain))
+    lang = source_lang(lines)
+    ai.USED.clear()
+    ai.OLLAMA_OVERRIDE = ai.better_local_model(settings, lang, log) if "ollama" in chain else None
+    try:
+        out = _translate(lines, settings, log, progress, cancel, brief, title, chain, on_brief)
+    finally:
+        ai.OLLAMA_OVERRIDE = None
+    if ai.USED.get("ollama") and (lang in ("zh", "ja", "ko") or len(chain) > 1):
+        online = [p for p in chain if p != "ollama"]
+        why = (f"AI online ({', '.join(PROVIDERS[p]['name'].split(' (')[0] for p in online)}) bị lỗi - xem dòng 🔀 ở trên"
+               if online else "chưa nhập key AI online nào")
+        log(f"⚠ Bản dịch này do AI trên máy làm ({why}). AI trên máy yếu hơn nhiều, dễ dịch sai nội dung và tên "
+            "nhân vật (nhất là phim Trung/Nhật/Hàn). Để dịch chuẩn: nhập key DeepSeek hoặc Gemini/Groq (miễn phí) "
+            "trong ⚙️ Cài đặt rồi bấm 🌐 AI dịch lại.", "warn")
+    return out
+
+
+def _translate(lines, settings, log, progress, cancel, brief, title, chain, on_brief=None) -> list[dict]:
     lines = [dict(x) for x in lines]
     for i, ln in enumerate(lines):
         ln["_max"] = max_chars(ln, lines[i + 1] if i + 1 < len(lines) else None)
     if brief is None:
         progress(0.03, "AI đọc lướt video: tên riêng, xưng hô")
-        brief = make_brief(lines, settings, log, cancel)
+        brief = make_brief(lines, settings, log, cancel, title=title)
+        if on_brief:
+            on_brief(brief)
     head = _brief_text(brief, settings)
     local = chain[0] == "ollama"
     size = 25 if local else BATCH
@@ -213,25 +283,9 @@ def translate(lines: list[dict], settings: Settings, log, progress, cancel, brie
                 raise
             except Exception as e:  # noqa: BLE001
                 log(f"Dịch lại lỗi ({e}).", "warn")
-    # câu quá dài so với thời gian nói -> rút gọn
+    # tối ưu cho thuyết minh: câu đọc quá nhanh -> rút gọn, ĐO LẠI, còn dài thì rút chặt hơn (tối đa 3 vòng)
     if settings.get("translate", "shorten", True):
-        long_ = [i for i in range(len(lines)) if result.get(i) and len(result[i]) > lines[i]["_max"] * 1.25]
-        if long_:
-            progress(0.92, f"Rút gọn {len(long_)} câu cho kịp thời gian")
-            log(f"Rút gọn {len(long_)} câu dài hơn thời gian nói...")
-            for a in range(0, len(long_), 30):
-                idx = long_[a:a + 30]
-                body = "\n".join(f"{i + 1} | max {lines[i]['_max']} chars | {result[i]}" for i in idx)
-                try:
-                    got = _ask(settings, SHORTEN_SYSTEM, body, idx, log, cancel)
-                except Cancelled:
-                    raise
-                except Exception as e:  # noqa: BLE001
-                    log(f"Rút gọn lỗi ({e}) - giữ bản dịch dài.", "warn")
-                    continue
-                for i, v in got.items():
-                    if i in idx and v and len(v) < len(result[i]) and not _FOREIGN.search(v):
-                        result[i] = v
+        _shorten_loop(lines, result, settings, log, progress, cancel, local)
     out = []
     left = 0
     for i, ln in enumerate(lines):
@@ -244,6 +298,46 @@ def translate(lines: list[dict], settings: Settings, log, progress, cancel, brie
         log(f"Còn {left} câu chưa dịch được - sửa tay trong bảng rồi xuất lại.", "warn")
     progress(1.0, "Đã dịch xong")
     return out
+
+
+def too_fast(line: dict, vi: str | None) -> bool:
+    """Câu dịch đọc nhanh hơn MAX_CPS (quá tải cho giọng đọc)."""
+    return bool(vi) and len(vi) > line["_max"] * MAX_CPS / CPS
+
+
+def _shorten_loop(lines, result, settings, log, progress, cancel, local, rounds: int = 3) -> None:
+    for rnd in range(rounds):
+        long_ = [i for i in range(len(lines)) if too_fast(lines[i], result.get(i))]
+        if not long_:
+            if rnd:
+                log("✅ Tối ưu thuyết minh xong: mọi câu đều đọc kịp thời gian.")
+            return
+        log(f"⚡ Tối ưu thuyết minh: {len(long_)} câu đọc quá nhanh (>{MAX_CPS:.0f} ký tự/giây) → AI rút gọn "
+            f"(vòng {rnd + 1}/{rounds}{', yêu cầu chặt hơn' if rnd else ''})...")
+        progress(0.9 + 0.03 * rnd, f"Rút gọn {len(long_)} câu cho kịp thời gian (vòng {rnd + 1})")
+        tighten = 1.0 - 0.1 * rnd  # vòng sau đặt giới hạn thấp hơn để AI cắt mạnh tay hơn
+        system = SHORTEN_SYSTEM + (SHORTEN_STRICT if rnd else "")
+        groups = [long_[a:a + 30] for a in range(0, len(long_), 30)]
+
+        def run(idx):
+            body = "\n".join(f"{i + 1} | max {max(6, int(lines[i]['_max'] * tighten))} chars | "
+                             f"original: {lines[i]['text']} | now: {result[i]}" for i in idx)
+            try:
+                return _ask(settings, system, body, idx, log, cancel)
+            except Cancelled:
+                raise
+            except Exception as e:  # noqa: BLE001
+                log(f"Rút gọn lỗi ({e}) - giữ bản dịch hiện tại.", "warn")
+                return {}
+
+        with ThreadPoolExecutor(max_workers=1 if local else 4) as ex:
+            for idx, got in zip(groups, ex.map(run, groups)):
+                for i, v in got.items():
+                    if i in idx and v and len(v) < len(result[i]) and not _FOREIGN.search(v):
+                        result[i] = v
+    left = sum(too_fast(lines[i], result.get(i)) for i in range(len(lines)))
+    if left:
+        log(f"Còn {left} câu hơi dài - giọng đọc sẽ tự nói nhanh lên một chút (tối đa ×1.35).", "warn")
 
 
 def to_srt(lines: list[dict], key: str = "vi") -> str:

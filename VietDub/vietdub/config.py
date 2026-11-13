@@ -28,6 +28,7 @@ DEFAULTS: dict = {
         "glossary": "",            # "林动 = Lâm Động" mỗi dòng 1 tên / thuật ngữ
         "context": "",             # vài câu giới thiệu video (thể loại, nhân vật, quan hệ) giúp dịch đúng xưng hô
         "shorten": True,           # câu dịch dài quá thời gian nói -> AI rút gọn
+        "safe": False,             # tránh từ ngữ vi phạm chính sách TikTok / YouTube
     },
     "voice": {"engine": "vieneu", "voice": "Ngọc Huyền", "speed": 0, "volume": 100, "fallback": True,
               "max_speed": 1.35},

@@ -254,17 +254,19 @@ class MainWindow(QMainWindow):
         self.context = b.line(QLineEdit(), "translate", "context")
         self.context.setPlaceholderText("vd: phim cổ trang, A là sư phụ của B, C là công chúa")
         self.glossary = QPlainTextEdit()
-        self.glossary.setPlaceholderText("Tên riêng (mỗi dòng 1 tên):\n林动 = Lâm Động\nHarry = Harry")
+        self.glossary.setPlaceholderText("Tên riêng (mỗi dòng 1 tên, AI luôn dùng):\n一护 = Ichigo\n林动 = Lâm Động")
         self.glossary.setFixedHeight(64)
         self.glossary.setPlainText(self.settings.get("translate", "glossary", ""))
         self.glossary.textChanged.connect(lambda: b.set("translate", "glossary", self.glossary.toPlainText()))
-        self.shorten = b.check(QCheckBox("Câu dịch dài quá thời gian nói → AI rút gọn"), "translate", "shorten")
+        self.shorten = b.check(QCheckBox("Tối ưu cho thuyết minh: câu đọc quá nhanh → AI rút gọn, đo lại"),
+                               "translate", "shorten")
+        self.safe = b.check(QCheckBox("Tránh từ ngữ vi phạm chính sách TikTok / YouTube"), "translate", "safe")
         g = QGridLayout()
         b_ref = button("🔄", lambda: self.refresh_status(force=True), tip="Kiểm tra lại AI")
         b_ref.setFixedWidth(40)
         rows_ = [("AI dịch", self.provider), ("Model", row(self.model, b_ref, stretch=False)), ("", self.lb_ai),
                  ("Văn phong", self.style_), ("Bối cảnh", self.context), ("Tên riêng", self.glossary),
-                 ("", self.shorten)]
+                 ("", self.shorten), ("", self.safe)]
         for i, (k, w) in enumerate(rows_):
             g.addWidget(label(k, "muted"), i, 0)
             g.addWidget(w, i, 1)

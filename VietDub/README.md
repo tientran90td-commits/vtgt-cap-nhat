@@ -10,7 +10,7 @@ Dịch video tiếng nước ngoài (Trung, Anh, Hàn, Nhật, Thái...) sang **
 | ⬇ Lấy video | Kéo thả file, hoặc **dán link** YouTube / TikTok / Douyin / Bilibili / Facebook (yt-dlp) |
 | 🔲 Phụ đề cứng | **Kéo khung** đúng dòng chữ in sẵn trên video (hoặc để app tự dò), bấm *Đọc thử* để xem app đọc đúng không, rồi **quét cả video** thành lời gốc có thời gian (OCR RapidOCR / PaddleOCR: Trung giản & phồn thể, Anh, Nhật, Hàn, Thái, Nga, Hindi, Ả Rập, Latin). Khung này cũng dùng để xóa phụ đề gốc đúng chỗ |
 | 🎧 Lời gốc | Phụ đề có sẵn (file .srt, phụ đề trong MKV, phụ đề tải kèm link) → Whisper bằng card đồ họa / CPU → Groq (online, rất nhanh). Tự lọc câu "ảo" Whisper hay bịa (字幕由..., Thanks for watching...) |
-| 🌐 Dịch | AI đọc lướt cả video để lập **bảng tên riêng** (tên Trung → Hán-Việt: 林动 → Lâm Động) và **xưng hô** giữa các nhân vật, rồi dịch từng lô câu theo văn phong bạn chọn. Câu nào bị sót thì app tự dịch lại. Câu nào dài quá thời gian nói thì AI tự rút gọn |
+| 🌐 Dịch | AI đọc **tên video + lời thoại** để nhận ra đây là phim gì, lập **bảng tên riêng** (anime Nhật kể lại bằng tiếng Trung → tên gốc: 一护 → Ichigo; phim Trung → Hán-Việt: 林动 → Lâm Động) và **xưng hô**, rồi dịch từng lô 30 câu theo văn phong bạn chọn. Câu sót thì tự dịch lại. **Tối ưu thuyết minh**: câu đọc quá nhanh thì AI rút gọn, đo lại, còn dài thì rút chặt hơn (tối đa 3 vòng). Có tùy chọn tránh từ ngữ vi phạm chính sách TikTok / YouTube |
 | 🎙️ Thuyết minh | Giọng **VieNeu Ngọc Huyền** (mặc định, chạy trên máy), Hải Đăng..., Edge Hoài My / Nam Minh (miễn phí, cần mạng), Piper, OpenAI, ElevenLabs, Gemini. Mỗi câu đặt đúng lúc nhân vật nói. Câu dài thì đọc nhanh hơn chút (tối đa 1.35 lần), không bao giờ đọc chồng câu |
 | 🎵 Tiếng gốc | **AI tách nhạc nền** (model UVR MDX-Net): bỏ hẳn giọng gốc, giữ nhạc nền và tiếng động, nghe như phim lồng tiếng thật. Có card đồ họa thì chạy bằng card (DirectML). Hoặc giữ tiếng gốc nhỏ, tự giảm thêm lúc đang đọc |
 | 🧽 Phụ đề gốc | **Xóa thông minh**: tự dò dải phụ đề, dò **lúc nào có chữ** và **chữ rộng tới đâu**, rồi chỉ xóa đúng chỗ đó, đúng lúc đó. Hình được nội suy từ vùng xung quanh nên không để lại dải mờ hay dải đen |
@@ -53,7 +53,8 @@ model đọc chữ cho mọi ngôn ngữ, Whisper, model tách nhạc, giọng P
 
 1. Kéo thả video hoặc dán link → *Tải*.
 2. Chọn **mẫu nhanh**: *Thuyết minh + Vietsub*, *Chỉ Vietsub*, *TikTok dọc* hoặc *Nhanh nhất*.
-3. Phim cổ trang thì chọn văn phong *Cổ trang*. Biết tên nhân vật thì ghi vào ô *Tên riêng*, ví dụ `林动 = Lâm Động`.
+3. Phim cổ trang thì chọn văn phong *Cổ trang*. Biết tên nhân vật thì ghi vào ô *Tên riêng*, ví dụ `一护 = Ichigo` hoặc `林动 = Lâm Động`.
+   Phim Trung / Nhật / Hàn nên dùng **AI online** (DeepSeek, Gemini, Groq): AI trên máy (Ollama) yếu hơn nhiều và dễ dịch sai tên, sai nội dung.
 4. Bấm **⚡ VIỆT HÓA → XUẤT VIDEO**.
 5. Muốn sửa câu dịch: sửa thẳng ở cột *Tiếng Việt* → **👁 Xem thử 20 giây** → **🎬 Xuất lại từ bảng dịch**.
    Giọng đã đọc được dùng lại, chỉ câu đã sửa mới đọc lại.

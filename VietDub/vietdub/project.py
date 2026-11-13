@@ -197,14 +197,16 @@ class Project:
     def run_translate(self, log=_noop, progress=_noop, cancel=None) -> list[dict]:
         if not self.source:
             raise RuntimeError("Chưa có lời gốc.")
-        if not self.brief:
-            progress(0.02, "AI đọc lướt: tên riêng, xưng hô")
-            self.brief = translate.make_brief(self.source, self.settings, log, cancel)
-            self._save("brief.json", self.brief)
+        # lập lại bảng tên mỗi lần dịch: bảng cũ có thể do AI yếu làm sai, dùng lại sẽ sai mãi
+        progress(0.02, "AI đọc lướt: nhận ra phim, tên riêng, xưng hô")
         lines = translate.translate(self.source, self.settings, log, lambda p, m="": progress(0.05 + p * 0.95, m),
-                                    cancel, brief=self.brief)
+                                    cancel, title=self.title, brief=None, on_brief=self._set_brief)
         self.save_lines(lines)
         return lines
+
+    def _set_brief(self, brief: dict) -> None:
+        self.brief = brief
+        self._save("brief.json", brief)
 
     def voice_files(self, lines: list[dict], log=_noop, progress=_noop, cancel=None) -> list:
         """Đọc giọng cho từng câu. Giọng đã chọn không dùng được -> giọng dự phòng (máy <-> online),

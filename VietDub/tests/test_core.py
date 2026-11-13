@@ -64,11 +64,15 @@ class FakeAI(BaseHTTPRequestHandler):
         system, user = body["messages"][0]["content"], body["messages"][1]["content"]
         if system.startswith("You prepare a translation brief"):
             FakeAI.calls["brief"] += 1
-            return self._send(json.dumps({"genre": "phiêu lưu", "names": {"Jack": "Jack"},
+            assert user.startswith("VIDEO TITLE: English Video"), user[:80]  # AI biết tên video để nhận ra phim
+            return self._send(json.dumps({"work": "Jack phiêu lưu ký", "genre": "phiêu lưu", "names": {"Jack": "Jack"},
                                           "pronouns": "Jack và Mary là bạn: xưng tôi - cậu."}))
         if system.startswith("You shorten"):
             FakeAI.calls["shorten"] += 1
             ids = re.findall(r"^(\d+) \|", user, re.M)
+            if "STRICT" not in system:  # vòng 1 rút chưa đủ -> app phải đo lại và yêu cầu rút chặt hơn
+                return self._send(json.dumps({"lines": {i: "Câu này đã rút gọn một lần nhưng vẫn còn dài dòng " * 3
+                                                        for i in ids}}, ensure_ascii=False))
             return self._send(json.dumps({"lines": {i: f"Câu {i} ngắn." for i in ids}}, ensure_ascii=False))
         if system.startswith("You write Vietnamese metadata"):
             FakeAI.calls["info"] += 1
@@ -77,6 +81,7 @@ class FakeAI(BaseHTTPRequestHandler):
                                          ensure_ascii=False))
         FakeAI.calls["translate"] += 1
         assert "NAMES/TERMS" in user and "Jack = Jack" in user and "xưng tôi" in user
+        assert "VIDEO TITLE: English Video" in user and "WORK: Jack phiêu lưu ký" in user
         ids = re.findall(r"^(\d+) \| [\d.]+s \| max (\d+) chars \|", user, re.M)
         out = {}
         for i, mx in ids:
@@ -309,6 +314,29 @@ def check_units():
     x = np.random.default_rng(1).standard_normal((2, separate.HOP * 255)).astype(np.float32)
     sp = m._stft(x)
     assert sp.shape == (2, 3073, 256) and np.abs(m._istft(sp, x.shape[1]) - x).max() < 1e-4
+    # nhận chữ viết lời gốc; phim Trung mà chọn Llama trên máy -> dùng Qwen; hết hạn mức -> sang AI khác ngay
+    from vietdub import ai, translate as tr
+
+    assert tr.source_lang([{"text": "一护推开宫殿大门"}]) == "zh"
+    assert tr.source_lang([{"text": "黒崎一護はドアを開けた"}]) == "ja"
+    assert tr.source_lang([{"text": "안녕하세요 친구"}]) == "ko" and tr.source_lang([{"text": "Hello"}]) == "other"
+    st = Settings(TMP / "u.json")
+    st.set("ai", "ollama_model", "llama3.1:8b")
+    assert ai.better_local_model(st, "zh") == ai.CJK_LOCAL and ai.better_local_model(st, "other") is None
+    st.set("ai", "ollama_model", "qwen2.5:14b")
+    assert ai.better_local_model(st, "zh") is None
+
+    class R:
+        def __init__(self, code, text):
+            self.status_code, self.text, self.headers = code, text, {}
+
+    for text, kind in (('{"error":{"code":"insufficient_quota"}}', ai.AIError),
+                       ('quotaId: "GenerateRequestsPerDayPerProjectPerModel-FreeTier"', ai.AIError),
+                       ('quotaId: "GenerateRequestsPerMinutePerProjectPerModel-FreeTier" retryDelay": "7s', ai._Retry)):
+        try:
+            ai._check(R(429, text), "X")
+        except Exception as e:  # noqa: BLE001
+            assert type(e) is kind, (text, e)
     print("✓ lọc câu rác Whisper, giới hạn chữ, kiểm tra bản dịch, ghép thuyết minh khớp thời gian, STFT tách nhạc")
 
 
@@ -333,7 +361,7 @@ def main():
     assert len(p.source) == n and any("phụ đề" in m and ".srt" in m for m in LOG), LOG[:6]
     assert len(p.lines) == n and all(x["vi"] for x in p.lines), [x["vi"] for x in p.lines]
     assert FakeAI.calls["brief"] == 1 and FakeAI.calls["translate"] >= 2 and FakeAI.dropped  # câu sót -> dịch lại
-    assert p.lines[4]["vi"] == "Câu 5 ngắn." and FakeAI.calls["shorten"] == 1             # câu quá dài -> rút gọn
+    assert p.lines[4]["vi"] == "Câu 5 ngắn." and FakeAI.calls["shorten"] == 2             # rút gọn, đo lại, rút chặt hơn
     assert p.lines[2]["vi"] == "Câu số 3 đã được dịch sang tiếng Việt."
     info = probe(out)
     assert abs(info.duration - 60) < 1.0 and info.has_audio and (info.width, info.height) == (640, 360), info
