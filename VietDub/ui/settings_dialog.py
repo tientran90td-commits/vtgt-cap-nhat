@@ -15,7 +15,7 @@ KEYS = [("gemini", "Google Gemini (miễn phí - dịch hay nhất)", "https://a
         ("claude", "Anthropic Claude", "https://console.anthropic.com/settings/keys"),
         ("openai", "OpenAI", "https://platform.openai.com/api-keys"),
         ("groq", "Groq (Whisper + AI, có gói miễn phí)", "https://console.groq.com/keys"),
-        ("openrouter", "OpenRouter", "https://openrouter.ai/keys"),
+        ("openrouter", "OpenRouter (có DeepSeek miễn phí)", "https://openrouter.ai/keys"),
         ("deepseek", "DeepSeek", "https://platform.deepseek.com/api_keys"),
         ("elevenlabs", "ElevenLabs (giọng đọc)", "https://elevenlabs.io/app/settings/api-keys")]
 

@@ -30,8 +30,8 @@ PROVIDERS = {
     "groq": {"name": "Groq (rất nhanh, có gói miễn phí)", "key": "groq", "default": "openai/gpt-oss-120b",
              "models": ["openai/gpt-oss-120b", "llama-3.3-70b-versatile"], "base": "https://api.groq.com/openai/v1",
              "max_chars": 60_000},
-    "openrouter": {"name": "OpenRouter (nhiều model)", "key": "openrouter", "default": "google/gemini-2.5-flash",
-                   "models": ["google/gemini-2.5-flash"], "base": "https://openrouter.ai/api/v1", "max_chars": 300_000},
+    "openrouter": {"name": "OpenRouter (có DeepSeek miễn phí)", "key": "openrouter", "default": "auto",
+                   "models": ["auto"], "base": "https://openrouter.ai/api/v1", "max_chars": 300_000},
     "deepseek": {"name": "DeepSeek", "key": "deepseek", "default": "deepseek-chat", "models": ["deepseek-chat"],
                  "base": "https://api.deepseek.com/v1", "max_chars": 150_000},
     "ollama": {"name": "Ollama - AI chạy trên máy (miễn phí)", "key": None, "default": "qwen2.5:7b",
@@ -80,6 +80,8 @@ def _check(r: requests.Response, name: str) -> dict:
         elif r.headers.get("retry-after", "").isdigit():
             delay = min(60.0, float(r.headers["retry-after"]))
         raise _Retry(f"{name} bận / quá tải (HTTP {r.status_code})", delay)
+    if r.status_code == 402:
+        raise AIError(f"{name}: tài khoản API hết tiền (HTTP 402) - nạp thêm hoặc dùng key AI khác.")
     if r.status_code in (401, 403):
         raise AIError(f"{name}: API key sai hoặc không có quyền (HTTP {r.status_code}).")
     if r.status_code >= 400:
@@ -175,6 +177,30 @@ def list_models(provider: str, settings: Settings) -> list[str]:
     return sorted(m.get("id", "") for m in data.get("data", []) if m.get("id"))
 
 
+def openrouter_models(settings: Settings) -> list[dict]:
+    r = requests.get("https://openrouter.ai/api/v1/models", timeout=30, proxies=settings.proxies())
+    return _check(r, "OpenRouter").get("data", [])
+
+
+def _free(m: dict) -> bool:
+    pr = m.get("pricing") or {}
+    return str(m.get("id", "")).endswith(":free") or (str(pr.get("prompt")) in ("0", "0.0")
+                                                      and str(pr.get("completion")) in ("0", "0.0"))
+
+
+def pick_openrouter(models: list[dict]) -> str | None:
+    """Ưu tiên DeepSeek MIỄN PHÍ (dịch tiếng Trung rất tốt), rồi Qwen miễn phí. Bỏ bản 'suy nghĩ lâu' (R1, distill)
+    nếu có bản thường, vì dịch không cần và chậm hơn nhiều."""
+    free = [m for m in models if _free(m) and m.get("id")]
+    for fam in ("deepseek", "qwen"):
+        cands = [m for m in free if fam in m["id"].lower()]
+        fast = [m for m in cands if not re.search(r"r1|distill|think|coder|math|vl\b|-vl", m["id"].lower())]
+        cands = fast or cands
+        if cands:
+            return max(cands, key=lambda m: (m.get("created") or 0, _ver(m["id"].split("/")[-1])))["id"]
+    return None
+
+
 def _ver(name: str) -> tuple:
     m = re.search(r"(\d+)(?:\.(\d+))?", name)
     return (int(m.group(1)), int(m.group(2) or 0)) if m else (0, 0)
@@ -217,6 +243,13 @@ def resolve_model(provider: str, settings: Settings, log=None) -> str:
                 log(f"Không lấy được danh sách model ({e}).", "warn")
         if new == "auto":
             new = "gemini-2.5-flash" if provider == "gemini" else "gpt-4o-mini"
+    if provider == "openrouter":
+        try:
+            new = pick_openrouter(openrouter_models(settings)) or "google/gemini-2.5-flash"
+        except Exception as e:  # noqa: BLE001
+            new = "google/gemini-2.5-flash"
+            if log:
+                log(f"Không lấy được danh sách model OpenRouter ({e}).", "warn")
     _RESOLVED[provider] = new
     if log:
         log(f"AI {PROVIDERS[provider]['name']}: dùng model {new}")

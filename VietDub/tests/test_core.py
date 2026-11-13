@@ -337,6 +337,15 @@ def check_units():
             ai._check(R(429, text), "X")
         except Exception as e:  # noqa: BLE001
             assert type(e) is kind, (text, e)
+    try:  # API hết tiền (DeepSeek 402) -> báo rõ, sang AI khác ngay
+        ai._check(R(402, '{"error":{"message":"Insufficient Balance"}}'), "DeepSeek")
+    except ai.AIError as e:
+        assert "hết tiền" in str(e)
+    om = [{"id": "google/gemini-2.5-flash", "pricing": {"prompt": "0.0000003", "completion": "0.0000025"}},
+          {"id": "deepseek/deepseek-r1:free", "created": 3}, {"id": "deepseek/deepseek-chat-v3.1:free", "created": 2},
+          {"id": "qwen/qwen3-235b:free", "created": 5}]
+    assert ai.pick_openrouter(om) == "deepseek/deepseek-chat-v3.1:free"   # DeepSeek miễn phí, bản thường
+    assert ai.pick_openrouter(om[:1]) is None
     print("✓ lọc câu rác Whisper, giới hạn chữ, kiểm tra bản dịch, ghép thuyết minh khớp thời gian, STFT tách nhạc")
 
 
