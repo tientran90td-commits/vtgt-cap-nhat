@@ -326,6 +326,43 @@ class Project:
                                    band=an.get("band"), boxes=an.get("boxes"), start=t0, length=seconds,
                                    bg_audio=an.get("bg"))
 
+    # ------------------------------------------------ dựng tiếp trong OpenCut
+    def opencut_package(self, log=_noop, progress=_noop, cancel=None) -> dict:
+        """Chuẩn bị cho OpenCut: video đã xóa phụ đề gốc (tiếng nền), giọng thuyết minh, phụ đề Việt (chữ sửa được).
+        Trả về {files: {...}, manifest: {...}} để máy chủ OpenCut phục vụ."""
+        import uuid
+
+        opts = self.settings.section("video")
+        out_dir = self.dir / "opencut"
+        out_dir.mkdir(exist_ok=True)
+        an = self.analysis(log, cancel, lambda p, m="": progress(0.05 + p * 0.25, m))
+        has_vi = any((x.get("vi") or "").strip() for x in self.lines)
+        files, items = {}, []
+        bg = an.get("bg") if opts.get("background") == "separate" else None
+        clean = render.clean_video(self.video, self.info, opts, out_dir / "video_sach.mp4", out_dir / "work", log,
+                                   lambda p, m="": progress(0.3 + p * 0.4, m), cancel, band=an.get("band"),
+                                   boxes=an.get("boxes"), audio=bg)
+        files["video"] = clean
+        items.append({"name": f"{self.title} (đã xóa phụ đề gốc).mp4", "url": "/vietdub/files/video", "kind": "video"})
+        if has_vi and self._wants_dub():
+            vfiles = self.voice_files(self.lines, log, lambda p, m="": progress(0.7 + p * 0.25, m), cancel)
+            track = out_dir / "thuyet_minh.wav"
+            dub.build(self.lines, vfiles, self.info.duration, track,
+                      float(self.settings.get("voice", "max_speed", 1.35)), cancel=cancel, log=log)
+            files["dub"] = track
+            items.append({"name": "Thuyết minh tiếng Việt.wav", "url": "/vietdub/files/dub", "kind": "audio"})
+        if has_vi:
+            srt = out_dir / "phu_de_viet.srt"
+            srt.write_text(translate.to_srt(self.lines), encoding="utf-8")
+            files["srt"] = srt
+            items.append({"name": "Phụ đề Việt.srt", "url": "/vietdub/files/srt", "kind": "subtitle"})
+        ci = probe(clean)
+        title = ((self.publish_info or {}).get("titles") or [None])[0] or f"{self.title} (Việt hóa)"
+        manifest = {"job": uuid.uuid4().hex[:12], "title": title[:80], "width": ci.width, "height": ci.height,
+                    "items": items}
+        progress(1.0, "Đã chuẩn bị cho OpenCut")
+        return {"files": files, "manifest": manifest}
+
     # ------------------------------------------------ ảnh bìa, tiêu đề, hashtag
     def run_publish(self, log=_noop, cancel=None) -> dict:
         opts = self.settings.section("publish")

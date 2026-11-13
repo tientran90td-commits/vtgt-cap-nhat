@@ -26,6 +26,7 @@ ITEMS = {
     "whisper_gpu": ("🎮 Whisper bằng card đồ họa (Windows)", "~0.9 GB"),
     "uvr": ("🎵 Tách nhạc nền khỏi giọng gốc (UVR)", "~70 MB"),
     "piper": ("🗣️ Giọng Piper tiếng Việt (dự phòng khi mất mạng)", "~60 MB"),
+    "opencut": ("🎬 Trình dựng OpenCut tiếng Việt", "~35 MB"),
 }
 PIP = {"vieneu": ["vieneu"], "ocr": ["rapidocr"], "whisper": ["faster-whisper"],
        "uvr": ["onnxruntime"], "piper": ["piper-tts"]}
@@ -63,6 +64,9 @@ def status() -> dict[str, bool]:
     for cid in ITEMS:
         mod = MODULE.get(cid)
         out[cid] = bool(done.get(cid)) and (mod is None or has_module(mod))
+    from . import opencut
+
+    out["opencut"] = opencut.up_to_date()
     if os.name != "nt":
         out.pop("whisper_gpu", None)
     return out
@@ -169,6 +173,10 @@ def install(cid: str, settings: Settings, log, progress, cancel) -> None:
         separate.model_path(settings, log, progress, cancel)
         log("✅ Model tách nhạc nền sẵn sàng.")
         _mark(cid)
+    elif cid == "opencut":
+        from . import opencut
+
+        opencut.install(settings, log, progress, cancel)
     elif cid == "piper":
         from . import voices
 

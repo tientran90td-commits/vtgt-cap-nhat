@@ -364,10 +364,13 @@ class MainWindow(QMainWindow):
         self.btn_render = button("🎬 Xuất lại từ bảng dịch", self.do_render, "primary")
         self.btn_cancel = button("⏹ Hủy", self.cancel, "danger")
         self.btn_cancel.setEnabled(False)
+        self.btn_oc = button("🎬 Dựng tiếp trong OpenCut", self.open_opencut, "primary",
+                             "Mở trình dựng OpenCut (tiếng Việt): video đã xóa phụ đề gốc + thuyết minh + phụ đề "
+                             "Việt nạp sẵn trên dòng thời gian")
         self.btn_pub = button("📤 Đăng video", self.open_publish, tip="Ảnh bìa, tiêu đề, mô tả, hashtag")
         self.btn_pub.setEnabled(False)
         lay.addWidget(row(*chips, self.prog, self.lb_status, stretch=False))
-        lay.addWidget(row(self.btn_all, self.btn_render, self.btn_cancel, "stretch", self.btn_pub,
+        lay.addWidget(row(self.btn_all, self.btn_render, self.btn_cancel, "stretch", self.btn_oc, self.btn_pub,
                           button("📂 Mở thư mục video", self.open_folder), button("▶ Xem video", self.play)))
         self.log = QPlainTextEdit()
         self.log.setObjectName("log")
@@ -771,7 +774,7 @@ class MainWindow(QMainWindow):
         return True
 
     def _buttons(self):
-        return (self.btn_all, self.btn_render, self.btn_tr, self.btn_stt, self.btn_prev, self.btn_edit)
+        return (self.btn_all, self.btn_render, self.btn_tr, self.btn_stt, self.btn_prev, self.btn_edit, self.btn_oc)
 
     def run_task(self, fn, title: str, on_done=None, with_steps=False):
         if self.worker is not None:
@@ -951,6 +954,32 @@ class MainWindow(QMainWindow):
         self.btn_pub.setEnabled(True)
         self._load_media(str(out))
         self.open_folder()
+
+    def open_opencut(self):
+        """Dựng tiếp trong OpenCut: chưa mở video thì mở danh sách dự án OpenCut."""
+        from vietdub import opencut
+
+        p = self.project
+        if p is not None and p.lines:
+            p.save_lines(self.collect())
+
+        def job(log, progress, cancel):
+            if not opencut.up_to_date():
+                opencut.install(self.settings, log, progress, cancel)
+            base = opencut.start()
+            if p is None or not p.lines:
+                return base + "/projects/"
+            pk = p.opencut_package(log, progress, cancel)
+            opencut.share(pk["files"], pk["manifest"])
+            log("Mở OpenCut: video, thuyết minh và phụ đề Việt sẽ được nạp sẵn trên dòng thời gian.")
+            return opencut.editor_url(base, pk["manifest"])
+
+        def done(url):
+            opencut.open_window(url)
+            if not opencut.browser():
+                QMessageBox.information(self, "OpenCut", "Không thấy Edge/Chrome - đã mở bằng trình duyệt mặc định. "
+                                        "OpenCut chạy tốt nhất trên Edge hoặc Chrome.")
+        self.run_task(job, "Chuẩn bị OpenCut", on_done=done)
 
     def open_publish(self):
         if not self.need_project():

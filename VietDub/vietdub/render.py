@@ -300,3 +300,48 @@ def render_video(video: str, info: MediaInfo, lines: list[dict], dub_wav: Path |
         write_srt(out.with_suffix(".srt"), items)
     progress(1.0, "Xong")
     return out
+
+
+def clean_video(video: str, info: MediaInfo, opts: dict, out: Path, work: Path, log, progress, cancel,
+                band: tuple | None = None, boxes: list | None = None, audio: Path | None = None) -> Path:
+    """Video gốc đã xóa phụ đề gốc (không in phụ đề Việt, không thuyết minh) để dựng tiếp ở trình khác.
+    audio: nhạc nền đã tách giọng (nếu có) thay cho tiếng gốc."""
+    W, H = output_size(info, opts.get("aspect", "source"), int(opts.get("height", 1080)))
+    cover = opts.get("cover", "none")
+    if cover == "auto" and not band:
+        cover = "none"
+    need_vf = cover != "none" or (W, H) != (even(info.width), even(info.height))
+    work.mkdir(parents=True, exist_ok=True)
+    args = ["-i", video]
+    if audio is not None:
+        args += ["-i", str(audio)]
+    tail = []
+    if need_vf:
+        g = video_filter(W, H, opts.get("fill", "blur"), cover, float(opts.get("cover_height", 14)),
+                         max(24, min(60, round(info.fps or 30))), info.width, info.height, band=band, boxes=boxes)
+        g = g.replace(",tpad=stop_mode=clone:stop_duration=5", "")
+        tail += ["-filter_complex", g + ";[vb]format=yuv420p[v]", "-map", "[v]"]
+    else:
+        tail += ["-map", "0:v:0"]
+    if audio is not None:
+        tail += ["-map", "1:a:0"]
+    elif info.has_audio:
+        tail += ["-map", "0:a:0"]
+    tail += ["-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-t", f"{info.duration:.3f}", "-movflags", "+faststart"]
+    out = Path(out)
+    out.parent.mkdir(parents=True, exist_ok=True)
+    tmp = out.with_name(out.stem + ".tmp.mp4")
+    enc = encoder_args(opts.get("encoder", "auto"), int(opts.get("quality", 21)))
+
+    def go(vcodec):
+        run([*args, *tail, *vcodec, str(tmp)], cancel=cancel, total=info.duration, cwd=str(work),
+            on_progress=lambda p: progress(p, f"Chuẩn bị video cho OpenCut {int(p * 100)}%"))
+    if need_vf:
+        go([*enc, "-pix_fmt", "yuv420p"])
+    else:
+        try:
+            go(["-c:v", "copy"])
+        except MediaError:
+            go([*enc, "-pix_fmt", "yuv420p"])
+    tmp.replace(out)
+    return out

@@ -18,6 +18,7 @@ Dịch video tiếng nước ngoài (Trung, Anh, Hàn, Nhật, Thái...) sang **
 | ✏️ Chỉnh phụ đề trực tiếp | Video chạy, **phụ đề Việt hiện ngay trên hình**. Gõ sửa chữ là thấy liền; chỉnh thời gian bằng nút *= lúc này* hoặc ±0.1 giây; tách, gộp, thêm, xóa câu; dời tất cả phụ đề; đổi cỡ, màu, vị trí chữ. Phím tắt: Space, Ctrl+S, Alt+[ / Alt+], PageUp / PageDown |
 | 🎬 Xuất | Giữ khung gốc hoặc 16:9 / 9:16 / 1:1. Không cần vẽ gì lên hình thì **chép thẳng hình gốc**, xuất trong vài giây |
 | 📤 Đăng | Ảnh bìa có tiêu đề tiếng Việt, tiêu đề / mô tả / hashtag tiếng Việt |
+| 🎬 Dựng tiếp | **OpenCut tiếng Việt** (trình dựng mã nguồn mở kiểu CapCut) mở ngay trong cửa sổ riêng, dòng thời gian đã có sẵn: video đã xóa phụ đề gốc, giọng thuyết minh, phụ đề Việt (chữ sửa được). Cắt ghép, thêm chữ, nhãn dán, hiệu ứng, mặt nạ, khung hình chính... rồi bấm **Xuất video** |
 
 **Chạy cả trên máy lẫn qua mạng** (ô chế độ ở góc trên): ⚡ Tự động · 🔒 Chỉ trên máy · 🌐 Ưu tiên online. Mỗi bước
 tự chọn cách đang dùng được; lỗi hay mất mạng thì tự chuyển cách kia.
@@ -49,6 +50,22 @@ model đọc chữ cho mọi ngôn ngữ, Whisper, model tách nhạc, giọng P
 
 Dòng lệnh: `python main.py video.mp4` hoặc `python main.py https://... --output sub`.
 
+## 🎬 Dựng tiếp trong OpenCut
+
+Bấm **🎬 Dựng tiếp trong OpenCut** (thanh dưới cùng). VietDub chuẩn bị 3 thứ rồi mở OpenCut trong cửa sổ riêng của
+Edge / Chrome:
+
+- video đã xóa phụ đề gốc (nếu chọn tách nhạc thì tiếng nền đã bỏ giọng gốc),
+- giọng thuyết minh tiếng Việt (1 rãnh âm thanh riêng, chỉnh âm lượng / cắt được),
+- phụ đề Việt dạng chữ trên dòng thời gian (sửa chữ, phông, màu, vị trí được).
+
+OpenCut chạy hoàn toàn trên máy: VietDub tự chạy 1 máy chủ web nhỏ ở `127.0.0.1` (không ra mạng), không cần Node.js
+hay đăng nhập. Dự án OpenCut được lưu trong cửa sổ đó, lần sau mở lại vẫn còn. Giữ VietDub mở trong lúc dựng.
+
+OpenCut là phần mềm mã nguồn mở của nhóm OpenCut (giấy phép MIT, xem `opencut/LICENSE-OpenCut.txt`). Bản đi kèm là
+bản *classic* đã ngừng phát triển; VietDub dịch giao diện sang tiếng Việt, sửa vài lỗi có sẵn, bỏ phần cần máy chủ
+online (đăng nhập, góp ý, thư viện âm thanh Freesound). Dựng lại bản này: xem `opencut/build_opencut_vi.py`.
+
 ## Ổ đầy (No space left on device)
 
 - Dọn Thùng rác, chạy *Disk Cleanup* cho ổ C.
@@ -67,6 +84,7 @@ VietDub/
 │   ├── hardsub.py         # dò phụ đề gốc: vị trí, lúc xuất hiện, bề rộng
 │   ├── ocr.py             # quét phụ đề cứng thành chữ (RapidOCR)
 │   ├── components.py      # 📦 tải thư viện & model
+│   ├── opencut.py         # máy chủ OpenCut trên máy + cầu nối VietDub
 │   ├── render.py          # xuất video 1 lượt: xóa phụ đề gốc, phụ đề Việt, trộn tiếng
 │   ├── transcript.py      # lời gốc: phụ đề / Whisper
 │   ├── voices.py          # giọng đọc
@@ -76,6 +94,7 @@ VietDub/
 │   ├── publish.py         # ảnh bìa, tiêu đề, hashtag
 │   ├── updater.py         # cập nhật trực tiếp
 │   └── project.py         # quy trình & lưu dự án
+├── opencut/               # OpenCut tiếng Việt: bản dựng sẵn (zip) + script Việt hóa & dựng lại
 ├── ui/                    # giao diện PySide6
 └── tests/test_core.py     # kiểm thử toàn bộ quy trình (không cần mạng)
 ```
@@ -97,4 +116,5 @@ khóa kênh.
 | [Ollama](https://ollama.com) + Qwen2.5 | AI dịch chạy trên máy |
 | [edge-tts](https://github.com/rany2/edge-tts), [Piper](https://github.com/rhasspy/piper), [VieNeu-TTS](https://github.com/pnnbao97/VieNeu-TTS) | Giọng thuyết minh |
 | [RapidOCR](https://github.com/RapidAI/RapidOCR) + [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) | Đọc phụ đề cứng mọi ngôn ngữ |
+| [OpenCut](https://github.com/opencut-app/opencut-classic) (MIT) | Trình dựng video, Việt hóa, chạy kèm |
 | [PySide6](https://doc.qt.io/qtforpython-6/), [Pillow](https://python-pillow.org) | Giao diện, ảnh bìa |

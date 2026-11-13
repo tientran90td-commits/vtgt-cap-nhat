@@ -117,6 +117,43 @@ def make_video(path: Path, seconds: int = 60):
     return len(lines)
 
 
+def check_opencut(s: Settings, p: Project):
+    """OpenCut tiếng Việt: cài từ bản đi kèm, máy chủ trên máy, trang dựng mọi id, cầu nối nạp dữ liệu VietDub."""
+    import requests
+
+    from vietdub import opencut
+
+    if not opencut.bundled_zip().exists():
+        print("✓ (bỏ qua OpenCut: chưa có opencut/opencut-vi.zip)")
+        return
+    opencut.install(s, log, prog, None)
+    assert opencut.up_to_date()
+    base = opencut.start()
+    sess = requests.Session()
+    sess.trust_env = False
+    home = sess.get(base + "/projects/", timeout=10)
+    assert home.status_code == 200 and 'lang="vi"' in home.text
+    ed = sess.get(base + "/editor/abc-123/", timeout=10)
+    assert ed.status_code == 200 and "<html" in ed.text           # mọi id dùng chung trang dựng
+    assert sess.get(base + "/editor/abc-123/index.txt", timeout=10).status_code == 200
+    s.set("video", "output", "both")
+    s.set("video", "background", "duck")
+    pk = p.opencut_package(log, prog)
+    kinds = [x["kind"] for x in pk["manifest"]["items"]]
+    assert kinds == ["video", "audio", "subtitle"], kinds
+    opencut.share(pk["files"], pk["manifest"])
+    m = sess.get(base + "/vietdub/manifest.json", timeout=10).json()
+    assert m["job"] == pk["manifest"]["job"] and m["width"] == 640
+    srt = sess.get(base + "/vietdub/files/srt", timeout=10).text
+    assert "-->" in srt and "Câu" in srt
+    v = sess.get(base + "/vietdub/files/video", timeout=30)
+    assert v.status_code == 200 and len(v.content) > 10000
+    assert sess.get(base + "/vietdub/files/khong-co", timeout=10).status_code == 404
+    url = opencut.editor_url(base, pk["manifest"])
+    assert f"vietdub={m['job']}" in url and "/editor/vietdub-" in url
+    print("✓ OpenCut tiếng Việt: cài từ bản đi kèm, máy chủ trên máy, cầu nối video + thuyết minh + phụ đề")
+
+
 def check_ocr(s: Settings):
     """Quét phụ đề cứng tiếng Trung bằng OCR (theo khung) -> lời gốc đúng chữ, đúng thời gian."""
     font = "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"
@@ -272,6 +309,7 @@ def main():
     print("✓ chỉ thuyết minh (chép thẳng hình), chỉ phụ đề, nhạc nền tách giọng (+ tự xử lý khi lỗi), khung dọc 9:16, "
           "xem thử 20 giây")
 
+    check_opencut(s, p)
     check_ocr(s)
     assert set(components.status()) >= {"vieneu", "ocr", "whisper", "uvr", "piper"}
     assert voices._plain("Ngọc Huyền") == "ngoc huyen"
