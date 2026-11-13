@@ -154,6 +154,74 @@ def check_opencut(s: Settings, p: Project):
     print("✓ OpenCut tiếng Việt: cài từ bản đi kèm, máy chủ trên máy, cầu nối video + thuyết minh + phụ đề")
 
 
+def check_oc_tools(s: Settings):
+    """Tab VietDub AI trong OpenCut: gửi file, chạy việc nền, lấy kết quả; trang web lạ bị chặn."""
+    import requests
+
+    from vietdub import opencut
+
+    base = opencut.start(settings=s)
+    h = {"X-VietDub": "1"}
+    sess = requests.Session()
+    sess.trust_env = False
+    assert sess.post(base + "/vietdub/api/run/tts", json={"text": "x"}, timeout=10).status_code == 403  # thiếu header
+    assert sess.post(base + "/vietdub/api/run/tts", json={"text": "x"}, headers={**h, "Origin": "https://evil.example"},
+                     timeout=10).status_code == 403
+    job = sess.post(base + "/vietdub/api/run/tts", json={"text": "Xin chào các bạn"}, headers=h, timeout=10).json()["job"]
+    for _ in range(100):
+        st = sess.get(f"{base}/vietdub/api/job/{job}", headers=h, timeout=10).json()
+        if st["state"] != "running":
+            break
+        time.sleep(0.2)
+    assert st["state"] == "done", st
+    item = st["result"]["items"][0]
+    wav = sess.get(base + item["url"], headers=h, timeout=10)
+    assert item["kind"] == "audio" and wav.status_code == 200 and wav.content[:4] == b"RIFF"
+    up = sess.post(base + "/vietdub/upload?name=a b.txt", data=b"hello", headers=h, timeout=10).json()["upload"]
+    from vietdub import oc_tools
+
+    assert oc_tools.upload_path(up).read_bytes() == b"hello" and oc_tools.upload_path(up).name == "a b.txt"
+    bad = sess.post(base + "/vietdub/api/run/khong_co", json={}, headers=h, timeout=10)
+    assert bad.status_code == 400
+    print("✓ tab VietDub AI: đọc chữ thành giọng qua máy chủ trên máy, gửi file; chặn trang web lạ")
+
+
+def check_drive():
+    """Mọi dữ liệu nằm trong thư mục app (cùng ổ), chuyển dữ liệu cũ khỏi ổ C."""
+    from vietdub import config
+
+    assert config.app_home() == Path(os.environ["VIETDUB_HOME"])
+    st = Settings(TMP / "drive.json")
+    assert st.output_dir().parent == config.app_dir() and st.downloads_dir().parent == config.app_dir()
+    # chuyển dữ liệu bản cũ (giả lập ổ C)
+    old = TMP / "old_C" / "VietDub"
+    (old / "projects" / "p1").mkdir(parents=True)
+    (old / "projects" / "p1" / "a.json").write_text("1", encoding="utf-8")
+    (old / "models").mkdir()
+    (old / "models" / "m.bin").write_bytes(b"x" * 10)
+    keep = config.old_home
+    config.old_home = lambda: old
+    try:
+        n = config.migrate_old_home()
+    finally:
+        config.old_home = keep
+    assert n == 2 and not old.exists()
+    assert (config.app_home() / "projects" / "p1" / "a.json").exists() and (config.app_home() / "models" / "m.bin").exists()
+    env_keep = dict(os.environ)
+    try:
+        config.setup_env()
+        home = config.app_home()
+        for k in ("TEMP", "HF_HOME", "XDG_CACHE_HOME", "UV_CACHE_DIR"):
+            assert Path(os.environ[k]).is_relative_to(home), (k, os.environ[k])
+    finally:
+        os.environ.clear()
+        os.environ.update(env_keep)
+        import tempfile as _t
+
+        _t.tempdir = None
+    print("✓ cài trên ổ chứa app: dữ liệu, file tạm, model, bộ nhớ đệm đều trong thư mục app; chuyển dữ liệu cũ khỏi ổ C")
+
+
 def check_ocr(s: Settings):
     """Quét phụ đề cứng tiếng Trung bằng OCR (theo khung) -> lời gốc đúng chữ, đúng thời gian."""
     font = "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"
@@ -310,6 +378,8 @@ def main():
           "xem thử 20 giây")
 
     check_opencut(s, p)
+    check_oc_tools(s)
+    check_drive()
     check_ocr(s)
     assert set(components.status()) >= {"vieneu", "ocr", "whisper", "uvr", "piper"}
     assert voices._plain("Ngọc Huyền") == "ngoc huyen"

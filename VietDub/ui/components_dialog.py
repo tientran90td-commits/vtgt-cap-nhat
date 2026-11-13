@@ -19,8 +19,13 @@ class ComponentsDialog(QDialog):
         self.grid = QGridLayout()
         cl.addLayout(self.grid)
         lay.addWidget(c)
-        lay.addWidget(label("Cần mạng khi tải. File tạm để trên cùng ổ với app, không lưu cache. "
-                            "Đang tải vẫn có thể bấm Hủy ở cửa sổ chính.", "muted"))
+        from vietdub.config import app_home, disk_info
+
+        drive, free, _t = disk_info(app_home())
+        self.lb_disk = label(f"Tất cả lưu vào {app_home()} - ổ {drive} còn trống {free:.1f} GB "
+                             "(cần ~5 GB để tải hết). Không ghi gì vào ổ C.", "muted")
+        lay.addWidget(self.lb_disk)
+        lay.addWidget(label("Cần mạng khi tải. Đang tải vẫn có thể bấm Hủy ở cửa sổ chính.", "muted"))
         lay.addStretch(1)
         lay.addWidget(row(button("⬇ Tải tất cả", self.all, "big"), "stretch", button("Đóng", self.accept)))
         self.refresh()

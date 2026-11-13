@@ -143,6 +143,28 @@ class MainWindow(QMainWindow):
         self._timer.start(60_000)
         if self.settings.get("update", "auto_check", True) and self.settings.mode != "offline":
             QTimer.singleShot(2500, lambda: self.check_update(silent=True))
+        QTimer.singleShot(600, self.check_storage)
+
+    # ================================================================ ổ đĩa
+    def check_storage(self):
+        from vietdub.config import (app_dir, app_home, disk_info, migrate_old_home, needs_migration, old_home,
+                                    on_system_drive)
+
+        drive, free, _total = disk_info(app_home())
+        self.log_msg(f"Dữ liệu app: {app_home()} · ổ {drive} còn trống {free:.1f} GB")
+        if on_system_drive() and not self.settings.get("ui", "warned_c", False):
+            self.binder.set("ui", "warned_c", True)
+            QMessageBox.warning(self, "App đang ở ổ C",
+                                f"VietDub đang nằm ở {app_dir()} (ổ C).\n\nMọi dữ liệu, model và video của app đều "
+                                "nằm cùng ổ với thư mục app. Ổ C sắp đầy thì hãy:\n1. Đóng app.\n2. Chép cả thư mục "
+                                "VietDub sang ổ D (vd D:\\VietDub).\n3. Chạy lại install.bat ở chỗ mới, rồi xóa thư mục "
+                                "cũ ở ổ C.")
+        if needs_migration():
+            self.log_msg(f"Thấy dữ liệu bản cũ ở {old_home()} - chuyển sang thư mục app để giải phóng ổ C...")
+            self.run_task(migrate_old_home, "Chuyển dữ liệu cũ khỏi ổ C",
+                          on_done=lambda _n: self.refresh_status(force=True))
+        elif free < 3:
+            self.log_msg(f"⚠️ Ổ {drive} chỉ còn {free:.1f} GB - nên dọn bớt (video xuất, dự án cũ).", "warn")
 
     # ================================================================ cột ① video
     def _col_video(self) -> QWidget:
@@ -398,13 +420,13 @@ class MainWindow(QMainWindow):
                "local": transcript.ENGINES["local"], "subtitle": transcript.ENGINES["subtitle"]}
         if not off:
             stt.update({"groq": transcript.ENGINES["groq"], "openai": transcript.ENGINES["openai"]})
-        try:
-            self.stt.currentIndexChanged.disconnect()
-        except (RuntimeError, TypeError):
-            pass
+        self.stt.blockSignals(True)
         fill(self.stt, stt)
         self._select(self.stt, self.settings.get("speech", "engine"))
-        self.stt.currentIndexChanged.connect(lambda _i: self.binder.set("speech", "engine", self.stt.currentData()))
+        self.stt.blockSignals(False)
+        if not getattr(self, "_stt_connected", False):
+            self.stt.currentIndexChanged.connect(lambda _i: self.binder.set("speech", "engine", self.stt.currentData()))
+            self._stt_connected = True
         provs = {"auto": ai.PROVIDERS["auto"]["name"] if not off else "⚡ Tự chọn (AI trên máy)",
                  "ollama": ai.PROVIDERS["ollama"]["name"]}
         if not off:
@@ -966,7 +988,10 @@ class MainWindow(QMainWindow):
         def job(log, progress, cancel):
             if not opencut.up_to_date():
                 opencut.install(self.settings, log, progress, cancel)
-            base = opencut.start()
+            base = opencut.start(settings=self.settings)
+            from vietdub import oc_tools
+
+            oc_tools.cleanup()
             if p is None or not p.lines:
                 return base + "/projects/"
             pk = p.opencut_package(log, progress, cancel)

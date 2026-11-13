@@ -165,10 +165,42 @@ def patch_after_translate(web: Path) -> None:
             sub(web / "src" / rel, old, new, count=item[3] if len(item) > 3 else 1)
 
 
+WASM_FILES = ("opencut_wasm.js", "opencut_wasm_bg.js", "opencut_wasm_bg.wasm", "opencut_wasm.d.ts")
+
+
+def build_wasm(root: Path) -> Path:
+    """Dựng lại lõi WebAssembly của OpenCut có thêm hiệu ứng (cần Rust + target wasm32 + wasm-bindgen-cli 0.2.116)."""
+    sys.path.insert(0, str(HERE / "wasm"))
+    import patch_effects
+
+    patch_effects.apply(root / "rust")
+    subprocess.run(["cargo", "build", "-p", "opencut-wasm", "--target", "wasm32-unknown-unknown", "--release"],
+                   cwd=root, check=True)
+    pkg = root / "rust" / "wasm" / "pkg-vietdub"
+    shutil.rmtree(pkg, ignore_errors=True)
+    wasm_bindgen = shutil.which("wasm-bindgen") or str(Path.home() / ".cargo" / "bin" / "wasm-bindgen")
+    subprocess.run([wasm_bindgen, "--target", "bundler", "--out-dir", str(pkg),
+                    str(root / "target" / "wasm32-unknown-unknown" / "release" / "opencut_wasm.wasm")], check=True)
+    wasm_opt = shutil.which("wasm-opt")
+    if wasm_opt:  # thu nhỏ file nếu có binaryen
+        subprocess.run([wasm_opt, "-O2", "--enable-bulk-memory", "--enable-nontrapping-float-to-int",
+                        "-o", str(pkg / "opencut_wasm_bg.wasm"), str(pkg / "opencut_wasm_bg.wasm")], check=False)
+    return pkg
+
+
+def use_wasm(root: Path, pkg: Path) -> None:
+    """Thay gói opencut-wasm (npm) bằng bản vừa dựng. Xóa file cũ trước: bun liên kết cứng tới bộ nhớ đệm chung."""
+    dst = root / "node_modules" / "opencut-wasm"
+    for name in WASM_FILES:
+        (dst / name).unlink(missing_ok=True)
+        shutil.copyfile(pkg / name, dst / name)
+
+
 def build(root: Path, out_zip: Path) -> None:
     web = root / "apps" / "web"
     bun = shutil.which("bun") or str(Path.home() / ".bun" / "bin" / "bun")
     subprocess.run([bun, "install"], cwd=root, check=True)
+    use_wasm(root, build_wasm(root))
     subprocess.run([bun, "run", "build"], cwd=web, check=True)
     out = web / "out"
     if not (out / "projects" / "index.html").exists():

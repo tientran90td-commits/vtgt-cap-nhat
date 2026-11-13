@@ -24,7 +24,8 @@ from .config import Settings
 from .media import Cancelled, no_window
 
 SUBDIR = "VietDub"
-KEEP = {".venv", "venv", "_backup", "build", "dist", "__pycache__", ".git"}  # không bao giờ ghi đè/xóa
+KEEP = {".venv", "venv", "_backup", "build", "dist", "__pycache__", ".git", "data", "tools", "Video xuất",
+        "Video tải về"}  # không bao giờ ghi đè/xóa
 CODE_DIRS = ("vietdub", "ui", "tests")  # file .py không còn ở bản mới sẽ được dọn
 
 
@@ -187,9 +188,10 @@ def _install_requirements(root: Path, log, progress, cancel) -> None:
     progress(0.9, "Cài thư viện mới (nếu có)")
     log("Cài thư viện mới (nếu có)...")
     try:
-        r = subprocess.run([sys.executable, "-m", "pip", "install", "-q", "--disable-pip-version-check", "-r", str(req)],
-                           capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=1800,
-                           **no_window())
+        from .components import pip_command, pip_env
+
+        r = subprocess.run(pip_command(["-r", str(req)]), capture_output=True, text=True, encoding="utf-8",
+                           errors="replace", timeout=1800, env=pip_env(), **no_window())
         if r.returncode != 0:
             log("Cài thư viện mới lỗi - có thể chạy lại install.bat:\n" + (r.stderr or r.stdout)[-500:], "warn")
         else:

@@ -63,6 +63,11 @@ def has_module(name: str) -> bool:
 
 # ------------------------------------------------------------------ Ollama
 def ollama_exe() -> str | None:
+    from .config import app_dir
+
+    for p in (app_dir() / "tools" / "ollama" / "ollama.exe", app_dir() / "tools" / "ollama" / "ollama"):
+        if p.exists():  # Ollama cài cùng ổ với app (install.bat)
+            return str(p)
     found = shutil.which("ollama")
     if found:
         return found

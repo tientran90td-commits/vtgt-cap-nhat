@@ -76,14 +76,40 @@ def app_dir() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def pip_install(pkgs: list[str], log, cancel=None) -> None:
+def uv_exe() -> Path | None:
+    """uv (trình cài thư viện Python siêu nhanh) do install.bat tải về thư mục app/tools."""
+    for name in ("uv.exe", "uv"):
+        p = app_dir() / "tools" / name
+        if p.exists():
+            return p
+    return None
+
+
+def pip_command(args: list[str]) -> list[str]:
+    """Lệnh cài thư viện vào đúng môi trường của app: ưu tiên uv (nhanh, cache trên cùng ổ), không có thì pip."""
+    uv = uv_exe()
+    if uv:
+        args = ["--reinstall" if a == "--force-reinstall" else a for a in args]
+        return [str(uv), "pip", "install", "--python", sys.executable, *args]
+    return [sys.executable, "-m", "pip", "install", "--disable-pip-version-check", *args]
+
+
+def pip_env() -> dict:
+    from .config import app_home
+
     env = dict(os.environ)
-    tmp = app_dir() / ".tmp"
-    tmp.mkdir(exist_ok=True)
-    env.update(TEMP=str(tmp), TMP=str(tmp), PIP_NO_CACHE_DIR="1", PYTHONIOENCODING="utf-8")
-    log("Cài thư viện: " + " ".join(pkgs))
-    proc = subprocess.Popen([sys.executable, "-m", "pip", "install", "--disable-pip-version-check", *pkgs],
-                            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env, **no_window())
+    tmp = app_home() / "tmp"
+    tmp.mkdir(parents=True, exist_ok=True)
+    env.update(TEMP=str(tmp), TMP=str(tmp), PIP_NO_CACHE_DIR="1", PYTHONIOENCODING="utf-8",
+               UV_CACHE_DIR=str(app_home() / "cache" / "uv"))
+    return env
+
+
+def pip_install(pkgs: list[str], log, cancel=None) -> None:
+    env = pip_env()
+    log("Cài thư viện: " + " ".join(p for p in pkgs if not p.startswith("-")))
+    proc = subprocess.Popen(pip_command(pkgs), stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env,
+                            **no_window())
     tail = []
     for raw in iter(proc.stdout.readline, b""):
         if cancel is not None and cancel.is_set():
@@ -91,7 +117,7 @@ def pip_install(pkgs: list[str], log, cancel=None) -> None:
             raise Cancelled()
         line = raw.decode("utf-8", "replace").rstrip()
         tail = (tail + [line])[-12:]
-        if line.startswith(("Collecting", "Installing", "Successfully")):
+        if line.lstrip().startswith(("Collecting", "Installing", "Successfully", "Installed", "+ ")):
             log("  " + line[:150])
     proc.wait()
     importlib.invalidate_caches()

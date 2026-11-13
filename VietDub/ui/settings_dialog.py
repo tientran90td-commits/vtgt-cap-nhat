@@ -92,6 +92,11 @@ class SettingsDialog(QDialog):
         self.dl.changed.connect(lambda v: b.set("paths", "downloads", v))
         f.addRow("Phim tải từ link", self.dl)
         f.addRow("FFmpeg", self.ff)
+        from vietdub.config import app_home, disk_info
+
+        drive, free, total = disk_info(app_home())
+        f.addRow("Dữ liệu app", label(f"{app_home()}  ·  ổ {drive} còn {free:.1f}/{total:.0f} GB  ·  không dùng ổ C",
+                                       "muted"))
         f.addRow("Proxy mạng", b.line(QLineEdit(), "net", "proxy"))
         cl.addLayout(f)
         lay.addWidget(c)

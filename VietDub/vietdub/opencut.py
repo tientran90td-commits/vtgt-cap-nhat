@@ -145,8 +145,66 @@ class Handler(SimpleHTTPRequestHandler):
             shutil.copyfileobj(fh, self.wfile, 1 << 20)
         return True
 
+    # ---- công cụ AI cho OpenCut (tab VietDub AI) ----
+    def _local_ok(self) -> bool:
+        """Chỉ nhận yêu cầu từ chính trang OpenCut trên máy này (chặn trang web lạ gọi vào máy chủ nội bộ)."""
+        host = (self.headers.get("Host") or "").split(":")[0]
+        origin = self.headers.get("Origin") or ""
+        if host not in ("127.0.0.1", "localhost"):
+            return False
+        if origin and urlparse(origin).hostname not in ("127.0.0.1", "localhost"):
+            return False
+        return self.headers.get("X-VietDub") == "1"
+
+    def _json(self, data, code: int = 200):
+        body = json.dumps(data, ensure_ascii=False).encode()
+        self.send_response(code)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
+
+    def do_POST(self):
+        from . import oc_tools
+
+        url = urlparse(self.path)
+        path = unquote(url.path)
+        if not self._local_ok():
+            return self._json({"error": "Không được phép."}, 403)
+        length = int(self.headers.get("Content-Length") or 0)
+        try:
+            if path == "/vietdub/upload":
+                from urllib.parse import parse_qs
+
+                name = (parse_qs(url.query).get("name") or ["file"])[0]
+                return self._json({"upload": oc_tools.save_upload(name, self.rfile, length)})
+            body = self.rfile.read(length) if length else b""
+            if path.startswith("/vietdub/api/cancel/"):
+                oc_tools.cancel(path.rsplit("/", 1)[-1])
+                return self._json({"ok": True})
+            if path.startswith("/vietdub/api/run/"):
+                return self._json({"job": oc_tools.start(path.rsplit("/", 1)[-1], oc_tools.handle_json(body))})
+        except ValueError as e:
+            return self._json({"error": str(e)}, 400)
+        self._json({"error": "Không có."}, 404)
+
     def do_GET(self):
         path = unquote(urlparse(self.path).path)
+        if path.startswith("/vietdub/api/"):
+            from . import oc_tools
+
+            if not self._local_ok():
+                return self._json({"error": "Không được phép."}, 403)
+            parts = path.split("/")
+            if len(parts) == 5 and parts[3] == "job":
+                return self._json(oc_tools.status(parts[4]))
+            if len(parts) == 6 and parts[3] == "file":
+                f = oc_tools.job_file(parts[4], parts[5])
+                if f is None:
+                    return self._json({"error": "Không thấy file."}, 404)
+                _BRIDGE["files"][f"job-{parts[4]}-{f.name}"] = f
+                return self._bridge(f"/vietdub/files/job-{parts[4]}-{f.name}")
+            return self._json({"error": "Không có."}, 404)
         if path.startswith("/vietdub/"):
             try:
                 self._bridge(path)
@@ -167,8 +225,12 @@ class Handler(SimpleHTTPRequestHandler):
         return super().translate_path(p)
 
 
-def start(port: int = PORT) -> str:
+def start(port: int = PORT, settings: Settings | None = None) -> str:
     """Chạy máy chủ web nhỏ (chỉ trên máy này). Trả về địa chỉ gốc."""
+    if settings is not None:
+        from . import oc_tools
+
+        oc_tools.set_settings(settings)
     if _SERVER.get("srv"):
         return _SERVER["url"]
     if not installed():

@@ -8,6 +8,10 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from vietdub.config import setup_env  # noqa: E402
+
+setup_env()  # trước mọi thư viện khác: file tạm, model, bộ nhớ đệm đều về ổ chứa app
+
 
 def cli(argv) -> int:
     from vietdub import download
@@ -38,6 +42,15 @@ def main() -> int:
     if len(sys.argv) > 1 and not sys.argv[1].startswith("-"):
         return cli(sys.argv[1:])
     from PySide6.QtWidgets import QApplication
+
+    from vietdub.config import app_home, needs_migration, old_home
+
+    if needs_migration():  # cài đặt bản cũ (ổ C) -> chép ngay để mở app đúng cài đặt; phần còn lại chuyển sau
+        old_set, new_set = old_home() / "settings.json", app_home() / "settings.json"
+        if old_set.exists() and not new_set.exists():
+            import shutil
+
+            shutil.copy2(old_set, new_set)
 
     from ui.style import QSS
     from ui.window import MainWindow

@@ -1,6 +1,9 @@
 .venv/
-.tmp/
 __pycache__/
 *.pyc
 _backup/
 .version.json
+data/
+tools/
+Video xuất/
+Video tải về/

@@ -26,15 +26,25 @@ tự chọn cách đang dùng được; lỗi hay mất mạng thì tự chuyể
 **🔄 Cập nhật trực tiếp**: bấm nút *Cập nhật* (app cũng tự báo khi có bản mới). Cài đặt, dự án và model được giữ
 nguyên. Có nút *Quay lại bản trước* trong ⚙️ Cài đặt.
 
-## Cài đặt (Windows)
+## Cài đặt (Windows) - tất cả nằm trên ổ chứa app (vd ổ D), không ghi gì vào ổ C
 
-1. Cài **Python 3.12** từ <https://www.python.org/downloads/>. Nhớ tick ✅ *Add python.exe to PATH*.
-2. Giải nén vào ổ còn **ít nhất 3 GB trống**, ví dụ `D:\VietDub`.
-3. Bấm đúp **`install.bat`**. Script tự kiểm tra chỗ trống; pip để file tạm trên cùng ổ với app và không lưu cache,
-   nên không làm đầy ổ C.
-4. **AI dịch**: cách hay nhất và miễn phí là lấy key **Gemini** tại <https://aistudio.google.com/apikey>, rồi dán vào
-   ⚙️ Cài đặt. Muốn dịch không cần mạng thì chọn **Y** khi `install.bat` hỏi cài Ollama (~5 GB, cần 8 GB RAM).
-5. Bấm đúp **`run.bat`**.
+1. Giải nén vào ổ D, ví dụ `D:\VietDub` (ổ còn **ít nhất 5 GB** trống).
+2. Bấm đúp **`install.bat`**. **Không cần cài Python trước**: script tải **uv** rồi tự cài Python 3.12 vào
+   `D:\VietDub\tools\python`. Thư viện, file tạm và bộ nhớ đệm đều nằm trong `D:\VietDub`.
+   Script tự kiểm tra chỗ trống và cảnh báo nếu thư mục app đang ở ổ C.
+3. **AI dịch**: cách hay nhất và miễn phí là lấy key **Gemini** tại <https://aistudio.google.com/apikey>, dán vào
+   ⚙️ Cài đặt. Muốn dịch không cần mạng thì chọn **Y** khi được hỏi cài Ollama. Ollama sẽ cài vào
+   `D:\VietDub\tools\ollama`, model để ở `D:\VietDub\data\ollama-models`.
+4. Bấm đúp **`run.bat`**.
+
+| Thứ | Nằm ở |
+|---|---|
+| Python, uv, Ollama | `D:\VietDub\tools\` |
+| Cài đặt, dự án, model (Whisper, giọng Ngọc Huyền, OCR, tách nhạc), file tạm, OpenCut | `D:\VietDub\data\` |
+| Video xuất ra / video tải về | `D:\VietDub\Video xuất\`, `D:\VietDub\Video tải về\` |
+
+Đang dùng bản cũ (dữ liệu ở `%APPDATA%\VietDub` trên ổ C): mở bản 1.3 là app **tự chuyển dữ liệu sang ổ D** và xóa
+bản cũ ở ổ C để giải phóng chỗ. Chuyển cả thư mục app sang ổ khác: chạy lại `install.bat` ở chỗ mới.
 
 **📦 Thư viện → ⬇ Tải tất cả** (nút ở góc trên): tải về máy 1 lần giọng **VieNeu Ngọc Huyền** (giọng mặc định),
 model đọc chữ cho mọi ngôn ngữ, Whisper, model tách nhạc, giọng Piper. Sau đó làm video không cần mạng.
@@ -59,12 +69,34 @@ Edge / Chrome:
 - giọng thuyết minh tiếng Việt (1 rãnh âm thanh riêng, chỉnh âm lượng / cắt được),
 - phụ đề Việt dạng chữ trên dòng thời gian (sửa chữ, phông, màu, vị trí được).
 
+### Công cụ thêm trong OpenCut (bản VietDub)
+
+**Tab ✨ VietDub AI** (trên cùng thanh bên trái của OpenCut), chạy trên máy nhờ VietDub:
+
+- 🎙️ **Đọc chữ thành giọng**: giọng Ngọc Huyền / Edge / Piper, thêm vào dòng thời gian tại đầu phát.
+- 💬 **Tạo phụ đề tiếng Việt** cho video / âm thanh bất kỳ trong dự án: nghe hoặc đọc phụ đề cứng, dịch, rồi tạo
+  chữ sửa được.
+- 🎙️ **Thuyết minh tiếng Việt** cho một file: giọng đọc khớp thời gian + phụ đề.
+- 🎵 **Tách nhạc nền & giọng nói** thành 2 file âm thanh riêng.
+- 🧽 **Xóa phụ đề cứng** thông minh.
+- 🌐 **Dịch chữ đang chọn** sang tiếng Việt.
+- ⬇ **Tải video từ link** vào dự án.
+
+**13 hiệu ứng mới** (tab Hiệu ứng, kéo thả lên dòng thời gian hoặc lên đoạn video, chỉnh được và đặt khung hình chính):
+Bộ lọc màu có sẵn (Ấm áp, Lạnh, Điện ảnh xanh-cam, Hoài cổ, Đen trắng, Sepia, Rực rỡ, Phai màu, Đêm, Kẹo ngọt,
+Mùa thu, Mờ lì...), Chỉnh màu (sáng, tương phản, bão hòa, phơi sáng, nhiệt độ, xoay màu, vùng sáng/tối, gamma),
+Đen trắng & tông màu, Viền tối, Làm nét, Phát sáng, Nhiễu hạt phim, Lệch màu RGB, Mờ chuyển động, Mờ phóng to,
+Khảm điểm ảnh, Lật / gương, Hai tông màu.
+
+Đã sửa 2 lỗi có sẵn của OpenCut classic khiến hiệu ứng đặt trên rãnh hiệu ứng không hiện hoặc làm khung xem trước
+bị phóng to; ẩn 2 tab "sắp có" (chuyển cảnh, chỉnh màu) và tab âm thanh online.
+
 OpenCut chạy hoàn toàn trên máy: VietDub tự chạy 1 máy chủ web nhỏ ở `127.0.0.1` (không ra mạng), không cần Node.js
 hay đăng nhập. Dự án OpenCut được lưu trong cửa sổ đó, lần sau mở lại vẫn còn. Giữ VietDub mở trong lúc dựng.
 
 OpenCut là phần mềm mã nguồn mở của nhóm OpenCut (giấy phép MIT, xem `opencut/LICENSE-OpenCut.txt`). Bản đi kèm là
 bản *classic* đã ngừng phát triển; VietDub dịch giao diện sang tiếng Việt, sửa vài lỗi có sẵn, bỏ phần cần máy chủ
-online (đăng nhập, góp ý, thư viện âm thanh Freesound). Dựng lại bản này: xem `opencut/build_opencut_vi.py`.
+online (đăng nhập, góp ý, thư viện âm thanh Freesound). Dựng lại bản này (cần Bun, Rust + wasm32, wasm-bindgen-cli 0.2.116): xem `opencut/build_opencut_vi.py`.
 
 ## Ổ đầy (No space left on device)
 
@@ -85,6 +117,7 @@ VietDub/
 │   ├── ocr.py             # quét phụ đề cứng thành chữ (RapidOCR)
 │   ├── components.py      # 📦 tải thư viện & model
 │   ├── opencut.py         # máy chủ OpenCut trên máy + cầu nối VietDub
+│   ├── oc_tools.py        # công cụ AI cho tab VietDub AI trong OpenCut
 │   ├── render.py          # xuất video 1 lượt: xóa phụ đề gốc, phụ đề Việt, trộn tiếng
 │   ├── transcript.py      # lời gốc: phụ đề / Whisper
 │   ├── voices.py          # giọng đọc
@@ -95,6 +128,7 @@ VietDub/
 │   ├── updater.py         # cập nhật trực tiếp
 │   └── project.py         # quy trình & lưu dự án
 ├── opencut/               # OpenCut tiếng Việt: bản dựng sẵn (zip) + script Việt hóa & dựng lại
+│   └── wasm/              # hiệu ứng mới (shader WGSL) + bản vá lõi Rust/WebAssembly
 ├── ui/                    # giao diện PySide6
 └── tests/test_core.py     # kiểm thử toàn bộ quy trình (không cần mạng)
 ```

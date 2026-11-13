@@ -1,4 +1,4 @@
-"""Cài đặt của app: lưu ở %APPDATA%/VietDub/settings.json (Windows) hoặc ~/.vietdub."""
+"""Cài đặt của app: lưu trong thư mục app (data/settings.json) - mọi thứ ở cùng ổ với app, không dùng ổ C."""
 from __future__ import annotations
 
 import copy
@@ -55,16 +55,118 @@ DEFAULTS: dict = {
 MODES = {"auto": "⚡ Tự động (máy + mạng)", "offline": "🔒 Chỉ trên máy", "online": "🌐 Ưu tiên online"}
 
 
+def app_dir() -> Path:
+    """Thư mục cài app (chứa main.py)."""
+    return Path(__file__).resolve().parent.parent
+
+
 def app_home() -> Path:
+    """Dữ liệu của app (cài đặt, dự án, model, giọng...): nằm NGAY TRONG thư mục app (vd D:\\VietDub\\data) để
+    mọi thứ ở cùng ổ với app - không ghi gì vào ổ C."""
     env = os.environ.get("VIETDUB_HOME")
-    if env:
-        p = Path(env)
-    elif sys.platform.startswith("win"):
-        p = Path(os.environ.get("APPDATA", Path.home())) / "VietDub"
-    else:
-        p = Path.home() / ".vietdub"
+    p = Path(env) if env else app_dir() / "data"
     p.mkdir(parents=True, exist_ok=True)
     return p
+
+
+def old_home() -> Path:
+    """Chỗ để dữ liệu của bản 1.0 - 1.2 (thường ở ổ C)."""
+    if sys.platform.startswith("win"):
+        return Path(os.environ.get("APPDATA", Path.home())) / "VietDub"
+    return Path.home() / ".vietdub"
+
+
+def setup_env() -> None:
+    """Gọi đầu tiên khi mở app: mọi bộ nhớ đệm / file tạm / model của thư viện đi kèm đều về ổ chứa app."""
+    if os.environ.get("VIETDUB_HOME"):
+        home = Path(os.environ["VIETDUB_HOME"])
+    else:
+        home = app_dir() / "data"
+    tmp = home / "tmp"
+    for d in (home, tmp, home / "cache"):
+        d.mkdir(parents=True, exist_ok=True)
+    env = {
+        "TEMP": tmp, "TMP": tmp, "TMPDIR": tmp,                      # file tạm (Python, pip, ffmpeg...)
+        "HF_HOME": home / "huggingface",                              # model Whisper, VieNeu (HuggingFace)
+        "XDG_CACHE_HOME": home / "cache",                             # yt-dlp, thư viện khác
+        "NUMBA_CACHE_DIR": home / "cache" / "numba",                  # librosa (giọng VieNeu)
+        "TORCH_HOME": home / "cache" / "torch",
+        "OLLAMA_MODELS": home / "ollama-models",                      # model AI trên máy (Ollama do app mở)
+        "UV_CACHE_DIR": home / "cache" / "uv",
+        "PIP_NO_CACHE_DIR": "1",
+    }
+    for k, v in env.items():
+        if k == "OLLAMA_MODELS" and os.environ.get(k):  # người dùng đã tự chọn chỗ để model
+            continue
+        os.environ[k] = str(v)
+    import tempfile
+
+    tempfile.tempdir = str(tmp)
+
+
+def disk_info(path: Path | None = None) -> tuple[str, float, float]:
+    """(ổ đĩa, GB còn trống, GB tổng) của ổ chứa `path` (mặc định: ổ chứa app)."""
+    import shutil
+
+    p = Path(path or app_dir())
+    u = shutil.disk_usage(p)
+    return (p.drive or p.anchor or "/"), u.free / 1e9, u.total / 1e9
+
+
+def on_system_drive() -> bool:
+    """App đang nằm ở ổ C (ổ hệ thống)?"""
+    if not sys.platform.startswith("win"):
+        return False
+    sysdrive = (os.environ.get("SystemDrive") or "C:").upper()
+    return app_dir().drive.upper() == sysdrive
+
+
+def needs_migration() -> bool:
+    old = old_home()
+    return not os.environ.get("VIETDUB_HOME") and old.exists() and old.resolve() != app_home().resolve() and \
+        any(old.iterdir())
+
+
+def migrate_old_home(log=lambda *_a, **_k: None, progress=lambda *_a, **_k: None, cancel=None) -> int:
+    """Chuyển dữ liệu bản cũ từ ổ C về thư mục app (chuyển xong thì xóa bên C để giải phóng chỗ)."""
+    import shutil
+
+    old, new = old_home(), app_home()
+    items = [p for p in old.iterdir()]
+    moved = 0
+    for i, src in enumerate(items):
+        if cancel is not None and cancel.is_set():
+            break
+        dst = new / src.name
+        progress(i / max(1, len(items)), f"Chuyển {src.name} sang {new.drive or new}")
+        try:
+            if dst.exists():
+                if src.is_dir() and dst.is_dir():  # gộp thư mục
+                    for f in src.rglob("*"):
+                        t = dst / f.relative_to(src)
+                        if f.is_file() and not t.exists():
+                            t.parent.mkdir(parents=True, exist_ok=True)
+                            shutil.move(str(f), str(t))
+                    shutil.rmtree(src, ignore_errors=True)
+                elif src.is_file() and src.name != "settings.json":
+                    src.unlink()
+                else:
+                    continue
+            else:
+                shutil.move(str(src), str(dst))
+            moved += 1
+        except OSError as e:
+            log(f"Không chuyển được {src.name}: {e}", "warn")
+    if (old / "settings.json").exists() and not (new / "settings.json").exists():
+        shutil.move(str(old / "settings.json"), str(new / "settings.json"))
+    try:
+        if not any(old.iterdir()):
+            old.rmdir()
+    except OSError:
+        pass
+    progress(1.0, "Đã chuyển dữ liệu")
+    log(f"✅ Đã chuyển dữ liệu cũ từ {old} sang {new}.")
+    return moved
 
 
 def _merge(base: dict, data: dict) -> dict:
@@ -121,12 +223,12 @@ class Settings:
             os.replace(tmp, self.path)
 
     def output_dir(self) -> Path:
-        p = Path(self.get("paths", "output") or (Path.home() / "Videos" / "VietDub"))
+        p = Path(self.get("paths", "output") or (app_dir() / "Video xuất"))   # cùng ổ với app (không về ổ C)
         p.mkdir(parents=True, exist_ok=True)
         return p
 
     def downloads_dir(self) -> Path:
-        p = Path(self.get("paths", "downloads") or (Path.home() / "Videos" / "VietDub" / "Tải về"))
+        p = Path(self.get("paths", "downloads") or (app_dir() / "Video tải về"))
         p.mkdir(parents=True, exist_ok=True)
         return p
 
