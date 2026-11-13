@@ -346,6 +346,18 @@ def check_units():
           {"id": "qwen/qwen3-235b:free", "created": 5}]
     assert ai.pick_openrouter(om) == "deepseek/deepseek-chat-v3.1:free"   # DeepSeek miễn phí, bản thường
     assert ai.pick_openrouter(om[:1]) is None
+    # dịch qua chat web (người dùng tự dán): soạn yêu cầu, đọc câu trả lời
+    ml = tr.prepare_lines([{"start": i * 3.0, "end": i * 3.0 + 2.5, "text": t} for i, t in
+                           enumerate(["一护推开宫殿大门", "前方正是友哈巴赫", "♪♪", "这一战"])])
+    pr = tr.manual_prompt(ml, [0, 1, 2], st, "黑崎一护 #死神千年血战篇", first=True)
+    assert "VIDEO TITLE: 黑崎一护 #死神千年血战篇" in pr and "1 | 2.5s | max" in pr and "Luffy" in pr and "这一战" not in pr
+    reply = 'Đây là bản dịch:\n```json\n{"lines": {"1": "Ichigo đẩy cửa cung điện", "2": "Phía trước là Yhwach", ' \
+            '"3": "", "9": "lạc"}}\n```'
+    got = tr.parse_reply(reply, [0, 1, 2])
+    assert got == {0: "Ichigo đẩy cửa cung điện", 1: "Phía trước là Yhwach", 2: ""}, got
+    assert tr.parse_reply("1 | Một\n2. Hai", [0, 1]) == {0: "Một", 1: "Hai"}
+    assert tr.parse_reply('{"lines": {"1": "ngắn", "2": "dài hơn cả câu cũ nhiều"}}', [0, 1],
+                          {0: "câu cũ dài", 1: "ngắn"}) == {0: "ngắn"}
     print("✓ lọc câu rác Whisper, giới hạn chữ, kiểm tra bản dịch, ghép thuyết minh khớp thời gian, STFT tách nhạc")
 
 

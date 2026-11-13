@@ -54,6 +54,7 @@ model đọc chữ cho mọi ngôn ngữ, Whisper, model tách nhạc, giọng P
 1. Kéo thả video hoặc dán link → *Tải*.
 2. Chọn **mẫu nhanh**: *Thuyết minh + Vietsub*, *Chỉ Vietsub*, *TikTok dọc* hoặc *Nhanh nhất*.
 3. Phim cổ trang thì chọn văn phong *Cổ trang*. Biết tên nhân vật thì ghi vào ô *Tên riêng*, ví dụ `一护 = Ichigo` hoặc `林动 = Lâm Động`.
+   **Không có key / hết tiền?** Bấm **🐋 Dịch qua DeepSeek web**: app soạn sẵn yêu cầu và chép vào bộ nhớ, bạn dán vào chat.deepseek.com rồi dán câu trả lời lại (mỗi lần 120 câu, câu thiếu tự hỏi lại, có nút rút gọn câu dài). Miễn phí; app không tự điều khiển trang web.
    Phim Trung / Nhật / Hàn nên dùng **AI online** (DeepSeek, Gemini, Groq): AI trên máy (Ollama) yếu hơn nhiều và dễ dịch sai tên, sai nội dung.
 4. Bấm **⚡ VIỆT HÓA → XUẤT VIDEO**.
 5. Muốn sửa câu dịch: sửa thẳng ở cột *Tiếng Việt* → **👁 Xem thử 20 giây** → **🎬 Xuất lại từ bảng dịch**.

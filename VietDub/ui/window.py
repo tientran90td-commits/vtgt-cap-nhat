@@ -362,7 +362,9 @@ class MainWindow(QMainWindow):
         self.btn_prev = button("👁 Xem thử 20 giây", self.do_preview, tip="Dựng thử quanh câu đang chọn")
         self.btn_edit = button("✏️ Chỉnh phụ đề trực tiếp", self.open_editor, "primary",
                                "Xem video, phụ đề Việt hiện ngay trên hình - sửa chữ, thời gian, kiểu chữ")
-        lay.addWidget(row(self.btn_tr, self.btn_edit, self.btn_prev, "stretch", self.lb_est))
+        self.btn_web = button("🐋 Dịch qua DeepSeek web", self.open_manual,
+                              tip="Miễn phí: app soạn sẵn yêu cầu, bạn dán vào chat.deepseek.com rồi dán kết quả lại")
+        lay.addWidget(row(self.btn_tr, self.btn_web, self.btn_edit, self.btn_prev, "stretch", self.lb_est))
         return c
 
     # ================================================================ thanh dưới
@@ -798,7 +800,8 @@ class MainWindow(QMainWindow):
         return True
 
     def _buttons(self):
-        return (self.btn_all, self.btn_render, self.btn_tr, self.btn_stt, self.btn_prev, self.btn_edit, self.btn_oc)
+        return (self.btn_all, self.btn_render, self.btn_tr, self.btn_stt, self.btn_prev, self.btn_edit, self.btn_oc,
+                self.btn_web)
 
     def run_task(self, fn, title: str, on_done=None, with_steps=False):
         if self.worker is not None:
@@ -936,6 +939,18 @@ class MainWindow(QMainWindow):
             return r
         self.run_task(job, "AI dịch", on_done=lambda _r: (self._update_tr_label(), self.load_table()),
                       with_steps=True)
+
+    def open_manual(self):
+        if not self.need_project():
+            return
+        if not self.project.source:
+            QMessageBox.information(self, "Chưa có lời gốc", "Bấm 'Lấy lời gốc' trước (đọc phụ đề / nghe lời thoại).")
+            return
+        from .manual_dialog import ManualTranslateDialog
+
+        ManualTranslateDialog(self, self.project).exec()
+        self._update_tr_label()
+        self.load_table()
 
     def do_render(self):
         if not self.need_project():

@@ -350,3 +350,66 @@ def to_srt(lines: list[dict], key: str = "vi") -> str:
 
 def save_json(path, data) -> None:
     path.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding="utf-8")
+
+
+# ------------------------------------------------------------------ dịch qua chat web (người dùng tự dán)
+MANUAL_PART = 120   # số câu mỗi lần dán (chat web trả lời trọn vẹn, không bị cắt giữa chừng)
+CHAT_URL = "https://chat.deepseek.com"
+
+
+def prepare_lines(lines: list[dict]) -> list[dict]:
+    out = [dict(x) for x in lines]
+    for i, ln in enumerate(out):
+        ln["_max"] = max_chars(ln, out[i + 1] if i + 1 < len(out) else None)
+    return out
+
+
+def manual_prompt(lines: list[dict], idx: list[int], settings: Settings, title: str = "",
+                  first: bool = True) -> str:
+    """Yêu cầu dịch hoàn chỉnh (một tin nhắn) để dán vào chat web như DeepSeek. `lines` đã qua prepare_lines."""
+    head = _brief_text({"title": title}, settings)
+    names_rules = GLOSSARY_SYSTEM[GLOSSARY_SYSTEM.index("Name rules"):]
+    parts = [
+        "Bạn là biên dịch viên lồng tiếng & phụ đề tiếng Việt chuyên nghiệp.",
+        "Trước khi dịch, hãy tự nhận ra đây là phim / anime / truyện nào (dựa vào tên video và lời thoại), "
+        "rồi dùng tên nhân vật và thuật ngữ đúng như fan Việt Nam quen dùng." if first else
+        "Tiếp tục dịch cùng phim ở trên, giữ nguyên tên riêng, thuật ngữ và xưng hô đã dùng.",
+        names_rules,
+        SYSTEM.split("Rules:\n", 1)[1].rsplit("Reply ONLY", 1)[0].strip(),
+        head,
+    ]
+    other = [lines[j]["text"] for j in range(max(0, idx[0] - 4), idx[0]) if j not in idx]
+    if other:
+        parts.append("PREVIOUS LINES (context only, do not translate):\n" + "\n".join(other))
+    parts.append("LINES TO TRANSLATE (id | duration | max chars | text):\n" + _lines_block(lines, idx))
+    parts.append('Trả lời CHỈ bằng JSON, đủ mọi id, không giải thích: {"lines": {"<id>": "<tiếng Việt>", ...}}')
+    return "\n\n".join(p for p in parts if p)
+
+
+def manual_shorten_prompt(lines: list[dict], result: dict[int, str], idx: list[int]) -> str:
+    body = "\n".join(f"{i + 1} | max {lines[i]['_max']} chars | original: {lines[i]['text']} | now: {result[i]}"
+                     for i in idx)
+    return (SHORTEN_SYSTEM.replace("Reply ONLY with JSON", "Trả lời CHỈ bằng JSON, không giải thích")
+            + "\n\n" + body)
+
+
+def parse_reply(text: str, idx: list[int], shorten_of: dict[int, str] | None = None) -> dict[int, str]:
+    """Đọc câu trả lời dán từ chat web: JSON {"lines": {...}} (hoặc dòng 'id | câu' / 'id. câu')."""
+    got: dict[int, str] = {}
+    try:
+        d = extract_json(text)
+        src = d.get("lines", d) if isinstance(d, dict) else {}
+        for k, v in (src.items() if isinstance(src, dict) else []):
+            if str(k).strip().isdigit() and isinstance(v, str):
+                got[int(str(k).strip()) - 1] = v.strip()
+    except Exception:  # noqa: BLE001 - thử kiểu từng dòng
+        for m in re.finditer(r"^\s*(\d+)\s*[|.:)\-]\s*(.+?)\s*$", text or "", re.M):
+            got[int(m.group(1)) - 1] = m.group(2).strip().strip('"')
+    out = {}
+    for i, v in got.items():
+        if i not in idx or _FOREIGN.search(v):  # "" = tiếng động / nhạc, hợp lệ
+            continue
+        if shorten_of is not None and (not v or len(v) >= len(shorten_of.get(i) or "")):
+            continue
+        out[i] = v
+    return out
