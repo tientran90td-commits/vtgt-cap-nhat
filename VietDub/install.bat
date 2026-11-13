@@ -40,6 +40,8 @@ if errorlevel 1 (
   pause
   exit /b 1
 )
+rem --- Windows: chay model AI bang card do hoa (AMD/NVIDIA/Intel) qua DirectML
+python -c "import onnxruntime as o,sys; sys.exit(0 if 'DmlExecutionProvider' in o.get_available_providers() else 1)" 2>nul || pip install --no-deps --force-reinstall onnxruntime-directml
 rd /s /q "%~dp0.tmp" 2>nul
 echo.
 echo [3/3] AI DICH:

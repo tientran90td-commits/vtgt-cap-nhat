@@ -10,12 +10,14 @@ faster-whisper>=1.1
 edge-tts>=7.0
 piper-tts>=1.2
 gTTS>=2.5
-# Tách nhạc nền khỏi giọng gốc (model UVR MDX-Net); Windows chạy bằng card đồ họa qua DirectML
-onnxruntime-directml>=1.17; sys_platform == "win32"
-onnxruntime>=1.17; sys_platform != "win32"
+# Chạy model AI (tách nhạc, đọc chữ, giọng VieNeu). Windows: install.bat đổi sang bản DirectML để chạy bằng card
+onnxruntime>=1.20
+# Đọc phụ đề cứng trên hình (OCR mọi ngôn ngữ: model PaddleOCR chạy trên onnxruntime)
+rapidocr>=3.0
+# Giọng Việt AI chạy trên máy: Ngọc Huyền, Hải Đăng... (bản v3 Turbo không cần PyTorch)
+vieneu>=3.8
 # Tải video từ link, ảnh bìa
 yt-dlp>=2025.1.1
 Pillow>=10.1
 # AI dịch online (Claude); Gemini / OpenAI / Groq... gọi trực tiếp
 anthropic>=2.8
-# Giọng VieNeu (nặng ~3 GB) cài riêng bằng install_vieneu.bat nếu muốn

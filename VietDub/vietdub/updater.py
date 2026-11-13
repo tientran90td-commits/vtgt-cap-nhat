@@ -192,6 +192,10 @@ def _install_requirements(root: Path, log, progress, cancel) -> None:
                            **no_window())
         if r.returncode != 0:
             log("Cài thư viện mới lỗi - có thể chạy lại install.bat:\n" + (r.stderr or r.stdout)[-500:], "warn")
+        else:
+            from .components import ensure_directml
+
+            ensure_directml(log)
     except (OSError, subprocess.SubprocessError) as e:
         log(f"Cài thư viện mới lỗi ({e}) - có thể chạy lại install.bat.", "warn")
 

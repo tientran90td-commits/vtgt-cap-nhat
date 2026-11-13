@@ -20,6 +20,7 @@ from .media import Cancelled, extract_audio, probe, run
 ENGINES = {
     "auto": "⚡ Tự động (phụ đề có sẵn → cách nhanh nhất đang có)",
     "subtitle": "Dùng file phụ đề gốc (.srt / .vtt / .ass)",
+    "ocr": "🔤 Đọc phụ đề cứng trên hình (OCR, theo khung phụ đề)",
     "groq": "Groq Whisper API (rất nhanh, có gói miễn phí)",
     "openai": "OpenAI Whisper API",
     "local": "Whisper offline trên máy (faster-whisper, CPU)",
@@ -211,19 +212,12 @@ def _download(url: str, dest: Path, settings: Settings, label: str, progress, ca
     return dest
 
 
-def _gpu_whisper(video: str, work: Path, duration: float, settings: Settings, language: str, prompt: str,
-                 log, progress, cancel) -> list[dict]:
-    """whisper.cpp bản Vulkan: nhận dạng thoại bằng card đồ họa (cả card AMD như RX 5700 XT)."""
-    import json as _json
-    import os
-    import subprocess
+def gpu_assets(settings: Settings, progress=lambda *_a: None, cancel=None):
+    """Tải (1 lần) chương trình whisper.cpp Vulkan + model ggml. Trả về (whisper-cli.exe, model)."""
     import zipfile
 
     from .config import app_home
-    from .media import no_window
 
-    if os.name != "nt":
-        raise TranscriptError("Whisper bằng card đồ họa hiện có bản dựng sẵn cho Windows.")
     tool = app_home() / "whisper-gpu"
     exe = next(iter(tool.glob("**/whisper-cli.exe")), None)
     if exe is None:
@@ -239,6 +233,21 @@ def _gpu_whisper(video: str, work: Path, duration: float, settings: Settings, la
     model = tool / f"ggml-{name}.bin"
     if not model.exists():
         _download(GGML_URL.format(name=name), model, settings, f"model {name}", progress, cancel)
+    return exe, model
+
+
+def _gpu_whisper(video: str, work: Path, duration: float, settings: Settings, language: str, prompt: str,
+                 log, progress, cancel) -> list[dict]:
+    """whisper.cpp bản Vulkan: nhận dạng thoại bằng card đồ họa (cả card AMD như RX 5700 XT)."""
+    import json as _json
+    import os
+    import subprocess
+
+    from .media import no_window
+
+    if os.name != "nt":
+        raise TranscriptError("Whisper bằng card đồ họa hiện có bản dựng sẵn cho Windows.")
+    exe, model = gpu_assets(settings, progress, cancel)
     wav = work / "audio16k.wav"
     if not wav.exists():
         extract_audio(video, wav, 16000, cancel)

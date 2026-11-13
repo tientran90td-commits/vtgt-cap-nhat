@@ -124,8 +124,9 @@ class MainWindow(QMainWindow):
         self.status = label("⏳ Đang kiểm tra...", "status", wrap=False)
         self.btn_update = button("🔄 Cập nhật", self.do_update, tip="Kiểm tra & cập nhật bản mới trực tiếp")
         main.addWidget(row(label(f"🌐 {APP_NAME}", "title", wrap=False), label(f"v{VERSION}", "muted", wrap=False),
-                           self.mode_box, self.status, "stretch", self.btn_update,
-                           button("⚙️ Cài đặt", self.open_settings)))
+                           self.mode_box, self.status, "stretch",
+                           button("📦 Thư viện", self.open_components, tip="Tải giọng Ngọc Huyền, OCR mọi ngôn ngữ..."),
+                           self.btn_update, button("⚙️ Cài đặt", self.open_settings)))
 
         body = QHBoxLayout()
         body.setSpacing(12)
@@ -182,6 +183,11 @@ class MainWindow(QMainWindow):
         self.sub_file = PathPicker("file", "Phụ đề (*.srt *.vtt *.ass *.ssa)", "tự tìm file .srt cạnh video")
         self.sub_file.changed.connect(self._sub_changed)
         lay.addWidget(self.sub_file)
+        self.btn_region = button("🔲 Khung phụ đề cứng (quét chữ / xóa đúng chỗ)", self.open_region,
+                                 tip="Kéo khung đúng dòng phụ đề in sẵn trên video gốc")
+        lay.addWidget(self.btn_region)
+        self.lb_region = label("", "muted")
+        lay.addWidget(self.lb_region)
         self.srclang = self.binder.combo(fill(QComboBox(), SRC_LANGS), "speech", "language")
         lay.addWidget(row(label("Ngôn ngữ gốc", "muted", wrap=False), self.srclang, stretch=False))
         self.stt = fill(QComboBox(), {})
@@ -261,7 +267,8 @@ class MainWindow(QMainWindow):
         self.btn_sep = button("⬇ Cài tách nhạc AI (~60 MB)", self.install_separator, "primary")
         self.lb_bg = label("", "muted")
         g = QGridLayout()
-        rows_ = [("Giọng đọc", self.engine), ("Giọng", self.voice),
+        self.lb_voice = label("", "muted")
+        rows_ = [("Giọng đọc", self.engine), ("Giọng", self.voice), ("", self.lb_voice),
                  ("Tốc độ", row(self.speed, button("🔊 Nghe thử", self.preview_voice), stretch=False)),
                  ("Tiếng gốc", self.bg), ("", row(self.ov, self.duck, stretch=False)), ("", self.btn_sep),
                  ("", self.lb_bg)]
@@ -329,7 +336,9 @@ class MainWindow(QMainWindow):
         self.lb_est = label("", "muted")
         self.btn_tr = button("🌐 AI dịch", self.do_translate, "primary", "Dịch (lại) toàn bộ sang tiếng Việt")
         self.btn_prev = button("👁 Xem thử 20 giây", self.do_preview, tip="Dựng thử quanh câu đang chọn")
-        lay.addWidget(row(self.btn_tr, self.btn_prev, "stretch", self.lb_est))
+        self.btn_edit = button("✏️ Chỉnh phụ đề trực tiếp", self.open_editor, "primary",
+                               "Xem video, phụ đề Việt hiện ngay trên hình - sửa chữ, thời gian, kiểu chữ")
+        lay.addWidget(row(self.btn_tr, self.btn_edit, self.btn_prev, "stretch", self.lb_est))
         return c
 
     # ================================================================ thanh dưới
@@ -382,7 +391,7 @@ class MainWindow(QMainWindow):
 
     def refresh_mode(self):
         off = self.settings.mode == "offline"
-        stt = {"auto": transcript.ENGINES["auto"], "gpu": transcript.ENGINES["gpu"],
+        stt = {"auto": transcript.ENGINES["auto"], "ocr": transcript.ENGINES["ocr"], "gpu": transcript.ENGINES["gpu"],
                "local": transcript.ENGINES["local"], "subtitle": transcript.ENGINES["subtitle"]}
         if not off:
             stt.update({"groq": transcript.ENGINES["groq"], "openai": transcript.ENGINES["openai"]})
@@ -528,6 +537,11 @@ class MainWindow(QMainWindow):
             i = max(0, self.voice.findData(voices.default_voice(eng)))
         self.voice.setCurrentIndex(i)
         self.voice.blockSignals(False)
+        from vietdub import components
+
+        need = {"vieneu": "vieneu", "piper": "piper"}.get(eng)
+        self.lb_voice.setText("⚠️ Chưa tải giọng này → bấm 📦 Thư viện → Tải (lúc làm video app sẽ tạm dùng giọng "
+                              "dự phòng)" if need and not components.status().get(need) else "")
         if self.voice.currentData() is not None:
             self.binder.set("voice", "voice", self.voice.currentData())
 
@@ -573,6 +587,39 @@ class MainWindow(QMainWindow):
             if k in widgets:
                 self._select(widgets[k], v)
         self.log_msg(f"Mẫu {name}")
+
+    def open_components(self):
+        from .components_dialog import ComponentsDialog
+
+        ComponentsDialog(self).exec()
+        self._engine_changed(init=True)
+
+    def open_region(self):
+        if not self.need_project():
+            return
+        from .region_dialog import RegionDialog
+
+        RegionDialog(self, self.project).exec()
+        self._update_region_label()
+
+    def _update_region_label(self):
+        r = self.project.region if self.project else None
+        self.lb_region.setText(f"✅ Đã đặt khung: ngang {r[0] * 100:.0f}–{r[2] * 100:.0f}%, "
+                               f"dọc {r[1] * 100:.0f}–{r[3] * 100:.0f}%" if r else "")
+
+    def open_editor(self):
+        if not self.need_project():
+            return
+        if not self.project.lines:
+            QMessageBox.information(self, "Chưa dịch", "Dịch trước (🌐 AI dịch) rồi mới chỉnh phụ đề được.")
+            return
+        self.project.save_lines(self.collect())
+        if self.player is not None:
+            self.player.pause()
+        from .sub_editor import SubEditor
+
+        SubEditor(self, self.project).exec()
+        self.load_table()
 
     def open_settings(self):
         from .settings_dialog import SettingsDialog
@@ -648,6 +695,7 @@ class MainWindow(QMainWindow):
         side = transcript.find_sidecar(path)
         self.sub_file.setText(str(side) if side else "")
         self._update_tr_label()
+        self._update_region_label()
         self.load_table()
         self._load_media(path)
         self.btn_pub.setEnabled(bool(p.publish_info) or p.thumbnail.exists())
@@ -723,7 +771,7 @@ class MainWindow(QMainWindow):
         return True
 
     def _buttons(self):
-        return (self.btn_all, self.btn_render, self.btn_tr, self.btn_stt, self.btn_prev)
+        return (self.btn_all, self.btn_render, self.btn_tr, self.btn_stt, self.btn_prev, self.btn_edit)
 
     def run_task(self, fn, title: str, on_done=None, with_steps=False):
         if self.worker is not None:

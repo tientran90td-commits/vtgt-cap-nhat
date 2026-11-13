@@ -7,7 +7,7 @@ import re
 import threading
 from pathlib import Path
 
-from . import dub, hardsub, hybrid, publish, render, separate, transcript, translate, voices
+from . import dub, hardsub, hybrid, ocr, publish, render, separate, transcript, translate, voices
 from .config import Settings, app_home
 from .media import Cancelled, probe
 
@@ -36,6 +36,8 @@ class Project:
         self.lines: list[dict] = self._load("lines.json", [])            # lời gốc + bản dịch (vi)
         self.brief: dict | None = self._load("brief.json", None)         # tên riêng, xưng hô
         self.publish_info: dict | None = self._load("publish/info.json", None)
+        r = self._load("region.json", None)                              # khung phụ đề cứng người dùng chọn
+        self.region: tuple | None = tuple(r) if r else None
         self.subtitle_file = ""
         self.voice_engine_used = ""
         self._an: dict = {}
@@ -85,10 +87,13 @@ class Project:
                 self._an["bg"] = None
             try:
                 if self.settings.get("video", "cover") in ("auto", "smart"):
-                    band = hardsub.detect(self.video, self.info, self.dir, cancel, log)
-                    self._an["band"] = band
-                    if band:
-                        self._an["boxes"] = hardsub.timeline(self.video, self.info, band, self.dir, cancel, log)
+                    if self.region:
+                        self._cover_from_region(cancel, log)
+                    else:
+                        band = hardsub.detect(self.video, self.info, self.dir, cancel, log)
+                        self._an["band"] = band
+                        if band:
+                            self._an["boxes"] = hardsub.timeline(self.video, self.info, band, self.dir, cancel, log)
             except Cancelled:
                 pass
             except Exception as e:  # noqa: BLE001
@@ -98,6 +103,34 @@ class Project:
                 self._an_thread = None
         self._an_thread = threading.Thread(target=job, daemon=True)
         self._an_thread.start()
+
+    def set_region(self, region: tuple | None) -> None:
+        """Khung phụ đề cứng (x0, y0, x1, y1 theo tỉ lệ) người dùng kéo: dùng để quét chữ & xóa đúng chỗ."""
+        self.region = tuple(round(float(v), 4) for v in region) if region else None
+        self._save("region.json", list(self.region) if self.region else None)
+        for k in ("band", "boxes"):
+            self._an.pop(k, None)
+
+    def _cover_from_region(self, cancel=None, log=_noop) -> None:
+        x0, y0, x1, y1 = self.region
+        band = (y0, y1)
+        boxes = hardsub.timeline(self.video, self.info, band, self.dir, cancel, log)
+        self._an["band"] = band
+        self._an["boxes"] = [(a, b, max(x0, bx0), min(x1, bx1)) for a, b, bx0, bx1 in boxes
+                             if min(x1, bx1) > max(x0, bx0)]
+
+    def auto_region(self, cancel=None) -> tuple | None:
+        """Gợi ý khung phụ đề: dải tự dò + bề rộng chữ lớn nhất."""
+        band = hardsub.detect(self.video, self.info, self.dir, cancel)
+        if not band:
+            return None
+        boxes = hardsub.timeline(self.video, self.info, band, self.dir, cancel)
+        if boxes:
+            x0 = max(0.0, min(b[2] for b in boxes) - 0.02)
+            x1 = min(1.0, max(b[3] for b in boxes) + 0.02)
+        else:
+            x0, x1 = 0.05, 0.95
+        return (round(x0, 4), round(max(0.0, band[0] - 0.01), 4), round(x1, 4), round(min(1.0, band[1] + 0.01), 4))
 
     def _wants_bg(self) -> bool:
         return self._wants_dub() and self.settings.get("video", "background") == "separate" and separate.available()
@@ -129,6 +162,8 @@ class Project:
             except Exception as e:  # noqa: BLE001
                 log(f"Tách nhạc nền lỗi ({e}) - dùng tiếng gốc nhỏ thay thế.", "warn")
                 self._an["bg"] = None
+        if need_cover and "band" not in self._an and self.region:
+            self._cover_from_region(cancel, log)
         if need_cover and "band" not in self._an:
             self._an["band"] = hardsub.detect(self.video, self.info, self.dir, cancel, log)
             if self._an["band"]:
@@ -136,9 +171,20 @@ class Project:
         return self._an
 
     # ------------------------------------------------ các bước
+    def run_ocr(self, log=_noop, progress=_noop, cancel=None) -> tuple[list[dict], str]:
+        region = self.region or self.auto_region(cancel)
+        if not region:
+            raise RuntimeError("Không thấy phụ đề cứng - bấm '🔲 Khung phụ đề cứng' để kéo khung đúng chỗ có chữ.")
+        lang = self.settings.get("speech", "ocr_lang", "auto")
+        segs = ocr.scan(self.video, self.info, region, self.dir, lang, log, progress, cancel)
+        return segs, f"đọc phụ đề cứng (OCR {ocr.LANGS.get(lang, ocr.LANGS['auto'])[0]})"
+
     def run_transcript(self, log=_noop, progress=_noop, cancel=None) -> list[dict]:
-        segs, src = transcript.transcribe(self.video, self.dir, self.settings, log, progress, cancel,
-                                          subtitle_file=self.subtitle_file)
+        if self.settings.get("speech", "engine") == "ocr" and not self.subtitle_file:
+            segs, src = self.run_ocr(log, progress, cancel)
+        else:
+            segs, src = transcript.transcribe(self.video, self.dir, self.settings, log, progress, cancel,
+                                              subtitle_file=self.subtitle_file)
         segs = transcript.clean_lines(segs)
         if not segs:
             raise RuntimeError("Không nghe được lời thoại nào trong video.")

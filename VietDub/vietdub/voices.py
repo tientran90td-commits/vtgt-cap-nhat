@@ -75,7 +75,7 @@ def list_voices(engine: str, settings: Settings) -> list[tuple[str, str]]:
                 return _EDGE_DEFAULT
         return _EDGE_CACHE
     if engine == "vieneu":
-        return _VIENEU
+        return vieneu_voices()
     if engine == "gtts":
         return [("vi", "Tiếng Việt"), ("en", "English"), ("zh-CN", "中文"), ("ja", "日本語"), ("ko", "한국어"),
                 ("th", "ไทย"), ("fr", "Français"), ("es", "Español")]
@@ -257,19 +257,91 @@ def _gemini(text, voice, out: Path, settings) -> Path:
     return wav
 
 
-def _vieneu(text, voice, out: Path, settings) -> Path:
+def _plain(s: str) -> str:
+    import unicodedata
+
+    s = unicodedata.normalize("NFD", s or "").replace("đ", "d").replace("Đ", "D")
+    return "".join(c for c in s if unicodedata.category(c) != "Mn").lower().strip()
+
+
+def vieneu_model():
+    """Nạp VieNeu v3 Turbo (lần đầu tự tải model ~ vài trăm MB từ HuggingFace)."""
     global _VIENEU_MODEL
     try:
         from vieneu import Vieneu
     except ImportError as e:
-        raise TTSError("Chưa cài VieNeu: chạy install_vieneu.bat (cần ~3 GB trống).") from e
+        raise TTSError("Chưa cài VieNeu: bấm 📦 Thư viện → Tải tất cả (hoặc chạy install_vieneu.bat).") from e
     with _OFFLINE_LOCK:
         if _VIENEU_MODEL is None:
             _VIENEU_MODEL = Vieneu(mode="v3turbo")
-        audio = _VIENEU_MODEL.infer(text, voice=voice or "Ngọc Huyền")
-        wav = out.with_suffix(".raw.wav")
-        _VIENEU_MODEL.save(audio, str(wav))
+            try:  # lưu danh sách giọng thật của model để hiện trong app
+                names = [vid for _desc, vid in _VIENEU_MODEL.list_preset_voices()]
+                if names:
+                    (app_home() / "models").mkdir(parents=True, exist_ok=True)
+                    (app_home() / "models" / "vieneu_voices.json").write_text(
+                        __import__("json").dumps(names, ensure_ascii=False), encoding="utf-8")
+            except Exception:  # noqa: BLE001
+                pass
+    return _VIENEU_MODEL
+
+
+def vieneu_voices() -> list[tuple[str, str]]:
+    """Giọng VieNeu: danh sách thật của model (sau khi tải) hoặc danh sách có sẵn. Ngọc Huyền luôn đứng đầu."""
+    f = app_home() / "models" / "vieneu_voices.json"
+    known = dict(_VIENEU)
+    try:
+        names = __import__("json").loads(f.read_text(encoding="utf-8")) if f.exists() else []
+    except ValueError:
+        names = []
+    if not names:
+        return _VIENEU
+    out = [(n, known.get(n, n)) for n in names]
+    out.sort(key=lambda x: _plain(x[0]) != "ngoc huyen")
+    return out
+
+
+def vieneu_voice_id(model, voice: str) -> str:
+    """Khớp tên giọng (không phân biệt dấu/hoa thường); không có thì Ngọc Huyền / giọng đầu tiên."""
+    names = [vid for _d, vid in model.list_preset_voices()]
+    if not names or voice in names:
+        return voice
+    want = _plain(voice or "Ngọc Huyền")
+    for n in names:
+        if _plain(n) == want or want in _plain(n):
+            return n
+    for n in names:
+        if "ngoc huyen" in _plain(n):
+            return n
+    return names[0]
+
+
+def _vieneu(text, voice, out: Path, settings) -> Path:
+    wav = out.with_suffix(".raw.wav")
+    if wav.exists() and wav.stat().st_size > 1000:  # đã đọc sẵn theo lô
+        return wav
+    m = vieneu_model()
+    with _OFFLINE_LOCK:
+        audio = m.infer(text, voice=vieneu_voice_id(m, voice or "Ngọc Huyền"))
+        m.save(audio, str(wav))
     return wav
+
+
+def _vieneu_batch(items: list[tuple[str, Path]], voice: str, cancel, on_done) -> None:
+    """Đọc nhiều câu 1 lượt (nhanh hơn đọc từng câu) -> file .raw.wav cạnh từng file đích."""
+    m = vieneu_model()
+    vid = vieneu_voice_id(m, voice or "Ngọc Huyền")
+    for a in range(0, len(items), 8):
+        if cancel is not None and cancel.is_set():
+            raise Cancelled()
+        part = items[a:a + 8]
+        with _OFFLINE_LOCK:
+            try:
+                audios = m.infer_batch([vi_normalize(" ".join(t.split())) for t, _p in part], voice=vid)
+            except Exception:  # noqa: BLE001 - bản cũ không có infer_batch / lỗi lô -> để đọc từng câu
+                return
+            for (_t, p), audio in zip(part, audios):
+                m.save(audio, str(Path(p).with_suffix(".raw.wav")))
+        on_done(len(part))
 
 
 def piper_model(name: str, settings: Settings, log=None) -> Path:
@@ -402,6 +474,13 @@ def synth_many(engine: str, items: list[tuple[str, Path]], voice: str, settings:
             progress(done[0] / len(todo), f"Đọc giọng {done[0]}/{len(todo)}")
     log(f"Đọc {len(todo)} đoạn giọng ({ENGINES[engine]['name'].split(' - ')[0]}"
         + (f", {workers} đoạn cùng lúc" if workers > 1 else "") + ")...")
+    if engine == "vieneu" and len(todo) > 1:
+        got = [0]
+
+        def batch_done(n):
+            got[0] += n
+            progress(0.8 * got[0] / len(todo), f"Đọc giọng {got[0]}/{len(todo)}")
+        _vieneu_batch(todo, voice, cancel, batch_done)
     with ThreadPoolExecutor(max_workers=workers) as ex:
         for f in [ex.submit(one, it) for it in todo]:
             f.result()

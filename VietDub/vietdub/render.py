@@ -19,6 +19,8 @@ COVERS = {"auto": "⚡ Xóa thông minh: tự dò, chỉ xóa đúng chỗ & đ�
           "blur": "Làm mờ phụ đề gốc ở dưới", "zoom": "Phóng to để đẩy phụ đề gốc ra ngoài",
           "bar": "Phủ dải đen lên phụ đề gốc"}
 POSITIONS = {"bottom": "Dưới", "middle": "Giữa", "top": "Trên"}
+COLORS = {"white": ("Trắng", "&H00FFFFFF", "#FFFFFF"), "yellow": ("Vàng", "&H0000E6FF", "#FFE600"),
+          "cyan": ("Xanh nhạt", "&H00FFE08A", "#8AE0FF")}
 
 
 def even(x: float) -> int:
@@ -72,7 +74,8 @@ def _ass_time(t: float) -> str:
 
 
 def write_ass(path: Path, items: list[tuple[float, float, str]], W: int, H: int, size: int, position: str,
-              font: str = "Arial") -> None:
+              font: str = "Arial", color: str = "white") -> None:
+    primary = COLORS.get(color, COLORS["white"])[1]
     scale = min(W, H) / 1080
     fs = max(14, int(size * scale * (1.25 if W < H else 1.0)))  # video dọc: chữ to hơn cho dễ đọc
     align = {"bottom": 2, "middle": 5, "top": 8}.get(position, 2)
@@ -81,7 +84,7 @@ def write_ass(path: Path, items: list[tuple[float, float, str]], W: int, H: int,
             "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, "
             "Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, "
             "MarginL, MarginR, MarginV, Encoding\n"
-            f"Style: Default,{font},{fs},&H00FFFFFF,&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,"
+            f"Style: Default,{font},{fs},{primary},&H00FFFFFF,&H00000000,&H80000000,-1,0,0,0,100,100,0,0,1,"
             f"{max(1.5, 3 * scale):.1f},{max(0.5, 1.2 * scale):.1f},{align},{int(50 * scale)},{int(50 * scale)},{margin},1\n\n"
             "[Events]\nFormat: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text\n")
     body = "".join(f"Dialogue: 0,{_ass_time(a)},{_ass_time(b)},Default,,0,0,0,,{t}\n" for a, b, t in items)
@@ -238,7 +241,8 @@ def render_video(video: str, info: MediaInfo, lines: list[dict], dub_wav: Path |
                          boxes=boxes, t_offset=start, length=length)
         g = g.replace(",tpad=stop_mode=clone:stop_duration=5", "")
         if burn and items:
-            write_ass(work / "vi.ass", items, W, H, int(opts.get("sub_size", 54)), opts.get("sub_position", "bottom"))
+            write_ass(work / "vi.ass", items, W, H, int(opts.get("sub_size", 54)), opts.get("sub_position", "bottom"),
+                      color=opts.get("sub_color", "white"))
             g = g.replace("[vb]", "[vs]") + ";[vs]subtitles=filename=vi.ass[vb]"
         fc.append(g + ";[vb]format=yuv420p[v]")
     ov, vv = float(opts.get("orig_volume", 0.3) or 0.0), float(opts.get("voice_volume", 1.0) or 1.0)

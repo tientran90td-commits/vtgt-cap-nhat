@@ -19,7 +19,8 @@ sys.path.insert(0, str(ROOT))
 TMP = Path(tempfile.mkdtemp(prefix="vietdub_"))
 os.environ["VIETDUB_HOME"] = str(TMP / "home")
 
-from vietdub import dub, hybrid, render, separate, transcript, translate, updater, voices  # noqa: E402
+from vietdub import (components, dub, hybrid, ocr, render, separate, transcript, translate, updater,  # noqa: E402
+                     voices)
 from vietdub.config import Settings  # noqa: E402
 from vietdub.media import probe, run  # noqa: E402
 from vietdub.project import Project  # noqa: E402
@@ -114,6 +115,42 @@ def make_video(path: Path, seconds: int = 60):
          "-preset", "ultrafast", "-c:a", "aac", "-shortest", path.name], cwd=str(path.parent))
     path.with_suffix(".srt").write_text(srt, encoding="utf-8")
     return len(lines)
+
+
+def check_ocr(s: Settings):
+    """Quét phụ đề cứng tiếng Trung bằng OCR (theo khung) -> lời gốc đúng chữ, đúng thời gian."""
+    font = "/usr/share/fonts/truetype/wqy/wqy-zenhei.ttc"
+    if not ocr.available() or not Path(font).exists():
+        print("✓ (bỏ qua OCR: thiếu rapidocr hoặc font chữ Hán để tạo video thử)")
+        return
+    w = TMP / "ocr"
+    w.mkdir()
+    L = ["师父，我们现在去哪里？", "林动，你一定要小心。", "这件事情没有那么简单。", "我不会让你失望的！"]
+    srt = "".join(f"{i + 1}\n{transcript.fmt(i * 4 + 0.5)},500 --> {transcript.fmt(i * 4 + 3)},300\n{L[i % 4]}\n\n"
+                  for i in range(8))
+    (w / "zh.srt").write_text(srt, encoding="utf-8")
+    run(["-f", "lavfi", "-i", "mandelbrot=s=1280x720:r=25", "-f", "lavfi", "-i", "sine=f=200:d=32", "-t", "32", "-vf",
+         "subtitles=zh.srt:force_style='Fontname=WenQuanYi Zen Hei,Fontsize=26,Outline=2'", "-c:v", "libx264",
+         "-preset", "ultrafast", "-c:a", "aac", "-shortest", "Phim Trung.mp4"], cwd=str(w))
+    s.set("speech", "engine", "ocr")
+    p = Project(str(w / "Phim Trung.mp4"), s)
+    reg = p.auto_region()
+    assert reg and reg[1] > 0.75 and reg[0] < 0.4 and reg[2] > 0.6, reg
+    assert ocr.read_image(ocr.grab(p.video, p.info, reg, 5.0)) == L[1]          # đọc thử 1 khung
+    p.set_region(reg)
+    segs = p.run_transcript(log, prog)
+    def bare(t):  # so chữ, bỏ dấu câu (OCR đôi khi sót / thừa dấu phẩy - không ảnh hưởng bản dịch)
+        return re.sub(r"[，。！？、,.!?]", "", t)
+    assert [bare(x["text"]) for x in segs] == [bare(L[i % 4]) for i in range(8)], [x["text"] for x in segs]
+    assert "，，" not in "".join(x["text"] for x in segs)
+    assert all(abs(x["start"] - (i * 4 + 0.5)) < 0.4 and abs(x["end"] - (i * 4 + 3.3)) < 0.5
+               for i, x in enumerate(segs)), segs
+    # khung người dùng đặt được dùng để xóa phụ đề gốc đúng chỗ
+    s.set("video", "cover", "auto")
+    an = p.analysis()
+    assert an["band"] == (reg[1], reg[3]) and an["boxes"] and all(reg[0] <= b[2] < b[3] <= reg[2] for b in an["boxes"])
+    s.set("speech", "engine", "auto")
+    print(f"✓ quét phụ đề cứng tiếng Trung (OCR theo khung): {len(segs)}/8 câu đúng chữ & thời gian; xóa theo khung")
 
 
 def check_units():
@@ -234,6 +271,16 @@ def main():
     assert 19 < probe(pv).duration < 21
     print("✓ chỉ thuyết minh (chép thẳng hình), chỉ phụ đề, nhạc nền tách giọng (+ tự xử lý khi lỗi), khung dọc 9:16, "
           "xem thử 20 giây")
+
+    check_ocr(s)
+    assert set(components.status()) >= {"vieneu", "ocr", "whisper", "uvr", "piper"}
+    assert voices._plain("Ngọc Huyền") == "ngoc huyen"
+
+    class FakeVN:
+        def list_preset_voices(self):
+            return [("nữ", "Ngoc Huyen (Bắc)"), ("nam", "Hải Đăng")]
+    assert voices.vieneu_voice_id(FakeVN(), "Ngọc Huyền") == "Ngoc Huyen (Bắc)"
+    assert voices.vieneu_voice_id(FakeVN(), "Không có") == "Ngoc Huyen (Bắc)"
 
     # cập nhật trực tiếp: chép bản mới, sao lưu bản cũ, không đụng .venv / app khác
     app = TMP / "app"

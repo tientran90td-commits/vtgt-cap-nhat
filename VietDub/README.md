@@ -8,12 +8,14 @@ Dịch video tiếng nước ngoài (Trung, Anh, Hàn, Nhật, Thái...) sang **
 | Bước | Cách làm |
 |---|---|
 | ⬇ Lấy video | Kéo thả file, hoặc **dán link** YouTube / TikTok / Douyin / Bilibili / Facebook (yt-dlp) |
+| 🔲 Phụ đề cứng | **Kéo khung** đúng dòng chữ in sẵn trên video (hoặc để app tự dò), bấm *Đọc thử* để xem app đọc đúng không, rồi **quét cả video** thành lời gốc có thời gian (OCR RapidOCR / PaddleOCR: Trung giản & phồn thể, Anh, Nhật, Hàn, Thái, Nga, Hindi, Ả Rập, Latin). Khung này cũng dùng để xóa phụ đề gốc đúng chỗ |
 | 🎧 Lời gốc | Phụ đề có sẵn (file .srt, phụ đề trong MKV, phụ đề tải kèm link) → Whisper bằng card đồ họa / CPU → Groq (online, rất nhanh). Tự lọc câu "ảo" Whisper hay bịa (字幕由..., Thanks for watching...) |
 | 🌐 Dịch | AI đọc lướt cả video để lập **bảng tên riêng** (tên Trung → Hán-Việt: 林动 → Lâm Động) và **xưng hô** giữa các nhân vật, rồi dịch từng lô câu theo văn phong bạn chọn. Câu nào bị sót thì app tự dịch lại. Câu nào dài quá thời gian nói thì AI tự rút gọn |
-| 🎙️ Thuyết minh | Giọng Edge (Hoài My, Nam Minh: miễn phí), Piper (trên máy), VieNeu (cài thêm), OpenAI, ElevenLabs, Gemini. Mỗi câu đặt đúng lúc nhân vật nói. Câu dài thì đọc nhanh hơn chút (tối đa 1.35 lần), không bao giờ đọc chồng câu |
+| 🎙️ Thuyết minh | Giọng **VieNeu Ngọc Huyền** (mặc định, chạy trên máy), Hải Đăng..., Edge Hoài My / Nam Minh (miễn phí, cần mạng), Piper, OpenAI, ElevenLabs, Gemini. Mỗi câu đặt đúng lúc nhân vật nói. Câu dài thì đọc nhanh hơn chút (tối đa 1.35 lần), không bao giờ đọc chồng câu |
 | 🎵 Tiếng gốc | **AI tách nhạc nền** (model UVR MDX-Net): bỏ hẳn giọng gốc, giữ nhạc nền và tiếng động, nghe như phim lồng tiếng thật. Có card đồ họa thì chạy bằng card (DirectML). Hoặc giữ tiếng gốc nhỏ, tự giảm thêm lúc đang đọc |
 | 🧽 Phụ đề gốc | **Xóa thông minh**: tự dò dải phụ đề, dò **lúc nào có chữ** và **chữ rộng tới đâu**, rồi chỉ xóa đúng chỗ đó, đúng lúc đó. Hình được nội suy từ vùng xung quanh nên không để lại dải mờ hay dải đen |
 | 💬 Phụ đề Việt | In lên hình, kèm luôn phụ đề bật/tắt được trong file MP4 |
+| ✏️ Chỉnh phụ đề trực tiếp | Video chạy, **phụ đề Việt hiện ngay trên hình**. Gõ sửa chữ là thấy liền; chỉnh thời gian bằng nút *= lúc này* hoặc ±0.1 giây; tách, gộp, thêm, xóa câu; dời tất cả phụ đề; đổi cỡ, màu, vị trí chữ. Phím tắt: Space, Ctrl+S, Alt+[ / Alt+], PageUp / PageDown |
 | 🎬 Xuất | Giữ khung gốc hoặc 16:9 / 9:16 / 1:1. Không cần vẽ gì lên hình thì **chép thẳng hình gốc**, xuất trong vài giây |
 | 📤 Đăng | Ảnh bìa có tiêu đề tiếng Việt, tiêu đề / mô tả / hashtag tiếng Việt |
 
@@ -33,7 +35,8 @@ nguyên. Có nút *Quay lại bản trước* trong ⚙️ Cài đặt.
    ⚙️ Cài đặt. Muốn dịch không cần mạng thì chọn **Y** khi `install.bat` hỏi cài Ollama (~5 GB, cần 8 GB RAM).
 5. Bấm đúp **`run.bat`**.
 
-Giọng **VieNeu** (Ngọc Huyền, Hải Đăng...) nặng ~3 GB nên cài riêng bằng **`install_vieneu.bat`** khi cần.
+**📦 Thư viện → ⬇ Tải tất cả** (nút ở góc trên): tải về máy 1 lần giọng **VieNeu Ngọc Huyền** (giọng mặc định),
+model đọc chữ cho mọi ngôn ngữ, Whisper, model tách nhạc, giọng Piper. Sau đó làm video không cần mạng.
 
 ## Cách dùng
 
@@ -62,6 +65,8 @@ VietDub/
 │   ├── dub.py             # ghép thuyết minh khớp thời gian
 │   ├── separate.py        # AI tách nhạc nền khỏi giọng (UVR MDX-Net qua onnxruntime)
 │   ├── hardsub.py         # dò phụ đề gốc: vị trí, lúc xuất hiện, bề rộng
+│   ├── ocr.py             # quét phụ đề cứng thành chữ (RapidOCR)
+│   ├── components.py      # 📦 tải thư viện & model
 │   ├── render.py          # xuất video 1 lượt: xóa phụ đề gốc, phụ đề Việt, trộn tiếng
 │   ├── transcript.py      # lời gốc: phụ đề / Whisper
 │   ├── voices.py          # giọng đọc
@@ -91,4 +96,5 @@ khóa kênh.
 | [UVR MDX-Net](https://github.com/Anjok07/ultimatevocalremovergui), [python-audio-separator](https://github.com/nomadkaraoke/python-audio-separator) | Model & thuật toán tách nhạc nền (viết lại gọn bằng numpy + [onnxruntime](https://onnxruntime.ai)) |
 | [Ollama](https://ollama.com) + Qwen2.5 | AI dịch chạy trên máy |
 | [edge-tts](https://github.com/rany2/edge-tts), [Piper](https://github.com/rhasspy/piper), [VieNeu-TTS](https://github.com/pnnbao97/VieNeu-TTS) | Giọng thuyết minh |
+| [RapidOCR](https://github.com/RapidAI/RapidOCR) + [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) | Đọc phụ đề cứng mọi ngôn ngữ |
 | [PySide6](https://doc.qt.io/qtforpython-6/), [Pillow](https://python-pillow.org) | Giao diện, ảnh bìa |

@@ -22,14 +22,14 @@ DEFAULTS: dict = {
         "fallback": True,          # AI lỗi / quá tải -> tự chuyển AI khác (online <-> trên máy)
         "auto_start_ollama": True, # Ollama đã cài nhưng chưa mở -> app tự mở
     },
-    "speech": {"engine": "auto", "whisper_model": "large-v3-turbo", "language": "auto"},
+    "speech": {"engine": "auto", "whisper_model": "large-v3-turbo", "language": "auto", "ocr_lang": "auto"},
     "translate": {
         "style": "natural",        # xem translate.STYLES
         "glossary": "",            # "林动 = Lâm Động" mỗi dòng 1 tên / thuật ngữ
         "context": "",             # vài câu giới thiệu video (thể loại, nhân vật, quan hệ) giúp dịch đúng xưng hô
         "shorten": True,           # câu dịch dài quá thời gian nói -> AI rút gọn
     },
-    "voice": {"engine": "edge", "voice": "vi-VN-HoaiMyNeural", "speed": 0, "volume": 100, "fallback": True,
+    "voice": {"engine": "vieneu", "voice": "Ngọc Huyền", "speed": 0, "volume": 100, "fallback": True,
               "max_speed": 1.35},
     "video": {
         "output": "both",          # both (thuyết minh + phụ đề) | dub (chỉ thuyết minh) | sub (chỉ phụ đề)
@@ -41,7 +41,7 @@ DEFAULTS: dict = {
         "voice_volume": 1.0,
         "burn_subs": True,         # in phụ đề Việt lên hình
         "soft_subs": True,         # kèm phụ đề Việt bật/tắt được trong file MP4
-        "sub_size": 54, "sub_position": "bottom",
+        "sub_size": 54, "sub_position": "bottom", "sub_color": "white",
         "cover": "auto", "cover_height": 14,      # che phụ đề gốc: auto | none | blur | zoom | bar ; % chiều cao
         "aspect": "source", "height": 1080, "fill": "blur",
         "encoder": "auto", "quality": 21, "keep_srt": False,
