@@ -220,6 +220,28 @@ def check_drive():
 
         _t.tempdir = None
     print("✓ cài trên ổ chứa app: dữ liệu, file tạm, model, bộ nhớ đệm đều trong thư mục app; chuyển dữ liệu cũ khỏi ổ C")
+    # pythonw.exe: sys.stdout/stderr = None -> thư viện in ra (VieNeu, tqdm) không được lỗi
+    saved = {n: getattr(sys, n) for n in ("stdout", "stderr", "__stdout__", "__stderr__")}
+    try:
+        for n in saved:
+            setattr(sys, n, None)
+        logf = config.fix_std_streams(TMP / "logs")
+        print("thư viện in ra khi chạy pythonw")
+        try:
+            import tqdm
+
+            for _ in tqdm.tqdm(range(3)):
+                pass
+        except ImportError:
+            sys.stderr.write("\r50%|#####     |")
+        sys.stderr.flush()
+        got = sys.stdout
+    finally:
+        for n, v in saved.items():
+            setattr(sys, n, v)
+    got.close()
+    assert logf and "thư viện in ra khi chạy pythonw" in logf.read_text(encoding="utf-8")
+    print("✓ chạy ẩn (pythonw): lời in ra của thư viện ghi vào data/logs/app.log, không lỗi 'NoneType ... write'")
 
 
 def check_ocr(s: Settings):

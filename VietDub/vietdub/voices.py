@@ -22,7 +22,7 @@ from .media import Cancelled, duration, no_window, run
 
 ENGINES = {
     "edge": {"name": "⭐ Microsoft Edge - Hoài My / Nam Minh, miễn phí (cần mạng)", "online": True},
-    "vieneu": {"name": "VieNeu - giọng Việt AI trên máy (cài thêm: install_vieneu.bat)", "online": False},
+    "vieneu": {"name": "VieNeu - giọng Việt AI trên máy (tải ở 📦 Thư viện)", "online": False},
     "gtts": {"name": "Google Translate - miễn phí", "online": True},
     "openai": {"name": "OpenAI TTS (cần key)", "online": True, "key": "openai"},
     "elevenlabs": {"name": "ElevenLabs - giọng siêu thật (cần key)", "online": True, "key": "elevenlabs"},
@@ -270,7 +270,7 @@ def vieneu_model():
     try:
         from vieneu import Vieneu
     except ImportError as e:
-        raise TTSError("Chưa cài VieNeu: bấm 📦 Thư viện → Tải tất cả (hoặc chạy install_vieneu.bat).") from e
+        raise TTSError("Chưa cài VieNeu: bấm 📦 Thư viện → ⬇ Tải ở dòng giọng VieNeu (hoặc Tải tất cả).") from e
     with _OFFLINE_LOCK:
         if _VIENEU_MODEL is None:
             _VIENEU_MODEL = Vieneu(mode="v3turbo")

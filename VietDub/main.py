@@ -8,8 +8,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from vietdub.config import setup_env  # noqa: E402
+from vietdub.config import fix_std_streams, setup_env  # noqa: E402
 
+fix_std_streams()  # pythonw.exe không có cửa sổ dòng lệnh: lời in ra của thư viện ghi vào data/logs/app.log
 setup_env()  # trước mọi thư viện khác: file tạm, model, bộ nhớ đệm đều về ổ chứa app
 
 

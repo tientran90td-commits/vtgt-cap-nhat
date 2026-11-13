@@ -76,6 +76,29 @@ def old_home() -> Path:
     return Path.home() / ".vietdub"
 
 
+def fix_std_streams(log_dir: Path | None = None) -> Path | None:
+    """Mở bằng pythonw.exe (run.bat, không cửa sổ đen) thì sys.stdout/stderr = None: thư viện nào in ra
+    (VieNeu, thanh tiến độ tải model...) sẽ lỗi "'NoneType' object has no attribute 'write'".
+    Chuyển chúng vào data/logs/app.log (giữ tối đa ~5 MB) để không bao giờ lỗi vì thế nữa."""
+    if sys.stdout is not None and sys.stderr is not None:
+        return None
+    if log_dir is None:
+        home = Path(os.environ["VIETDUB_HOME"]) if os.environ.get("VIETDUB_HOME") else app_dir() / "data"
+        log_dir = home / "logs"
+    path = log_dir / "app.log"
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+        if path.exists() and path.stat().st_size > 5 * 1024 * 1024:
+            path.replace(log_dir / "app.old.log")
+        f = open(path, "a", encoding="utf-8", errors="replace", buffering=1)
+    except OSError:
+        f, path = open(os.devnull, "w", encoding="utf-8"), None
+    for name in ("stdout", "stderr", "__stdout__", "__stderr__"):
+        if getattr(sys, name, None) is None:
+            setattr(sys, name, f)
+    return path
+
+
 def setup_env() -> None:
     """Gọi đầu tiên khi mở app: mọi bộ nhớ đệm / file tạm / model của thư viện đi kèm đều về ổ chứa app."""
     if os.environ.get("VIETDUB_HOME"):
