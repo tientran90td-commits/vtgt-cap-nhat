@@ -141,26 +141,22 @@ fun maxChars(lines: List<Line>, i: Int): Int {
     return max(8, (slot * CPS).toInt())
 }
 
-/** Lời thoại có mốc thời gian, gộp bớt nếu quá dài để vừa một lần gửi AI. */
+/** Lời thoại có mốc thời gian để gửi AI. Phim dài: gộp theo khoảng thời gian và cắt bớt chữ mỗi khoảng cho vừa giới hạn. */
 fun transcriptText(lines: List<Line>, limit: Int = 60000): String {
+    if (lines.isEmpty()) return ""
     var window = 0.0
     while (true) {
-        val sb = StringBuilder()
-        var bucketStart = -1.0
-        val bucket = StringBuilder()
-        fun flush() {
-            if (bucket.isNotEmpty()) sb.append('[').append(fmtTime(bucketStart)).append("] ").append(bucket.trim()).append('\n')
-            bucket.clear()
-        }
+        val buckets = mutableListOf<Pair<Double, StringBuilder>>()
         for (ln in lines) {
-            if (bucketStart < 0 || ln.start - bucketStart >= window) {
-                flush()
-                bucketStart = ln.start
-            }
-            bucket.append(ln.text.take(120)).append(' ')
+            if (buckets.isEmpty() || ln.start - buckets.last().first >= window) buckets.add(ln.start to StringBuilder())
+            buckets.last().second.append(ln.text.trim()).append(' ')
         }
-        flush()
-        if (sb.length <= limit || window > 120) return sb.toString()
+        val cap = max(40, limit / buckets.size - 10)
+        val sb = StringBuilder()
+        for ((t, text) in buckets) {
+            sb.append('[').append(fmtTime(t)).append("] ").append(text.toString().trim().take(cap)).append('\n')
+        }
+        if (sb.length <= limit || window >= 640) return sb.toString().take(limit)
         window = if (window == 0.0) 10.0 else window * 2
     }
 }
