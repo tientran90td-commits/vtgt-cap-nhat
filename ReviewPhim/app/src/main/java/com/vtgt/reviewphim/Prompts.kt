@@ -22,7 +22,31 @@ Quy tắc tên riêng (quan trọng nhất):
 
     fun glossary(prefs: Prefs): String {
         val g = prefs.str("glossary").lines().map { it.trim() }.filter { "=" in it }
-        return if (g.isEmpty()) "" else "Tên riêng BẮT BUỘC dùng:\n" + g.joinToString("\n")
+        val cast = prefs.str("cast")
+        val sb = StringBuilder()
+        if (cast.isNotBlank()) sb.append("Nhân vật chính thức của \"${prefs.str("cast_title")}\" (MyAnimeList, tên Latin - phim Trung " +
+            "thì đổi sang Hán-Việt): $cast\n")
+        if (g.isNotEmpty()) sb.append("Tên riêng BẮT BUỘC dùng:\n" + g.joinToString("\n"))
+        return sb.toString().trim()
+    }
+
+    /** Tên riêng AI trả về ({"names": {"gốc": "Việt"}}) -> nhớ vào bảng tên cho các tập sau (bộ nhớ truyện). */
+    fun parseNames(text: String): Map<String, String> = try {
+        val o = extractJson(text).optJSONObject("names")
+        if (o == null) emptyMap() else o.keys().asSequence().associateWith { o.optString(it).trim() }
+            .filter { (k, v) -> k.isNotBlank() && v.isNotBlank() && k != v && !FOREIGN.containsMatchIn(v) && k.length <= 40 }
+    } catch (e: Exception) {
+        emptyMap()
+    }
+
+    /** Ghép tên mới vào bảng tên (không ghi đè tên bạn đã sửa). Trả về số tên mới. */
+    fun learnNames(prefs: Prefs, names: Map<String, String>): Int {
+        val cur = prefs.str("glossary").lines().map { it.trim() }.filter { it.isNotEmpty() }.toMutableList()
+        val have = cur.mapNotNull { it.split("=").firstOrNull()?.trim() }.toSet()
+        val add = names.filterKeys { it !in have }.map { (k, v) -> "$k = $v" }
+        if (add.isEmpty()) return 0
+        prefs.set("glossary", (cur + add).takeLast(300).joinToString("\n"))
+        return add.size
     }
 
     /** Viết kịch bản review / tóm tắt từ lời thoại. */
@@ -44,7 +68,7 @@ Yêu cầu kịch bản:
 ${glossary(prefs)}
 
 Chỉ trả lời JSON, không giải thích:
-{"title": "tiêu đề video review hấp dẫn, tối đa 70 ký tự", "segments": [{"start": 12.5, "text": "lời kể..."}]}
+{"title": "tiêu đề video review hấp dẫn, tối đa 70 ký tự", "segments": [{"start": 12.5, "text": "lời kể..."}], "names": {"tên gốc trong lời thoại": "tên tiếng Việt đã dùng"}}
 
 LỜI THOẠI:
 ${transcriptText(lines)}
@@ -77,7 +101,7 @@ ${if (prev.isNotEmpty()) "\nCÂU TRƯỚC ĐÓ (chỉ để hiểu mạch, khôn
 CÁC CÂU CẦN DỊCH (id | thời lượng | max chars | lời gốc):
 $body
 
-Chỉ trả lời JSON, đủ mọi id, không giải thích: {"lines": {"<id>": "<tiếng Việt>"}}
+Chỉ trả lời JSON, đủ mọi id, không giải thích: {"lines": {"<id>": "<tiếng Việt>"}, "names": {"<tên gốc>": "<tên tiếng Việt đã dùng>"}}
 """.trim()
     }
 

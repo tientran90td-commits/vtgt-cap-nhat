@@ -217,14 +217,27 @@ private fun MakeTab(vm: MainVM) {
                     "dub" to "Chỉ thuyết minh")) { vm.output = it; vm.save("output", it) }
             }
         }
+        Section("Tên nhân vật đúng ngay từ đầu") {
+            var q by remember { mutableStateOf("") }
+            Hint("Gõ tên anime / phim (tiếng Anh hoặc Nhật, vd: Bleach) → app lấy danh sách nhân vật chính thức từ MyAnimeList " +
+                "để AI gọi đúng tên. Tên AI đã dùng cũng được nhớ lại cho các tập sau.")
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                OutlinedTextField(q, { q = it }, Modifier.weight(1f), singleLine = true, label = { Text("Tên anime / phim") })
+                Button(onClick = { vm.findCast(q) }, enabled = !vm.busy && q.isNotBlank()) { Text("🔍") }
+            }
+            if (vm.castInfo.isNotBlank()) Row(verticalAlignment = Alignment.CenterVertically) {
+                Text("📚 ${vm.castInfo}", modifier = Modifier.weight(1f), fontSize = 13.sp)
+                TextButton(onClick = vm::clearCast) { Text("✖") }
+            }
+        }
         Section("3. Lời gốc của video") {
             Choice("Lấy lời gốc bằng", vm.stt, listOf(
                 "whisper" to "🎧 Nghe lời thoại (Groq API; lỗi / không key → 🖐 nhờ Gemini)",
                 "gemini" to "🖐 Nhờ Gemini nghe (làm tay, không cần key)",
                 "ocr" to "🔤 Đọc phụ đề cứng trên hình (không cần mạng)",
-                "srt" to "📄 File phụ đề .srt",
+                "srt" to "📄 File phụ đề (.srt / .ass / .vtt)",
             )) { vm.stt = it; vm.save("stt", it); vm.lines = emptyList() }
-            if (vm.stt == "srt") OutlinedButton(onClick = { pickSrt.launch("*/*") }, enabled = !vm.busy) { Text("Chọn file .srt") }
+            if (vm.stt == "srt") OutlinedButton(onClick = { pickSrt.launch("*/*") }, enabled = !vm.busy) { Text("Chọn file phụ đề") }
             if (vm.stt == "ocr") Hint("Đọc chữ Trung + Latin. Kéo 2 thanh dưới để khung vàng ôm đúng dòng phụ đề.")
             BandEditor(vm)
             Row(verticalAlignment = Alignment.CenterVertically) {
@@ -304,9 +317,12 @@ private fun BottomBar(vm: MainVM) {
                 Text(vm.status, fontSize = 13.sp, maxLines = 2)
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (vm.busy && vm.apiWaiting) {
+                    Button(onClick = vm::skipToManual, modifier = Modifier.weight(1f)) { Text("🖐 Làm tay ngay") }
+                }
                 if (vm.busy) {
                     Button(onClick = vm::cancel, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB3261E)),
-                        modifier = Modifier.weight(1f)) { Text("⏹ Hủy") }
+                        modifier = Modifier.weight(if (vm.apiWaiting) 0.6f else 1f)) { Text("⏹ Hủy") }
                 } else {
                     Button(onClick = vm::makeVideo, enabled = vm.video != null, modifier = Modifier.weight(1f).height(52.dp)) {
                         Text(if (vm.mode == "recap") "⚡ LÀM VIDEO REVIEW" else "⚡ VIỆT HÓA VIDEO", fontWeight = FontWeight.Bold)

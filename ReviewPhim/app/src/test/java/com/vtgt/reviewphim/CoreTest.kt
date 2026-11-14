@@ -19,6 +19,41 @@ class CoreTest {
     }
 
     @Test
+    fun assSubtitles() {
+        val ass = """
+[Script Info]
+Title: test
+[V4+ Styles]
+Format: Name, Fontname, Fontsize
+Style: Default,Arial,20
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+Dialogue: 0,0:00:01.50,0:00:03.00,Default,,0,0,0,,{\an8}一护推开{\i1}宫殿{\i0}大门\N第二行
+Dialogue: 1,0:00:01.50,0:00:03.00,Default,,0,0,0,,一护推开宫殿大门 第二行
+Dialogue: 0,0:00:05.00,0:00:07.00,OP_Romaji,,0,0,0,,{\k20}ka{\k30}ze
+Dialogue: 0,0:00:08.00,0:00:09.00,Signs,,0,0,0,,{\pos(10,10)}Biển hiệu
+Dialogue: 0,0:00:10.00,0:00:12.00,Default,,0,0,0,,前方, 正是友哈巴赫
+""".trimIndent()
+        val l = parseSubs(ass)
+        assertEquals(listOf("一护推开宫殿大门 第二行", "前方, 正是友哈巴赫"), l.map { it.text })  // bỏ OP/ED, biển hiệu, lớp trùng
+        assertEquals(1.5, l[0].start, 1e-6)
+        assertEquals(12.0, l[1].end, 1e-6)
+        // .vtt thiếu giờ
+        val vtt = parseSubs("WEBVTT\n\n00:01.000 --> 00:03.500\nXin chào\n\n01:02:03.000 --> 01:02:04.000\nHai")
+        assertEquals(listOf(1.0, 3723.0), vtt.map { it.start })
+    }
+
+    @Test
+    fun nameMemoryAndCast() {
+        val n = Prompts.parseNames("{\"lines\": {\"1\": \"a\"}, \"names\": {\"一护\": \"Ichigo\", \"友哈巴赫\": \"Yhwach\", " +
+            "\"x\": \"x\", \"灵压\": \"灵压\"}}")
+        assertEquals(mapOf("一护" to "Ichigo", "友哈巴赫" to "Yhwach"), n)   // bỏ tên chưa dịch / giống hệt
+        assertTrue(Prompts.parseNames("không phải json").isEmpty())
+        assertEquals("Kurosaki Ichigo", Cast.malName("Kurosaki, Ichigo"))
+        assertEquals("Yhwach", Cast.malName("Yhwach"))
+    }
+
+    @Test
     fun geminiReply() {
         // Gemini trả SRT (có chữ thừa trước / sau) -> cộng thời điểm bắt đầu của phần
         val srt = parseTimed("Đây là phụ đề:\n```srt\n1\n00:00:01,000 --> 00:00:02,500\n一护推开宫殿大门。\n\n" +

@@ -34,10 +34,14 @@ object Ai {
     )
 
     val http: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(20, TimeUnit.SECONDS)
-        .readTimeout(300, TimeUnit.SECONDS)
-        .writeTimeout(120, TimeUnit.SECONDS)
+        .connectTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(100, TimeUnit.SECONDS)
+        .writeTimeout(60, TimeUnit.SECONDS)
+        .callTimeout(120, TimeUnit.SECONDS)   // 1 lần gọi tối đa 2 phút (Gemini quá tải từng treo 4 phút mới báo 503)
         .build()
+
+    /** Tổng thời gian chờ API cho 1 yêu cầu (mọi AI, mọi lần thử); quá thì chuyển sang làm tay. */
+    const val BUDGET_MS = 150_000L
 
     private val resolved = mutableMapOf<String, String>()
     private val JSON_TYPE = "application/json".toMediaType()
@@ -51,9 +55,11 @@ object Ai {
         val provs = chain(prefs)
         if (provs.isEmpty()) throw AiError("Chưa nhập key AI nào (mục Cài đặt).")
         var last: Exception? = null
+        val t00 = System.currentTimeMillis()
         for ((i, p) in provs.withIndex()) {
+            if (System.currentTimeMillis() - t00 > BUDGET_MS) break
             if (i > 0) log("🔀 Chuyển sang ${p.name} (vì: ${last?.message?.take(140)})")
-            for (attempt in 0 until 3) {
+            for (attempt in 0 until 2) {
                 try {
                     val model = model(p, prefs)
                     val t0 = System.currentTimeMillis()
@@ -64,13 +70,14 @@ object Ai {
                     throw e
                 } catch (e: RetryLater) {
                     last = e
-                    if (attempt == 2) break
-                    log("${e.message} - thử lại sau ${e.waitSec}s")
-                    delay(e.waitSec * 1000L)
+                    if (attempt == 1 || System.currentTimeMillis() - t00 > BUDGET_MS) break
+                    val w = minOf(e.waitSec, 6)
+                    log("${e.message} - thử lại sau ${w}s")
+                    delay(w * 1000L)
                 } catch (e: IOException) {
-                    last = e
-                    if (attempt == 2) break
-                    delay(3000L * (attempt + 1))
+                    last = AiError("${p.name}: ${if (e is java.io.InterruptedIOException) "chờ quá lâu không trả lời" else "lỗi mạng"}")
+                    if (attempt == 1 || System.currentTimeMillis() - t00 > BUDGET_MS) break
+                    delay(3000L)
                 } catch (e: Exception) {
                     last = e
                     break

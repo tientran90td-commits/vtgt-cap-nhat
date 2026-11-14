@@ -87,6 +87,14 @@ class MainVM(app: Application) : AndroidViewModel(app) {
     @Volatile
     private var apiDown = false                                   // API vừa lỗi trong lần làm này -> các bước sau làm tay luôn
     var dlHelp by mutableStateOf<String?>(null)                   // link tải không được -> hướng dẫn tải tay
+    var apiWaiting by mutableStateOf(false)                       // đang chờ API trả lời -> hiện nút "Làm tay ngay"
+    @Volatile
+    private var skipApi = false
+
+    /** Bạn bấm "🖐 Làm tay ngay" trong lúc chờ API. */
+    fun skipToManual() {
+        skipApi = true
+    }
     private var job: Job? = null
 
     private val work get() = File(ctx.filesDir, "work").apply { mkdirs() }
@@ -158,7 +166,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         val text = withContext(Dispatchers.IO) {
             ctx.contentResolver.openInputStream(uri)?.use { it.readBytes().toString(Charsets.UTF_8) } ?: ""
         }
-        val l = parseSrt(text)
+        val l = parseSubs(text)
         if (l.isEmpty()) throw IllegalArgumentException("File phụ đề không có câu nào.")
         withContext(Dispatchers.Main) { lines = l; segs = emptyList() }
         log("Phụ đề: ${l.size} câu.")
@@ -286,8 +294,10 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         while (true) {
             if (!Ai.manual(prefs) && !apiDown) {
                 try {
-                    return Ai.chat(prefs, "Bạn là trợ lý biên tập video tiếng Việt. Làm đúng yêu cầu, chỉ trả lời JSON.",
-                        prompt, ::log)
+                    return callApi(step, prompt)
+                } catch (e: SkipApi) {
+                    apiDown = true
+                    log("🖐 Bạn chọn làm tay - bỏ qua API.")
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: Exception) {
@@ -299,6 +309,35 @@ class MainVM(app: Application) : AndroidViewModel(app) {
             val r = askManual(ManualAsk(step, "deepseek", prompt, canApi = Ai.chain(prefs).isNotEmpty()))
             if (r != RETRY_API) return r
             apiDown = false  // bạn bấm "Thử lại API"
+        }
+    }
+
+    private class SkipApi : Exception()
+
+    /** Gọi API chạy riêng; trong lúc chờ hiện số giây + nút "Làm tay ngay" (bấm là bỏ chờ ngay, không treo). */
+    private suspend fun callApi(step: String, prompt: String): String {
+        skipApi = false
+        withContext(Dispatchers.Main) { apiWaiting = true }
+        val call = viewModelScope.async(Dispatchers.IO) {
+            Ai.chat(prefs, "Bạn là trợ lý biên tập video tiếng Việt. Làm đúng yêu cầu, chỉ trả lời JSON.", prompt, ::log)
+        }
+        val t0 = System.currentTimeMillis()
+        try {
+            while (!call.isCompleted) {
+                if (skipApi) {
+                    call.cancel()
+                    throw SkipApi()
+                }
+                kotlinx.coroutines.delay(300)
+                val s = (System.currentTimeMillis() - t0) / 1000
+                prog(progress, "⏳ $step: chờ AI trả lời ${s}s... (lâu quá thì bấm 🖐 Làm tay ngay)")
+            }
+            return call.await()
+        } catch (e: CancellationException) {
+            call.cancel()
+            throw e
+        } finally {
+            withContext(kotlinx.coroutines.NonCancellable + Dispatchers.Main) { apiWaiting = false }
         }
     }
 
@@ -389,6 +428,29 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         uri
     }
 
+    /** Bộ nhớ tên riêng: tên AI đã dùng được lưu vào bảng tên -> tập sau cùng bộ phim dùng đúng tên đó. */
+    private fun rememberNames(reply: String) {
+        val n = synchronized(prefs) { Prompts.learnNames(prefs, Prompts.parseNames(reply)) }
+        if (n > 0) log("🧠 Nhớ thêm $n tên riêng (sửa ở Cài đặt → Tên riêng).")
+    }
+
+    var castInfo by mutableStateOf(prefs.str("cast_title").let { if (it.isBlank()) "" else "$it: ${prefs.str("cast").split(", ").size} nhân vật" })
+
+    /** Lấy danh sách nhân vật chính thức từ MyAnimeList (Jikan, không cần key) - ý tưởng từ Aniflow. */
+    fun findCast(query: String) = launchTask("Tìm nhân vật") {
+        val f = Cast.lookup(query) ?: throw IllegalStateException("Không tìm thấy \"$query\" trên MyAnimeList - thử tên tiếng Anh / Nhật.")
+        prefs.set("cast", f.names.joinToString(", "))
+        prefs.set("cast_title", f.title)
+        withContext(Dispatchers.Main) { castInfo = "${f.title}: ${f.names.size} nhân vật" }
+        log("📚 ${f.title}: ${f.names.take(8).joinToString(", ")}${if (f.names.size > 8) "..." else ""}")
+    }
+
+    fun clearCast() {
+        prefs.set("cast", "")
+        prefs.set("cast_title", "")
+        castInfo = ""
+    }
+
     private suspend fun writeRecap(i: VInfo) {
         prog(0.32f, "AI viết kịch bản review...")
         log("AI viết kịch bản review ~${targetSec / 60} phút...")
@@ -397,7 +459,9 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         var last: Exception? = null
         repeat(2) {
             try {
-                val (t, s) = Prompts.parseRecap(askAi("Viết kịch bản review", prompt), i.duration)
+                val reply = askAi("Viết kịch bản review", prompt)
+                val (t, s) = Prompts.parseRecap(reply, i.duration)
+                rememberNames(reply)
                 withContext(Dispatchers.Main) {
                     recapTitle = t.ifBlank { title }
                     segs = s
@@ -429,8 +493,10 @@ class MainVM(app: Application) : AndroidViewModel(app) {
             if (manual) {
                 for ((k, p) in parts.withIndex()) {
                     log("Phần ${k + 1}/${parts.size}: ${p.size} câu")
-                    val got = Prompts.parseLines(askAi("Dịch phần ${k + 1}/${parts.size} (${p.size} câu)",
-                        Prompts.translate(title, cur, p, prefs, first)), p)
+                    val reply = askAi("Dịch phần ${k + 1}/${parts.size} (${p.size} câu)",
+                        Prompts.translate(title, cur, p, prefs, first))
+                    val got = Prompts.parseLines(reply, p)
+                    rememberNames(reply)
                     first = false
                     got.forEach { (j, v) -> cur[j].vi = v }
                     prog(0.32f + 0.3f * cur.count { it.vi.isNotBlank() } / cur.size)
@@ -442,8 +508,9 @@ class MainVM(app: Application) : AndroidViewModel(app) {
                     suspend {
                         sem.withPermit {
                             try {
-                                val got = Prompts.parseLines(askAi("Dịch", Prompts.translate(title, cur, p, prefs, true),
-                                    inline = false), p)
+                                val reply = askAi("Dịch", Prompts.translate(title, cur, p, prefs, true), inline = false)
+                                val got = Prompts.parseLines(reply, p)
+                                rememberNames(reply)
                                 synchronized(cur) { got.forEach { (j, v) -> cur[j].vi = v } }
                             } catch (e: CancellationException) {
                                 throw e

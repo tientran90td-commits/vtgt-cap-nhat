@@ -34,9 +34,52 @@ fun extractJson(text: String): JSONObject {
     }
 }
 
-/** Đọc file phụ đề .srt / .vtt. */
+/** Đọc file phụ đề bất kỳ: .ass / .ssa (anime), .srt, .vtt. */
+fun parseSubs(text: String): List<Line> = if (text.contains("[Events]") && text.contains("Dialogue:")) parseAss(text)
+else parseSrt(text)
+
+/**
+ * Phụ đề .ass (fansub anime): bỏ mã hiệu ứng {\...}, hình vẽ, lời bài hát OP/ED (karaoke), chữ trên biển hiệu,
+ * gộp dòng trùng (nhiều lớp hiệu ứng) - chỉ giữ lời thoại cho AI (ý tưởng từ subtitle-translator, MIT).
+ */
+fun parseAss(text: String): List<Line> {
+    var fmt = listOf("Layer", "Start", "End", "Style", "Name", "MarginL", "MarginR", "MarginV", "Effect", "Text")
+    val skipStyle = Regex("(?i)\\b(op|ed|opening|ending|song|lyrics?|karaoke|kara|signs?|title|insert|note)\\b|^(op|ed)")
+    val out = mutableListOf<Line>()
+    fun t(s: String): Double {
+        val p = s.trim().split(":")
+        return if (p.size == 3) p[0].toDouble() * 3600 + p[1].toDouble() * 60 + p[2].toDouble() else 0.0
+    }
+    for (raw in text.replace("\r", "").lines()) {
+        val ln = raw.trim()
+        if (ln.startsWith("Format:", true)) fmt = ln.substringAfter(":").split(",").map { it.trim() }
+        if (!ln.startsWith("Dialogue:", true)) continue
+        val parts = ln.substringAfter(":").split(",", limit = fmt.size)
+        if (parts.size < fmt.size) continue
+        val get = { k: String -> parts.getOrNull(fmt.indexOfFirst { it.equals(k, true) })?.trim() ?: "" }
+        val body = get("Text")
+        val style = get("Style") + " " + get("Name") + " " + get("Effect")
+        if (skipStyle.containsMatchIn(style.replace('_', ' ')) || Regex("(?i)\\\\k[fo]?\\d").containsMatchIn(body) ||
+            Regex("(?i)\\\\p[1-9]").containsMatchIn(body)) continue
+        val clean = body.replace(Regex("\\{[^}]*}"), "").replace("\\N", " ").replace("\\n", " ").replace("\\h", " ")
+            .replace(Regex("\\s+"), " ").trim()
+        if (clean.isEmpty()) continue
+        val a = t(get("Start"))
+        val b = t(get("End"))
+        val prev = out.lastOrNull()
+        if (prev != null && prev.text == clean && a - prev.end < 0.5) {
+            out[out.size - 1] = prev.copy(end = maxOf(prev.end, b))
+            continue
+        }
+        if (out.any { it.text == clean && kotlin.math.abs(it.start - a) < 0.05 }) continue  // lớp trùng
+        out.add(Line(a, b, clean))
+    }
+    return out.sortedBy { it.start }
+}
+
+/** Đọc file phụ đề .srt / .vtt (vtt có thể thiếu giờ: 00:01.000). */
 fun parseSrt(text: String): List<Line> {
-    val re = Regex("(\\d+):(\\d+):(\\d+)[,.](\\d+)\\s*-->\\s*(\\d+):(\\d+):(\\d+)[,.](\\d+)")
+    val re = Regex("(?:(\\d+):)?(\\d+):(\\d+)[,.](\\d+)\\s*-->\\s*(?:(\\d+):)?(\\d+):(\\d+)[,.](\\d+)")
     val out = mutableListOf<Line>()
     val rows = text.replace("\r", "").split("\n")
     var i = 0
@@ -46,7 +89,7 @@ fun parseSrt(text: String): List<Line> {
             i++
             continue
         }
-        val g = m.groupValues.drop(1).map { it.toDouble() }
+        val g = m.groupValues.drop(1).map { it.toDoubleOrNull() ?: 0.0 }
         val a = g[0] * 3600 + g[1] * 60 + g[2] + g[3] / 1000
         val b = g[4] * 3600 + g[5] * 60 + g[6] + g[7] / 1000
         i++
