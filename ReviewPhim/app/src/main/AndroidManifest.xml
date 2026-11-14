@@ -16,6 +16,8 @@
             <action android:name="android.intent.action.VIEW" />
             <data android:scheme="https" />
         </intent>
+        <package android:name="com.deepseek.chat" />
+        <package android:name="com.google.android.apps.bard" />
     </queries>
 
     <application

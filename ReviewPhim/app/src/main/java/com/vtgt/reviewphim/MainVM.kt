@@ -22,6 +22,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -30,6 +31,15 @@ import java.util.Date
 import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
+
+/**
+ * Một bước bạn làm tay thay cho gọi API: chép yêu cầu -> dán sang AI (DeepSeek / Gemini) -> dán câu trả lời lại.
+ * target: "deepseek" | "gemini"; file: file cần gửi kèm (âm thanh cho Gemini nghe).
+ */
+data class ManualAsk(val step: String, val target: String, val prompt: String, val note: String = "",
+                     val file: Uri? = null, val fileName: String = "", val canApi: Boolean = false)
+
+const val RETRY_API = "\u0000api"
 
 class MainVM(app: Application) : AndroidViewModel(app) {
     private val ctx get() = getApplication<Application>()
@@ -71,8 +81,12 @@ class MainVM(app: Application) : AndroidViewModel(app) {
     var busy by mutableStateOf(false)
     var result by mutableStateOf<Uri?>(null)
     var update by mutableStateOf<Updater.Release?>(null)
-    var manualPrompt by mutableStateOf<String?>(null)
+    var ask by mutableStateOf<ManualAsk?>(null)                  // bước đang chờ bạn làm tay (chép / dán)
     private var manualReply: CompletableDeferred<String?>? = null
+    private val manualLock = kotlinx.coroutines.sync.Mutex()
+    @Volatile
+    private var apiDown = false                                   // API vừa lỗi trong lần làm này -> các bước sau làm tay luôn
+    var dlHelp by mutableStateOf<String?>(null)                   // link tải không được -> hướng dẫn tải tay
     private var job: Job? = null
 
     private val work get() = File(ctx.filesDir, "work").apply { mkdirs() }
@@ -110,8 +124,16 @@ class MainVM(app: Application) : AndroidViewModel(app) {
     fun download(url: String) = launchTask("Tải video") {
         val u = Download.findUrl(url) ?: throw IllegalArgumentException("Không thấy link trong nội dung dán.")
         log("Tải: $u")
-        val (f, t) = Download.fetch(ctx, prefs, u, File(work, "dl").apply { deleteRecursively() }, ::log) {
-            prog(it, "Đang tải video ${(it * 100).toInt()}%")
+        withContext(Dispatchers.Main) { dlHelp = null }
+        val (f, t) = try {
+            Download.fetch(ctx, prefs, u, File(work, "dl").apply { deleteRecursively() }, ::log) {
+                prog(it, "Đang tải video ${(it * 100).toInt()}%")
+            }
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            withContext(Dispatchers.Main) { dlHelp = u }  // hiện cách tải tay
+            throw IllegalStateException("Không tải được link này - làm tay: xem hướng dẫn ở mục 1. (${e.message?.lines()?.firstOrNull()})")
         }
         setVideo(f, t)
     }
@@ -166,6 +188,32 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         manualReply?.complete(null)
     }
 
+    /** Các bước sẽ làm, bước nào bạn phải làm tay (🖐) - hiện trước khi bấm làm. */
+    fun plan(): List<Pair<String, Boolean>> {
+        val out = mutableListOf<Pair<String, Boolean>>()
+        val aiManual = Ai.manual(prefs)
+        val groq = prefs.key("groq").isNotBlank() || prefs.key("openai").isNotBlank()
+        out += if (lines.isNotEmpty()) "Lời gốc: đã có ${lines.size} câu" to false else when (stt) {
+            "ocr" -> "Lời gốc: máy tự đọc phụ đề trên hình" to false
+            "srt" -> "Lời gốc: từ file .srt bạn chọn" to false
+            "gemini" -> "Lời gốc: 🖐 đưa file âm thanh cho Gemini nghe, dán lại (${geminiParts()} lần)" to true
+            else -> if (groq) "Lời gốc: Groq nghe tự động (lỗi thì chuyển sang 🖐 nhờ Gemini)" to false
+            else "Lời gốc: 🖐 chưa có key Groq → đưa file âm thanh cho Gemini nghe, dán lại" to true
+        }
+        val n = if (mode == "recap") 1 else maxOf(1, (lines.size + 119) / 120)
+        val what = if (mode == "recap") "Viết kịch bản review" else "Dịch"
+        out += when {
+            mode == "recap" && segs.isNotEmpty() -> "$what: đã có kịch bản" to false
+            mode == "translate" && lines.isNotEmpty() && lines.none { it.vi.isBlank() } -> "$what: đã dịch xong" to false
+            aiManual -> "$what: 🖐 chép yêu cầu sang DeepSeek, dán câu trả lời lại (~$n lần)" to true
+            else -> "$what: AI tự động (lỗi thì chuyển sang 🖐 DeepSeek)" to false
+        }
+        out += "Giọng đọc, dựng video, lưu vào Thư viện: máy tự làm" to false
+        return out
+    }
+
+    private fun geminiParts(): Int = maxOf(1, ((info?.duration ?: 0.0) / GEMINI_PART + 0.999).toInt())
+
     fun resetScript() {
         lines = if (mode == "translate") lines.map { it.copy(vi = "") } else lines
         segs = emptyList()
@@ -209,6 +257,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         progress = 0f
         status = "⏳ $name..."
         if (keepAlive) KeepAliveService.start(ctx, name)
+        apiDown = false
         job = viewModelScope.launch(Dispatchers.Default) {
             try {
                 block()
@@ -222,24 +271,45 @@ class MainVM(app: Application) : AndroidViewModel(app) {
                 log("❌ $name: ${e.message ?: e}")
             } finally {
                 busy = false
-                manualPrompt = null
+                ask = null
                 if (keepAlive) KeepAliveService.stop(ctx)
             }
         }
     }
 
     // ================================================================ AI (API hoặc dán tay)
-    private suspend fun ask(prompt: String): String {
-        if (Ai.manual(prefs)) {
-            val d = CompletableDeferred<String?>()
-            manualReply = d
-            withContext(Dispatchers.Main) { manualPrompt = prompt }
-            log("🐋 Chép yêu cầu → dán vào DeepSeek → dán câu trả lời lại vào app.")
-            val r = d.await()
-            withContext(Dispatchers.Main) { manualPrompt = null }
-            return r ?: throw CancellationException("Đã hủy")
+    /**
+     * Hỏi AI: có key thì gọi API; API lỗi (hết tiền, quá tải, mất mạng...) thì KHÔNG dừng mà chuyển ngay sang
+     * làm tay (chép yêu cầu sang DeepSeek). inline = false: để người gọi gom các phần lỗi lại làm tay 1 lần.
+     */
+    private suspend fun askAi(step: String, prompt: String, inline: Boolean = true): String {
+        while (true) {
+            if (!Ai.manual(prefs) && !apiDown) {
+                try {
+                    return Ai.chat(prefs, "Bạn là trợ lý biên tập video tiếng Việt. Làm đúng yêu cầu, chỉ trả lời JSON.",
+                        prompt, ::log)
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    apiDown = true
+                    log("⚠ API lỗi (${e.message?.take(120)}) → chuyển sang 🖐 làm tay: chép yêu cầu sang DeepSeek.")
+                    if (!inline) throw e
+                }
+            }
+            val r = askManual(ManualAsk(step, "deepseek", prompt, canApi = Ai.chain(prefs).isNotEmpty()))
+            if (r != RETRY_API) return r
+            apiDown = false  // bạn bấm "Thử lại API"
         }
-        return Ai.chat(prefs, "Bạn là trợ lý biên tập video tiếng Việt. Làm đúng yêu cầu, chỉ trả lời JSON.", prompt, ::log)
+    }
+
+    private suspend fun askManual(a: ManualAsk): String = manualLock.withLock {
+        val d = CompletableDeferred<String?>()
+        manualReply = d
+        withContext(Dispatchers.Main) { ask = a }
+        log("🖐 ${a.step}: chép yêu cầu → dán sang ${if (a.target == "gemini") "Gemini" else "DeepSeek"} → dán câu trả lời lại.")
+        val r = d.await()
+        withContext(Dispatchers.Main) { ask = null }
+        r ?: throw CancellationException("Đã hủy")
     }
 
     fun answerManual(text: String?) {
@@ -255,12 +325,68 @@ class MainVM(app: Application) : AndroidViewModel(app) {
                 Stt.ocr(v, i, bandTop, bandBottom, ::log) { prog(it * 0.3f, "Đọc chữ trên hình ${(it * 100).toInt()}%") }
             }
             "srt" -> throw IllegalStateException("Chọn file phụ đề .srt trước.")
-            else -> Stt.whisper(ctx, prefs, v, i, ::log) { prog(it * 0.3f, "Nghe lời thoại ${(it * 100).toInt()}%") }
+            "gemini" -> geminiTranscript(v, i)
+            else -> if (prefs.key("groq").isBlank() && prefs.key("openai").isBlank()) {
+                log("Chưa có key Groq → 🖐 nhờ Gemini nghe lời thoại (không cần key).")
+                geminiTranscript(v, i)
+            } else try {
+                Stt.whisper(ctx, prefs, v, i, ::log) { prog(it * 0.3f, "Nghe lời thoại ${(it * 100).toInt()}%") }
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                log("⚠ Groq lỗi (${e.message?.take(120)}) → chuyển sang 🖐 nhờ Gemini nghe lời thoại.")
+                geminiTranscript(v, i)
+            }
         }
         if (l.isEmpty()) throw IllegalStateException(
             if (stt == "ocr") "Không đọc được chữ nào: chỉnh lại vùng phụ đề cho đúng chỗ chữ." else "Không nghe được lời thoại nào.")
         withContext(Dispatchers.Main) { lines = l }
         log("Lời gốc: ${l.size} câu.")
+    }
+
+    /** Lời gốc không cần API: lưu file âm thanh nhỏ vào Download, bạn đưa cho Gemini nghe rồi dán phụ đề lại. */
+    private suspend fun geminiTranscript(v: File, i: VInfo): List<Line> {
+        if (!i.hasAudio) throw IllegalStateException("Video không có tiếng - chọn 'Đọc phụ đề trên hình'.")
+        val n = geminiParts()
+        val out = mutableListOf<Line>()
+        for (k in 0 until n) {
+            val off = k * GEMINI_PART
+            val mp3 = File(ctx.cacheDir, "gemini_$k.mp3")
+            prog(0.3f * k / n, "Chuẩn bị file âm thanh ${k + 1}/$n")
+            Ff.speechAudio(ctx, v, mp3, off, if (n > 1) GEMINI_PART else 0.0)
+            val name = (title.take(50) + if (n > 1) " - phần ${k + 1}" else "").replace(Regex("[\\\\/:*?\"<>|]"), " ") + ".mp3"
+            val uri = saveToDownloads(mp3, name)
+            mp3.delete()
+            val mins = (minOf(GEMINI_PART, i.duration - off) / 60).toInt() + 1
+            var got = emptyList<Line>()
+            while (got.isEmpty()) {
+                val r = askManual(ManualAsk("Lời gốc ${if (n > 1) "phần ${k + 1}/$n" else ""}".trim(), "gemini",
+                    Prompts.transcribe(title, k + 1, n, mins),
+                    "Gửi kèm file \"$name\" (đã lưu ở Download/ReviewPhim) cho Gemini.", uri, name))
+                got = parseTimed(r, off)
+                if (got.isEmpty()) log("Không đọc được phụ đề trong câu trả lời - cần dạng SRT (00:00:01,000 --> ...). Dán lại.")
+            }
+            out += got
+            log("Gemini chép được ${got.size} câu (phần ${k + 1}/$n).")
+        }
+        return Stt.cleanLines(out.sortedBy { it.start })
+    }
+
+    private suspend fun saveToDownloads(f: File, name: String): Uri = withContext(Dispatchers.IO) {
+        val values = ContentValues().apply {
+            put(MediaStore.Downloads.DISPLAY_NAME, name)
+            put(MediaStore.Downloads.MIME_TYPE, "audio/mpeg")
+            put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/ReviewPhim")
+            put(MediaStore.Downloads.IS_PENDING, 1)
+        }
+        val r = ctx.contentResolver
+        val uri = r.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, values)
+            ?: throw IllegalStateException("Không lưu được file âm thanh vào Download.")
+        r.openOutputStream(uri)?.use { o -> f.inputStream().use { it.copyTo(o) } }
+        values.clear()
+        values.put(MediaStore.Downloads.IS_PENDING, 0)
+        r.update(uri, values, null, null)
+        uri
     }
 
     private suspend fun writeRecap(i: VInfo) {
@@ -271,7 +397,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         var last: Exception? = null
         repeat(2) {
             try {
-                val (t, s) = Prompts.parseRecap(ask(prompt), i.duration)
+                val (t, s) = Prompts.parseRecap(askAi("Viết kịch bản review", prompt), i.duration)
                 withContext(Dispatchers.Main) {
                     recapTitle = t.ifBlank { title }
                     segs = s
@@ -292,9 +418,9 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         val cur = lines.map { it.copy() }
         val todo = cur.indices.filter { cur[it].vi.isBlank() }
         prog(0.32f, "Dịch ${todo.size} câu...")
-        val manual = Ai.manual(prefs)
         var first = cur.none { it.vi.isNotBlank() }
-        for (round in 0 until 3) {
+        for (round in 0 until 4) {
+            val manual = Ai.manual(prefs) || apiDown  // API lỗi ở vòng trước -> vòng này làm tay, mỗi lần 120 câu
             val miss = cur.indices.filter { cur[it].vi.isBlank() && !cur[it].text.matches(Regex("[♪\\s\\p{Punct}]*")) }
             if (miss.isEmpty()) break
             if (round > 0) log("Dịch lại ${miss.size} câu bị sót...")
@@ -303,7 +429,8 @@ class MainVM(app: Application) : AndroidViewModel(app) {
             if (manual) {
                 for ((k, p) in parts.withIndex()) {
                     log("Phần ${k + 1}/${parts.size}: ${p.size} câu")
-                    val got = Prompts.parseLines(ask(Prompts.translate(title, cur, p, prefs, first)), p)
+                    val got = Prompts.parseLines(askAi("Dịch phần ${k + 1}/${parts.size} (${p.size} câu)",
+                        Prompts.translate(title, cur, p, prefs, first)), p)
                     first = false
                     got.forEach { (j, v) -> cur[j].vi = v }
                     prog(0.32f + 0.3f * cur.count { it.vi.isNotBlank() } / cur.size)
@@ -315,7 +442,8 @@ class MainVM(app: Application) : AndroidViewModel(app) {
                     suspend {
                         sem.withPermit {
                             try {
-                                val got = Prompts.parseLines(ask(Prompts.translate(title, cur, p, prefs, true)), p)
+                                val got = Prompts.parseLines(askAi("Dịch", Prompts.translate(title, cur, p, prefs, true),
+                                    inline = false), p)
                                 synchronized(cur) { got.forEach { (j, v) -> cur[j].vi = v } }
                             } catch (e: CancellationException) {
                                 throw e
@@ -330,14 +458,15 @@ class MainVM(app: Application) : AndroidViewModel(app) {
             }
         }
         // câu đọc quá nhanh -> AI rút gọn (chỉ khi dùng API; dán tay thì giọng đọc tự nói nhanh hơn chút)
-        if (!manual && output != "sub") {
+        if (!Ai.manual(prefs) && !apiDown && output != "sub") {
             for (round in 0 until 2) {
                 val long = cur.indices.filter { cur[it].vi.length > maxChars(cur, it) * 1.3 }
                 if (long.isEmpty()) break
                 log("⚡ Tối ưu thuyết minh: rút gọn ${long.size} câu đọc quá nhanh (vòng ${round + 1})...")
                 for (p in long.chunked(30)) {
                     try {
-                        val got = Prompts.parseLines(ask(Prompts.shorten(cur, p, 1.0 - 0.1 * round)), p)
+                        val got = Prompts.parseLines(askAi("Rút gọn câu dài", Prompts.shorten(cur, p, 1.0 - 0.1 * round),
+                            inline = false), p)
                         got.forEach { (j, v) -> if (v.isNotBlank() && v.length < cur[j].vi.length) cur[j].vi = v }
                     } catch (e: CancellationException) {
                         throw e
@@ -350,6 +479,10 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         withContext(Dispatchers.Main) { lines = cur }
         val left = cur.count { it.vi.isBlank() }
         log("Đã dịch ${cur.size - left}/${cur.size} câu." + if (left > 0) " Câu còn thiếu sửa tay ở tab Kịch bản." else "")
+    }
+
+    companion object {
+        const val GEMINI_PART = 20 * 60.0  // mỗi file gửi Gemini tối đa 20 phút (câu trả lời không bị cắt giữa chừng)
     }
 
     private suspend fun coroutineScopeAll(tasks: List<suspend () -> Unit>) =

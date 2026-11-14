@@ -93,6 +93,13 @@ $body
 """.trim()
     }
 
+    /** Nhờ Gemini (web / app) nghe file âm thanh và chép lời thoại - không cần API key. */
+    fun transcribe(title: String, part: Int, parts: Int, minutes: Int): String = """
+Mình gửi kèm file âm thanh lời thoại của video "$title"${if (parts > 1) " (phần $part/$parts)" else ""}, dài khoảng $minutes phút.
+Hãy nghe và chép lại TOÀN BỘ lời nói, đúng ngôn ngữ gốc (KHÔNG dịch, không tóm tắt, không bỏ câu).
+Trả lời CHỈ bằng phụ đề định dạng SRT chuẩn, mốc thời gian chính xác theo file (HH:MM:SS,mmm --> HH:MM:SS,mmm), mỗi câu 1 mục ngắn, không giải thích gì thêm.
+""".trim()
+
     /** Đọc câu trả lời dịch: JSON {"lines": {...}} hoặc từng dòng "id | câu". */
     fun parseLines(text: String, idx: Collection<Int>): Map<Int, String> {
         val got = mutableMapOf<Int, String>()

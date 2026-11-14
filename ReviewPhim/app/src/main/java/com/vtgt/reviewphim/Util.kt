@@ -62,6 +62,22 @@ fun parseSrt(text: String): List<Line> {
     return out
 }
 
+/** Lời thoại AI chép lại: SRT, hoặc từng dòng "[mm:ss] câu" / "mm:ss - câu". `offset`: giây cộng thêm (file chia phần). */
+fun parseTimed(text: String, offset: Double = 0.0): List<Line> {
+    val srt = parseSrt(text)
+    if (srt.isNotEmpty()) return srt.map { Line(it.start + offset, it.end + offset, it.text) }
+    val re = Regex("^\\s*\\[?(?:(\\d{1,2}):)?(\\d{1,2}):(\\d{2})(?:[.,](\\d+))?\\]?\\s*[-–:]?\\s*(.+?)\\s*$", RegexOption.MULTILINE)
+    val pts = re.findAll(text).map { m ->
+        val (h, mi, s, frac, t) = m.destructured
+        val sec = (h.toDoubleOrNull() ?: 0.0) * 3600 + mi.toDouble() * 60 + s.toDouble() + ("0.$frac".toDoubleOrNull() ?: 0.0)
+        sec to t.trim()
+    }.filter { it.second.isNotEmpty() }.toList()
+    return pts.mapIndexed { i, (a, t) ->
+        val b = pts.getOrNull(i + 1)?.first ?: (a + 3.0)
+        Line(a + offset, minOf(b, a + 8.0) + offset, t)
+    }
+}
+
 fun toSrt(cues: List<Cue>): String {
     fun ts(t: Double): String {
         val ms = (t * 1000).toLong()

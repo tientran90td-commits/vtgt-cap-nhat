@@ -102,7 +102,7 @@ fun AppScreen(vm: MainVM) {
         }
         BottomBar(vm)
     }
-    vm.manualPrompt?.let { ManualDialog(it, vm) }
+    vm.ask?.let { ManualDialog(it, vm) }
 }
 
 @Composable
@@ -168,6 +168,20 @@ private fun MakeTab(vm: MainVM) {
                 }
             }
             Hint("Mẹo: trong TikTok / YouTube bấm Chia sẻ → ReviewPhim AI để tải luôn.")
+            vm.dlHelp?.let { bad ->
+                val uh = LocalUriHandler.current
+                Surface(color = Color(0x33FFB74D), shape = RoundedCornerShape(10.dp)) {
+                    Column(Modifier.padding(10.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                        Text("🖐 Tải tay: link này app không tải được (trang chặn / cần đăng nhập).", fontWeight = FontWeight.SemiBold)
+                        Text("1. Bấm Mở link → dùng nút Lưu / Tải video của app gốc (TikTok, Douyin...) hoặc trang tải video " +
+                            "bạn hay dùng.\n2. Quay lại đây bấm 📂 Chọn video, chọn file vừa tải.", fontSize = 13.sp)
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            OutlinedButton(onClick = { runCatching { uh.openUri(bad) } }) { Text("🌐 Mở link") }
+                            Button(onClick = { vm.dlHelp = null; pick.launch("video/*") }) { Text("📂 Chọn video") }
+                        }
+                    }
+                }
+            }
             vm.info?.let { i ->
                 Text(vm.title, fontWeight = FontWeight.SemiBold, maxLines = 2)
                 Hint("${fmtTime(i.duration)} · ${i.width}x${i.height}${if (i.hasAudio) "" else " · không có tiếng"}" +
@@ -205,7 +219,8 @@ private fun MakeTab(vm: MainVM) {
         }
         Section("3. Lời gốc của video") {
             Choice("Lấy lời gốc bằng", vm.stt, listOf(
-                "whisper" to "🎧 Nghe lời thoại (Groq - miễn phí, cần key)",
+                "whisper" to "🎧 Nghe lời thoại (Groq API; lỗi / không key → 🖐 nhờ Gemini)",
+                "gemini" to "🖐 Nhờ Gemini nghe (làm tay, không cần key)",
                 "ocr" to "🔤 Đọc phụ đề cứng trên hình (không cần mạng)",
                 "srt" to "📄 File phụ đề .srt",
             )) { vm.stt = it; vm.save("stt", it); vm.lines = emptyList() }
@@ -216,6 +231,13 @@ private fun MakeTab(vm: MainVM) {
                 Checkbox(vm.cover, { vm.cover = it; vm.prefs.setBool("cover", it) })
                 Text("Che phụ đề gốc (phụ đề Việt hiện đúng chỗ đó)")
             }
+        }
+        Section("Các bước sẽ làm") {
+            vm.plan().forEachIndexed { k, (t, manual) ->
+                Text("${k + 1}. $t", fontSize = 14.sp, color = if (manual) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurface)
+            }
+            Hint("🖐 = bước bạn làm tay: app chép sẵn yêu cầu, bạn dán sang DeepSeek / Gemini rồi dán câu trả lời lại. " +
+                "Không cần API, không lo lỗi hết tiền / quá tải.")
         }
         Section("4. Khung hình & giọng đọc") {
             Choice("Khung hình", vm.aspect, Aspect.entries.map { it to it.label }) { vm.aspect = it; vm.save("aspect", it.name) }
@@ -366,36 +388,72 @@ private fun ScriptTab(vm: MainVM) {
 
 // ==================================================================== dán tay qua DeepSeek web
 @Composable
-private fun ManualDialog(prompt: String, vm: MainVM) {
+private fun ManualDialog(a: ManualAsk, vm: MainVM) {
     val clip = LocalClipboardManager.current
-    val uri = LocalUriHandler.current
-    var reply by remember(prompt) { mutableStateOf("") }
-    var copied by remember(prompt) { mutableStateOf(false) }
+    val ctx = LocalContext.current
+    val gemini = a.target == "gemini"
+    val who = if (gemini) "Gemini" else "DeepSeek"
+    var reply by remember(a) { mutableStateOf("") }
+    var copied by remember(a) { mutableStateOf(false) }
+    fun looksLikeAnswer(t: String) = t != a.prompt && (t.contains("{") || t.contains("-->") || Regex("\\d+:\\d{2}").containsMatchIn(t))
+    // quay lại app sau khi chép câu trả lời: tự dán
+    val owner = androidx.compose.ui.platform.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(owner, a) {
+        val obs = androidx.lifecycle.LifecycleEventObserver { _, ev ->
+            if (ev == androidx.lifecycle.Lifecycle.Event.ON_RESUME && reply.isBlank()) {
+                clip.getText()?.text?.let { if (looksLikeAnswer(it)) reply = it }
+            }
+        }
+        owner.lifecycle.addObserver(obs)
+        onDispose { owner.lifecycle.removeObserver(obs) }
+    }
+    fun openApp() {
+        val pkg = if (gemini) "com.google.android.apps.bard" else "com.deepseek.chat"
+        val web = if (gemini) "https://gemini.google.com/app" else "https://chat.deepseek.com"
+        val i = ctx.packageManager.getLaunchIntentForPackage(pkg)
+            ?: Intent(Intent.ACTION_VIEW, android.net.Uri.parse(web))
+        ctx.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+    }
     Dialog(onDismissRequest = {}, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Surface(Modifier.fillMaxWidth().padding(12.dp), shape = RoundedCornerShape(16.dp)) {
             Column(Modifier.padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("🐋 Nhờ DeepSeek (miễn phí)", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Text("1. Bấm Chép yêu cầu  2. Mở DeepSeek, dán vào ô chat, gửi  3. Bấm nút chép dưới câu trả lời của DeepSeek, " +
-                    "quay lại đây bấm Dán & dùng. Nên dùng cùng 1 cuộc trò chuyện cho các phần của cùng video.", fontSize = 13.sp)
+                Text("🖐 Làm tay: ${a.step}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
+                Text(if (gemini) "1. Bấm Chép yêu cầu.  2. Bấm Gửi file cho Gemini (hoặc mở Gemini, đính kèm file " +
+                    "\"${a.fileName}\" trong Download/ReviewPhim), dán yêu cầu, gửi.  3. Chép câu trả lời, quay lại đây - app tự dán, bấm Dùng."
+                else "1. Bấm Chép yêu cầu.  2. Mở DeepSeek, dán vào ô chat, gửi (nên dùng chung 1 cuộc trò chuyện cho các phần của " +
+                    "cùng video).  3. Bấm nút chép dưới câu trả lời, quay lại đây - app tự dán, bấm Dùng.", fontSize = 13.sp)
+                if (a.note.isNotBlank()) Hint(a.note)
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { clip.setText(AnnotatedString(prompt)); copied = true }, modifier = Modifier.weight(1f)) {
+                    Button(onClick = { clip.setText(AnnotatedString(a.prompt)); copied = true }, modifier = Modifier.weight(1f)) {
                         Text(if (copied) "✅ Đã chép" else "📋 Chép yêu cầu")
                     }
-                    OutlinedButton(onClick = { uri.openUri("https://chat.deepseek.com") }, modifier = Modifier.weight(1f)) {
-                        Text("🌐 Mở DeepSeek")
-                    }
+                    OutlinedButton(onClick = { openApp() }, modifier = Modifier.weight(1f)) { Text("🌐 Mở $who") }
                 }
-                Hint("Yêu cầu (${prompt.length} ký tự): " + prompt.take(300).replace("\n", " ") + "...")
+                a.file?.let { f ->
+                    OutlinedButton(onClick = {
+                        clip.setText(AnnotatedString(a.prompt)); copied = true
+                        val send = Intent(Intent.ACTION_SEND).setType("audio/mpeg").putExtra(Intent.EXTRA_STREAM, f)
+                            .putExtra(Intent.EXTRA_TEXT, a.prompt).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        val g = Intent(send).setPackage("com.google.android.apps.bard")
+                        ctx.startActivity((if (g.resolveActivity(ctx.packageManager) != null) g
+                        else Intent.createChooser(send, "Gửi file cho Gemini")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    }, modifier = Modifier.fillMaxWidth()) { Text("📤 Gửi file âm thanh cho Gemini (kèm yêu cầu)") }
+                }
+                Hint("Yêu cầu (${a.prompt.length} ký tự): " + a.prompt.take(240).replace("\n", " ") + "...")
                 OutlinedTextField(reply, { reply = it }, Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 260.dp),
-                    label = { Text("Câu trả lời của DeepSeek") })
+                    label = { Text("Câu trả lời của $who") })
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { clip.getText()?.text?.let { reply = it } }, modifier = Modifier.weight(1f)) {
                         Text("📋 Dán")
                     }
-                    Button(onClick = { vm.answerManual(reply) }, enabled = reply.contains("{") || reply.contains("|"),
+                    Button(onClick = { vm.answerManual(reply) }, enabled = looksLikeAnswer(reply) || reply.contains("|"),
                         modifier = Modifier.weight(1f)) { Text("✅ Dùng") }
                 }
-                TextButton(onClick = { vm.cancel() }) { Text("Hủy") }
+                Row {
+                    TextButton(onClick = { vm.cancel() }) { Text("Hủy") }
+                    Spacer(Modifier.weight(1f))
+                    if (a.canApi) TextButton(onClick = { vm.answerManual(RETRY_API) }) { Text("⚡ Thử lại API") }
+                }
             }
         }
     }
@@ -409,8 +467,8 @@ private fun SettingsTab(vm: MainVM) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 6.dp).imePadding()) {
         Section("AI viết kịch bản & dịch") {
             var ai by remember { mutableStateOf(vm.prefs.str("ai", "auto")) }
-            Choice("Dùng", ai, listOf("auto" to "Tự động: AI có key (không có key thì dán tay)",
-                "manual" to "🐋 Luôn dán tay qua DeepSeek web (miễn phí)")) { ai = it; vm.prefs.set("ai", it) }
+            Choice("Dùng", ai, listOf("manual" to "🖐 Làm tay: chép / dán sang DeepSeek (miễn phí, không lỗi API)",
+                "auto" to "⚡ API tự động (lỗi thì tự chuyển sang làm tay)")) { ai = it; vm.prefs.set("ai", it) }
             Hint("Key chỉ lưu trong máy này. Thứ tự dùng: DeepSeek → Gemini → OpenRouter → Groq → OpenAI; AI nào lỗi/hết tiền thì tự sang AI kế.")
             Ai.PROVS.forEach { p ->
                 var k by remember { mutableStateOf(vm.prefs.key(p.id)) }

@@ -19,6 +19,22 @@ class CoreTest {
     }
 
     @Test
+    fun geminiReply() {
+        // Gemini trả SRT (có chữ thừa trước / sau) -> cộng thời điểm bắt đầu của phần
+        val srt = parseTimed("Đây là phụ đề:\n```srt\n1\n00:00:01,000 --> 00:00:02,500\n一护推开宫殿大门。\n\n" +
+            "2\n00:00:03,000 --> 00:00:04,000\n前方正是友哈巴赫\n```", 1200.0)
+        assertEquals(2, srt.size)
+        assertEquals(1201.0, srt[0].start, 1e-6)
+        assertEquals("前方正是友哈巴赫", srt[1].text)
+        // hoặc từng dòng có mốc [mm:ss]
+        val ts = parseTimed("[00:05] Câu một\n[01:02.5] Câu hai\n1:00:03 - Câu ba")
+        assertEquals(listOf(5.0, 62.5, 3603.0), ts.map { it.start })
+        assertEquals(62.5, ts[0].end, 1e-6)
+        assertEquals("Câu ba", ts[2].text)
+        assertTrue(parseTimed("không có mốc thời gian").isEmpty())
+    }
+
+    @Test
     fun srt() {
         val l = parseSrt("1\n00:00:01,000 --> 00:00:02,500\n<i>Xin chào</i>\nbạn\n\n2\n00:01:00.000 --> 00:01:02.000\n{\\an8}Hai\n")
         assertEquals(2, l.size)
