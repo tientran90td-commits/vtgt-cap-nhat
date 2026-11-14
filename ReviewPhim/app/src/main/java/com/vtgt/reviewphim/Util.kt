@@ -52,7 +52,7 @@ fun parseSrt(text: String): List<Line> {
         i++
         val sb = StringBuilder()
         while (i < rows.size && rows[i].isNotBlank()) {
-            if (re.containsMatchIn(rows[i])) break
+            if (re.containsMatchIn(rows[i]) || rows[i].trim().startsWith("```")) break  // AI hay bọc trong ```srt ... ```
             sb.append(' ').append(rows[i].trim())
             i++
         }
