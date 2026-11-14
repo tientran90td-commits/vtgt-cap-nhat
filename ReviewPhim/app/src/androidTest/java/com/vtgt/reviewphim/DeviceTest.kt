@@ -24,7 +24,8 @@ class DeviceTest {
         var bright = 0
         for (y in (b.height * y0).toInt() until (b.height * y1).toInt() step 2) for (x in 0 until b.width step 2) {
             val c = b.getPixel(x, y)
-            if ((c shr 16 and 255) > 200 && (c shr 8 and 255) > 200 && (c and 255) > 200) bright++
+            // chữ phụ đề trắng, hoặc vàng khi karaoke đã đọc tới
+            if ((c shr 16 and 255) > 200 && (c shr 8 and 255) > 180) bright++
             n++
         }
         return bright.toDouble() / n
@@ -135,7 +136,9 @@ class DeviceTest {
         val frames = Shots.analyze(ctx, src, 0.0, 10.0)
         assertTrue("phải đọc được khung (${frames.size})", frames.size > 40)
         val sh = Shots.shots(frames, 10.0)
-        assertTrue("phải thấy nhiều cảnh (${sh.size})", sh.size >= 4)
+        // đổi sắc màu (độ sáng gần như giữ nguyên) không tính là cắt cảnh; vào / ra màn hình đen thì có
+        assertTrue("phải thấy các lần cắt cảnh (${sh.size})", sh.size >= 3)
+        assertTrue("phải nhận ra cảnh đen: $sh", sh.any { it.y < Shots.DARK_Y && it.a in 3.5..4.5 })
         val p = Shots.plan(sh, 0.5, 5.0, 10.0)
         assertTrue("không lấy cảnh đen: $p", p.none { (a, d) -> a < 5.9 && a + d > 4.1 })
         assertEquals(5.0, p.sumOf { it.second }, 0.05)
