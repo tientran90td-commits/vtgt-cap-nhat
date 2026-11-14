@@ -59,6 +59,10 @@ class MainVM(app: Application) : AndroidViewModel(app) {
     var bandBottom by mutableFloatStateOf(prefs.num("band_bottom", 0.96f))
     var voice by mutableStateOf(prefs.str("voice"))
     var rate by mutableFloatStateOf(prefs.num("rate", 1.1f))
+    var multiShot by mutableStateOf(prefs.bool("multi_shot", true))
+    var karaoke by mutableStateOf(prefs.bool("karaoke", true))
+    var hookTitle by mutableStateOf(prefs.bool("hook_title", true))
+    var bgmName by mutableStateOf(prefs.str("bgm_name"))
 
     // ---- tiến trình
     val logs = mutableStateListOf<String>()
@@ -136,6 +140,24 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         if (l.isEmpty()) throw IllegalArgumentException("File phụ đề không có câu nào.")
         withContext(Dispatchers.Main) { lines = l; segs = emptyList() }
         log("Phụ đề: ${l.size} câu.")
+    }
+
+    fun setBgm(uri: Uri?) = launchTask("Nhạc nền") {
+        val f = File(work, "bgm.audio")
+        if (uri == null) {
+            f.delete()
+            prefs.set("bgm_name", "")
+            withContext(Dispatchers.Main) { bgmName = "" }
+            return@launchTask
+        }
+        val name = ctx.contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use {
+            if (it.moveToFirst()) it.getString(0) else null
+        } ?: "nhạc"
+        withContext(Dispatchers.IO) {
+            ctx.contentResolver.openInputStream(uri)?.use { i -> f.outputStream().use { o -> i.copyTo(o) } }
+        }
+        prefs.set("bgm_name", name)
+        withContext(Dispatchers.Main) { bgmName = name }
     }
 
     // ================================================================ chạy
@@ -343,28 +365,43 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         val cues = mutableListOf<Cue>()
         val maxChars = if (aspect == Aspect.SOURCE && i.width > i.height) 44 else 30
         log("Đọc giọng ${segs.size} đoạn...")
+        var shotsUsed = 0
         Wav.Writer(narr).use { w ->
             var t = 0.0
-            var prevEnd = 0.0
+            var usedEnd = 0.0
+            val starts = segs.map { it.start }
             for ((k, s) in segs.withIndex()) {
                 prog(0.4f + 0.3f * k / segs.size, "Đọc giọng ${k + 1}/${segs.size}")
                 val wav = speak(s.text, File(dir, "s$k.wav"), rate)
                 val pcm = Wav.read(wav)
                 val dur = pcm.seconds + 0.35
-                var start = max(s.start, if (s.start < prevEnd && prevEnd + dur <= i.duration) prevEnd else s.start)
-                start = min(start, max(0.0, i.duration - dur))
-                val end = min(i.duration, start + dur)
+                var start = s.start
+                if (k > 0 && start < usedEnd) start = usedEnd  // không chiếu lại cảnh vừa dùng
+                start = start.coerceIn(0.0, max(0.0, i.duration - dur - 0.5))
+                // ghép nhiều cảnh ngắn bắt đầu ở điểm cắt cảnh, bỏ cảnh đen (cửa sổ tới đoạn kể sau)
+                val pieces = if (multiShot) {
+                    val nxt = starts.drop(k + 1).firstOrNull { it > start + dur }
+                    val win = minOf(maxOf(dur + 2.0, minOf(dur * 3.0, (nxt ?: (start + dur * 3.0)) - start, 45.0)),
+                        i.duration - start)
+                    val sh = Shots.shots(Shots.analyze(ctx, v, start - 0.5, win + 0.5), start + win)
+                    Shots.plan(sh, start, dur, i.duration)
+                } else listOf(start to dur)
+                if (k > 0) usedEnd = pieces.maxOf { it.first + it.second }
                 w.silenceTo(t + 0.15)
                 w.write(pcm)
                 cues += splitCues(s.text, t + 0.15, pcm.seconds, maxChars)
-                clips += start to end
-                t += end - start
+                for ((a, d) in pieces) clips += a to min(i.duration, a + d)
+                shotsUsed += pieces.size
+                t += pieces.sumOf { (a, d) -> min(i.duration, a + d) - a }
                 w.silenceTo(t)
-                prevEnd = end
             }
         }
-        finish(v, i, clips, cues, recapTitle.ifBlank { title }) { mixed ->
-            Ff.mixRecap(ctx, v, i.hasAudio, clips, narr, prefs.num("bg_vol", 0.12f).toDouble(), mixed)
+        log("Ghép ${segs.size} đoạn lời kể từ $shotsUsed cảnh.")
+        val bgm = File(work, "bgm.audio").takeIf { it.exists() && bgmName.isNotBlank() }
+        val name = recapTitle.ifBlank { title }
+        finish(v, i, clips, cues, name, hook = if (hookTitle) name else "") { mixed ->
+            Ff.mixRecap(ctx, v, i.hasAudio, clips, narr, prefs.num("bg_vol", 0.12f).toDouble(), mixed, bgm,
+                prefs.num("bgm_vol", 0.25f).toDouble())
         }
     }
 
@@ -409,15 +446,16 @@ class MainVM(app: Application) : AndroidViewModel(app) {
 
     /** Dựng hình + trộn tiếng + ghép + lưu vào thư viện ảnh. */
     private suspend fun finish(v: File, i: VInfo, clips: List<Pair<Double, Double>>?, cues: List<Cue>, name: String,
-                               mixAudio: suspend (File) -> Unit) {
+                               hook: String = "", mixAudio: suspend (File) -> Unit) {
         val vid = File(work, "video_only.mp4")
         val aud = File(work, "audio.wav")
         val out = File(work, "final.mp4")
         log("Trộn âm thanh...")
         prog(0.72f, "Trộn âm thanh")
         mixAudio(aud)
-        log("Dựng hình ${Render.outSize(spec(v, i, clips, cues, name)).let { "${it.first}x${it.second}" }}...")
-        Render.video(ctx, spec(v, i, clips, cues, name), vid) { prog(0.75f + 0.22f * it, "Dựng video ${(it * 100).toInt()}%") }
+        val sp = spec(v, i, clips, cues, name, hook)
+        log("Dựng hình ${Render.outSize(sp).let { "${it.first}x${it.second}" }}...")
+        Render.video(ctx, sp, vid) { prog(0.75f + 0.22f * it, "Dựng video ${(it * 100).toInt()}%") }
         prog(0.97f, "Ghép tiếng")
         Ff.mux(ctx, vid, aud, out)
         File(work, "final.srt").writeText(toSrt(cues))
@@ -428,8 +466,9 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         log("✅ Xong! Video đã lưu vào Thư viện ảnh → Movies/ReviewPhim.")
     }
 
-    private fun spec(v: File, i: VInfo, clips: List<Pair<Double, Double>>?, cues: List<Cue>, name: String) = RenderSpec(
-        v, i, clips, aspect, quality, if (cover) bandTop to bandBottom else null, bandTop to bandBottom, cues, name)
+    private fun spec(v: File, i: VInfo, clips: List<Pair<Double, Double>>?, cues: List<Cue>, name: String, hook: String) =
+        RenderSpec(v, i, clips, aspect, quality, if (cover) bandTop to bandBottom else null, bandTop to bandBottom, cues, name,
+            karaoke = karaoke && mode == "recap", hook = hook)
 
     private suspend fun saveToGallery(f: File, name: String): Uri = withContext(Dispatchers.IO) {
         val safe = name.replace(Regex("[\\\\/:*?\"<>|\\n]"), " ").trim().take(80).ifBlank { "ReviewPhim" }

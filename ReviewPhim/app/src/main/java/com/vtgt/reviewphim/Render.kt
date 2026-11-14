@@ -65,6 +65,10 @@ class RenderSpec(
     /** Phụ đề theo thời gian của video thành phẩm. */
     val cues: List<Cue>,
     val title: String,
+    /** Chữ đổi màu theo giọng đọc (karaoke). */
+    val karaoke: Boolean = false,
+    /** Tiêu đề lớn giữa màn hình 2.6 giây đầu video. */
+    val hook: String = "",
 )
 
 object Render {
@@ -101,13 +105,15 @@ object Render {
         else Presentation.LAYOUT_SCALE_TO_FIT
         val clips = spec.clips ?: listOf(0.0 to spec.info.duration)
         var offset = 0.0
-        val items = clips.map { (a, b) ->
+        val items = clips.mapIndexed { ci, (a, b) ->
             val local = spec.cues.filter { it.end > offset && it.start < offset + (b - a) }
                 .map { Cue(it.start - offset, it.end - offset, it.text) }
             val effects = mutableListOf<Effect>()
             spec.cover?.let { effects.add(OverlayEffect(ImmutableList.of<TextureOverlay>(CoverOverlay(spec.info, it)))) }
             effects.add(Presentation.createForWidthAndHeight(w, h, layout))
-            effects.add(OverlayEffect(ImmutableList.of<TextureOverlay>(SubtitleOverlay(w, h, local, subY, spec.title, titleY))))
+            val hookHere = if (spec.hook.isNotBlank() && offset < 2.6) spec.hook else ""
+            effects.add(OverlayEffect(ImmutableList.of<TextureOverlay>(
+                SubtitleOverlay(w, h, local, subY, spec.title, titleY, spec.karaoke, hookHere, 2.6 - offset))))
             val mi = MediaItem.Builder().setUri(android.net.Uri.fromFile(spec.src))
                 .setClippingConfiguration(MediaItem.ClippingConfiguration.Builder()
                     .setStartPositionMs((a * 1000).toLong()).setEndPositionMs((b * 1000).toLong()).build())
@@ -173,6 +179,7 @@ private class CoverOverlay(info: VInfo, band: Pair<Float, Float>) : BitmapOverla
 class SubtitleOverlay(
     private val w: Int, private val h: Int, private val cues: List<Cue>, private val subY: Float,
     private val title: String, private val titleY: Float,
+    private val karaoke: Boolean = false, private val hook: String = "", private val hookUntil: Double = 0.0,
 ) : BitmapOverlay() {
     private var firstUs = -1L
     private var lastKey = Int.MIN_VALUE
@@ -182,9 +189,13 @@ class SubtitleOverlay(
         if (firstUs < 0) firstUs = presentationTimeUs
         val t = (presentationTimeUs - firstUs) / 1e6
         val idx = cues.indexOfFirst { t >= it.start && t < it.end }
+        val lit = if (karaoke && idx >= 0) Shots.karaokeChars(cues[idx].text,
+            (t - cues[idx].start) / (cues[idx].end - cues[idx].start)) else 0
+        val showHook = hook.isNotBlank() && t < hookUntil
+        val key = idx * 10000 + lit * 2 + if (showHook) 1 else 0
         val cur = bmp
-        if (cur != null && idx == lastKey) return cur
-        lastKey = idx
+        if (cur != null && key == lastKey) return cur
+        lastKey = key
         // ảnh MỚI mỗi lần đổi chữ: Media3 chỉ tải lại ảnh khi đối tượng Bitmap khác
         val b = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888)
         val c = Canvas(b)
@@ -192,13 +203,15 @@ class SubtitleOverlay(
         if (titleY > 0 && title.isNotBlank()) {
             drawText(c, title, base * 0.068f, Color.rgb(255, 214, 64), titleY, w * 0.9f, bold = true, maxLines = 3)
         }
-        if (idx >= 0) drawText(c, cues[idx].text, base * 0.052f, Color.WHITE, subY, w * 0.9f, bold = true, maxLines = 3)
+        if (idx >= 0) drawText(c, cues[idx].text, base * 0.052f, Color.WHITE, subY, w * 0.9f, bold = true, maxLines = 3,
+            lit = if (karaoke) lit else -1)
+        if (showHook) drawText(c, hook, base * 0.085f, Color.rgb(255, 214, 64), h * 0.42f, w * 0.88f, bold = true, maxLines = 4)
         bmp = b
         return b
     }
 
     private fun drawText(c: Canvas, text: String, size: Float, color: Int, centerY: Float, maxW: Float, bold: Boolean,
-                         maxLines: Int) {
+                         maxLines: Int, lit: Int = -1) {
         val paint = TextPaint(Paint.ANTI_ALIAS_FLAG).apply {
             textSize = size
             typeface = Typeface.create(Typeface.SANS_SERIF, if (bold) Typeface.BOLD else Typeface.NORMAL)
@@ -214,7 +227,15 @@ class SubtitleOverlay(
         layout.draw(c)
         paint.style = Paint.Style.FILL
         paint.color = color
-        layout.draw(c)
+        if (lit >= 0) {  // karaoke: phần đã đọc màu vàng, phần chưa đọc màu trắng (viền vẫn đen)
+            val sp = android.text.SpannableString(text)
+            if (lit > 0) sp.setSpan(android.text.style.ForegroundColorSpan(Color.rgb(255, 214, 64)), 0,
+                minOf(lit, text.length), android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE)
+            StaticLayout.Builder.obtain(sp, 0, sp.length, paint, maxW.toInt())
+                .setAlignment(Layout.Alignment.ALIGN_CENTER).setMaxLines(maxLines).build().draw(c)
+        } else {
+            layout.draw(c)
+        }
         c.restore()
     }
 }

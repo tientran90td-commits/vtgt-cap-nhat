@@ -74,7 +74,7 @@ class DeviceTest {
         // 2 cảnh [1,3] + [5,7] -> 4 giây; phụ đề chữ trắng từ giây 2.5 tới 3.5 (rơi vào cảnh thứ 2)
         val clips = listOf(1.0 to 3.0, 5.0 to 7.0)
         val spec = RenderSpec(src, info, clips, Aspect.VERTICAL_FIT, 360, 0.80f to 0.96f, 0.80f to 0.96f,
-            listOf(Cue(2.5, 3.5, "MMMMMMMM")), "Tiêu đề thử")
+            listOf(Cue(2.5, 3.5, "MMMMMMMM")), "Tiêu đề thử", karaoke = true, hook = "HOOK HOOK")
         val vid = File(dir, "v.mp4")
         Render.video(ctx, spec, vid) {}
         val vi = Media.probe(vid)
@@ -91,10 +91,22 @@ class DeviceTest {
         assertTrue("phụ đề không được hiện ở giây 1.5 (off=$off)", off < 0.01)
         val yellow = yellowRatio(frameAt(vid, 1.5), 0.0f, top)
         assertTrue("tiêu đề vàng ở khung trên (yellow=$yellow)", yellow > 0.0005)
+        // tiêu đề hook lớn giữa màn hình trong 2.6 giây đầu, sau đó tắt
+        val hookOn = yellowRatio(frameAt(vid, 1.0), 0.37f, 0.47f)
+        val hookOff = yellowRatio(frameAt(vid, 3.5), 0.37f, 0.47f)
+        assertTrue("hook phải hiện ở giây 1 (on=$hookOn)", hookOn > 0.003)
+        assertTrue("hook phải tắt ở giây 3.5 (off=$hookOff)", hookOff < 0.0005)
 
         // trộn tiếng nền + lời kể, ghép -> mp4 có tiếng
         val mixed = File(dir, "a.wav")
         Ff.mixRecap(ctx, src, true, clips, narr, 0.12, mixed)
+        assertEquals(4.0, Wav.duration(mixed), 0.15)
+        // nhạc nền ngắn hơn video: lặp lại cho đủ, tự nhỏ khi có giọng đọc
+        val bgm = File(dir, "bgm.mp3")
+        Ff.run(ctx, listOf("-f", "lavfi", "-i", "sine=f=660:d=1.5", "-c:a", "libmp3lame", bgm.absolutePath))
+        Ff.mixRecap(ctx, src, true, clips, narr, 0.12, mixed, bgm, 0.3)
+        assertEquals(4.0, Wav.duration(mixed), 0.15)
+        Ff.mixRecap(ctx, src, false, clips, narr, 0.12, mixed, bgm, 0.3)
         assertEquals(4.0, Wav.duration(mixed), 0.15)
         val out = File(dir, "final.mp4")
         Ff.mux(ctx, vid, mixed, out)
@@ -111,6 +123,22 @@ class DeviceTest {
         Render.video(ctx, RenderSpec(src, info, null, Aspect.SOURCE, 360, null, 0.8f to 0.95f,
             listOf(Cue(0.0, 8.0, "Phụ đề tiếng Việt")), ""), vid) {}
         assertEquals(8.0, Media.probe(vid).duration, 0.3)
+    }
+
+    @Test
+    fun shotDetectionOnDevice() = runBlocking {
+        // video đổi màu (đổi cảnh) mỗi 2 giây, giây 4-6 màn hình đen
+        val src = File(dir, "cuts.mp4")
+        Ff.run(ctx, listOf("-f", "lavfi", "-i", "testsrc2=s=320x180:r=25:d=10",
+            "-vf", "hue=H=floor(t/2)*PI/2,drawbox=c=black:t=fill:enable='between(t,4,6)'",
+            "-c:v", "libx264", "-pix_fmt", "yuv420p", src.absolutePath))
+        val frames = Shots.analyze(ctx, src, 0.0, 10.0)
+        assertTrue("phải đọc được khung (${frames.size})", frames.size > 40)
+        val sh = Shots.shots(frames, 10.0)
+        assertTrue("phải thấy nhiều cảnh (${sh.size})", sh.size >= 4)
+        val p = Shots.plan(sh, 0.5, 5.0, 10.0)
+        assertTrue("không lấy cảnh đen: $p", p.none { (a, d) -> a < 5.9 && a + d > 4.1 })
+        assertEquals(5.0, p.sumOf { it.second }, 0.05)
     }
 
     @Test

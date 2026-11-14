@@ -128,11 +128,15 @@ object Ff {
 
     /** Review: âm thanh gốc của các cảnh đã chọn (rất nhỏ, làm nền) + lời kể -> WAV. */
     suspend fun mixRecap(ctx: Context, src: File, hasAudio: Boolean, clips: List<Pair<Double, Double>>, narr: File,
-                         bgVol: Double, out: File) {
+                         bgVol: Double, out: File, bgm: File? = null, bgmVol: Double = 0.25) {
         val fmt = "aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo"
         val a = mutableListOf("-i", src.absolutePath, "-i", narr.absolutePath)
+        if (bgm != null) a += listOf("-stream_loop", "-1", "-i", bgm.absolutePath)
+        // nhạc nền (lặp cho đủ dài), tự nhỏ lại khi có giọng đọc
+        val music = if (bgm == null) "" else
+            "[2:a]$fmt,volume=%.2f[m];[n]asplit=2[nv][nsc];[m][nsc]sidechaincompress=threshold=0.02:ratio=6:attack=20:release=400[md];".num(bgmVol)
         val graph = if (!hasAudio || bgVol <= 0.0) {
-            "[1:a]$fmt[a]"
+            "[1:a]$fmt[n];" + music + (if (bgm == null) "[n]anull[a]" else "[nv][md]amix=inputs=2:duration=first:normalize=0[a]")
         } else {
             val sb = StringBuilder()
             clips.forEachIndexed { i, (s, e) ->
@@ -140,7 +144,9 @@ object Ff {
             }
             clips.indices.forEach { sb.append("[c$it]") }
             sb.append("concat=n=${clips.size}:v=0:a=1,volume=%.2f[bg];".num(bgVol))
-            sb.append("[1:a]$fmt[n];[bg][n]amix=inputs=2:duration=longest:normalize=0[a]")
+            sb.append("[1:a]$fmt[n];").append(music)
+            sb.append(if (bgm == null) "[n][bg]amix=inputs=2:duration=first:normalize=0[a]"
+            else "[nv][bg][md]amix=inputs=3:duration=first:normalize=0[a]")
             sb.toString()
         }
         a += listOf("-filter_complex", graph, "-map", "[a]", "-vn", "-c:a", "pcm_s16le", out.absolutePath)

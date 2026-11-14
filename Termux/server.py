@@ -38,9 +38,10 @@ from vietdub.project import Project  # noqa: E402
 
 import recap  # noqa: E402
 
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 PORT = int(os.environ.get("PHIMVIET_PORT", "8765"))
 VIDEO_EXT = (".mp4", ".mkv", ".webm", ".mov", ".avi", ".flv", ".m4v", ".ts")
+AUDIO_EXT = (".mp3", ".m4a", ".aac", ".wav", ".ogg", ".opus", ".flac")
 SHARED = Path.home() / "storage" / "shared"
 
 TERMUX_DEFAULTS = {
@@ -48,7 +49,8 @@ TERMUX_DEFAULTS = {
     ("video", "background"): "duck", ("video", "aspect"): "9:16", ("video", "height"): 720,
     ("video", "fill"): "blur", ("video", "quality"): 23, ("video", "soft_subs"): False,
     ("publish", "thumbnail"): False, ("publish", "info"): False, ("mode", None): "online",
-    ("speech", "engine"): "auto",
+    ("speech", "engine"): "auto", ("video", "karaoke"): True, ("video", "multi_shot"): True,
+    ("video", "hook_title"): True, ("video", "bgm_volume"): 0.25,
 }
 
 
@@ -280,9 +282,12 @@ def do_translate(render_only: bool = False):
 
 
 # ------------------------------------------------------------------ trạng thái cho giao diện
-def browse() -> list[dict]:
-    """Video trong bộ nhớ máy (cần termux-setup-storage): Download, Movies, DCIM, Zalo, Telegram..."""
-    roots = [SHARED / d for d in ("Download", "Movies", "DCIM", "Pictures", "Zalo", "Telegram", "Documents")]
+def browse(kind: str = "video") -> list[dict]:
+    """Video (hoặc nhạc) trong bộ nhớ máy (cần termux-setup-storage): Download, Movies, DCIM, Music, Zalo..."""
+    exts = AUDIO_EXT if kind == "audio" else VIDEO_EXT
+    dirs = ("Music", "Download", "Recordings", "Documents") if kind == "audio" else \
+        ("Download", "Movies", "DCIM", "Pictures", "Zalo", "Telegram", "Documents")
+    roots = [SHARED / d for d in dirs]
     out = []
     for r in roots:
         if not r.exists():
@@ -290,7 +295,7 @@ def browse() -> list[dict]:
         for dirpath, dirs, files in os.walk(r):
             dirs[:] = [d for d in dirs if not d.startswith(".") and d != "PhimViet"]
             for f in files:
-                if f.lower().endswith(VIDEO_EXT):
+                if f.lower().endswith(exts):
                     fp = Path(dirpath) / f
                     try:
                         st = fp.stat()
@@ -336,6 +341,9 @@ def settings_view() -> dict:
         "background": s.get("video", "background") or "duck", "glossary": s.get("translate", "glossary") or "",
         "style_tr": s.get("translate", "style") or "natural", "styles_tr": {k: v[0] for k, v in translate.STYLES.items()},
         "out_dir": str(s.output_dir()), "separator": hybrid.has_module("onnxruntime"),
+        "karaoke": bool(s.get("video", "karaoke", True)), "multi_shot": bool(s.get("video", "multi_shot", True)),
+        "hook_title": bool(s.get("video", "hook_title", True)), "bgm": s.get("video", "bgm") or "",
+        "bgm_volume": s.get("video", "bgm_volume") or 0.25,
     }
 
 
@@ -346,6 +354,8 @@ SETTABLE = {
     "output": ("video", "output"), "aspect": ("video", "aspect"), "height": ("video", "height"),
     "fill": ("video", "fill"), "cover": ("video", "cover"), "background": ("video", "background"),
     "glossary": ("translate", "glossary"), "style_tr": ("translate", "style"),
+    "karaoke": ("video", "karaoke"), "multi_shot": ("video", "multi_shot"), "hook_title": ("video", "hook_title"),
+    "bgm": ("video", "bgm"), "bgm_volume": ("video", "bgm_volume"),
 }
 
 
@@ -449,7 +459,7 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/settings":
             return self._json(settings_view())
         if u.path == "/api/browse":
-            return self._json({"files": browse(), "storage": SHARED.exists()})
+            return self._json({"files": browse(q.get("kind", "video")), "storage": SHARED.exists()})
         if u.path == "/api/voices":
             eng = q.get("engine") or SETTINGS.get("voice", "engine") or "edge"
             vs = voices.list_voices(eng, SETTINGS)

@@ -138,11 +138,20 @@ private fun <T> Choice(label: String, value: T, options: List<Pair<T, String>>, 
 @Composable
 private fun Hint(text: String) = Text(text, color = Muted, fontSize = 12.sp)
 
+@Composable
+private fun Toggle(text: String, value: Boolean, onChange: (Boolean) -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(value, onChange)
+        Text(text, fontSize = 14.sp)
+    }
+}
+
 // ==================================================================== tab Làm video
 @Composable
 private fun MakeTab(vm: MainVM) {
     val pick = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let(vm::openVideo) }
     val pickSrt = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let(vm::loadSrt) }
+    val pickBgm = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let { u -> vm.setBgm(u) } }
     var link by remember { mutableStateOf("") }
     val clip = LocalClipboardManager.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 6.dp)) {
@@ -174,6 +183,21 @@ private fun MakeTab(vm: MainVM) {
                 Choice("Độ dài video review", vm.targetSec, listOf(60 to "1 phút", 120 to "2 phút", 180 to "3 phút",
                     300 to "5 phút", 600 to "10 phút", 900 to "15 phút")) { vm.targetSec = it; vm.save("target", "$it") }
                 Choice("Văn phong", vm.style, Prompts.STYLES.map { it.key to it.value }) { vm.style = it; vm.save("style", it) }
+                Toggle("Ghép nhiều cảnh ngắn theo điểm cắt cảnh (bỏ cảnh đen)", vm.multiShot) {
+                    vm.multiShot = it; vm.prefs.setBool("multi_shot", it)
+                }
+                Toggle("Phụ đề karaoke (chữ đổi màu theo giọng đọc)", vm.karaoke) { vm.karaoke = it; vm.prefs.setBool("karaoke", it) }
+                Toggle("Tiêu đề lớn ở đầu video (hook)", vm.hookTitle) { vm.hookTitle = it; vm.prefs.setBool("hook_title", it) }
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("🎵 Nhạc nền: " + vm.bgmName.ifBlank { "không có" }, modifier = Modifier.weight(1f), fontSize = 14.sp)
+                    OutlinedButton(onClick = { pickBgm.launch("audio/*") }, enabled = !vm.busy) { Text("Chọn") }
+                    if (vm.bgmName.isNotBlank()) TextButton(onClick = { vm.setBgm(null) }) { Text("✖") }
+                }
+                if (vm.bgmName.isNotBlank()) {
+                    var bv by remember { mutableStateOf(vm.prefs.num("bgm_vol", 0.25f)) }
+                    Hint("Âm lượng nhạc nền: ${(bv * 100).toInt()}% (tự nhỏ lại khi có giọng đọc)")
+                    Slider(bv, { bv = it; vm.prefs.setNum("bgm_vol", it) }, valueRange = 0.05f..0.6f)
+                }
             } else {
                 Choice("Xuất ra", vm.output, listOf("dub_sub" to "Thuyết minh + Vietsub", "sub" to "Chỉ Vietsub (giữ tiếng gốc)",
                     "dub" to "Chỉ thuyết minh")) { vm.output = it; vm.save("output", it) }

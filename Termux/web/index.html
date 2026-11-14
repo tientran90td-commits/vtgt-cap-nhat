@@ -52,6 +52,7 @@ video{width:100%;border-radius:10px;margin-top:8px;background:#000}
 .sheet h3{margin:0 0 6px}
 .files .f{padding:10px;border-bottom:1px solid var(--line)}
 .files .f b{display:block;word-break:break-all}
+.chk{display:flex;gap:10px;align-items:center;color:var(--text);font-size:14px;margin:12px 0 0}.chk input{width:20px;height:20px;accent-color:var(--pri)}
 .pill{display:inline-block;padding:2px 8px;border-radius:20px;background:var(--card2);font-size:12px;color:var(--muted);margin:2px 4px 2px 0}
 .pill.ok{color:var(--ok)}.pill.no{color:var(--warn)}
 a{color:var(--pri)}
@@ -91,6 +92,12 @@ a{color:var(--pri)}
       <label>Độ dài video review</label>
       <select data-set="target"><option value="60">1 phút</option><option value="120">2 phút</option><option value="180">3 phút</option><option value="300">5 phút</option><option value="600">10 phút</option><option value="900">15 phút</option></select>
       <label>Văn phong</label><select data-set="style" id="styles"></select>
+      <label class="chk"><input type="checkbox" data-chk="multi_shot"> Ghép nhiều cảnh ngắn theo điểm cắt cảnh (bỏ cảnh đen)</label>
+      <label class="chk"><input type="checkbox" data-chk="karaoke"> Phụ đề karaoke (chữ đổi màu theo giọng đọc)</label>
+      <label class="chk"><input type="checkbox" data-chk="hook_title"> Tiêu đề lớn ở đầu video (hook)</label>
+      <label>Nhạc nền (tự nhỏ lại khi có giọng đọc)</label>
+      <div class="row"><span class="muted grow" id="bgmname">Không có</span><button class="b" id="bgmpick">🎵 Chọn</button><button class="b" id="bgmoff">✖</button></div>
+      <label>Âm lượng nhạc nền: <span id="bgv"></span>%</label><input type="range" id="bgmvol" min="5" max="60" step="5">
     </div>
     <div id="opt-translate" class="hide">
       <label>Xuất ra</label>
@@ -175,7 +182,7 @@ a{color:var(--pri)}
 </div></div>
 
 <!-- chọn video trong máy -->
-<div class="modal" id="mpick"><div class="sheet"><div class="row"><h3 class="grow">Video trong máy</h3><button class="b" data-close>Đóng</button></div><div class="files" id="files"></div></div></div>
+<div class="modal" id="mpick"><div class="sheet"><div class="row"><h3 class="grow" id="mtitle">Video trong máy</h3><button class="b" data-close>Đóng</button></div><div class="files" id="files"></div></div></div>
 <!-- dán tay DeepSeek -->
 <div class="modal" id="mask"><div class="sheet">
   <h3>🐋 Nhờ DeepSeek (miễn phí)</h3>
@@ -227,6 +234,9 @@ async function loadSettings() {
   $("#sepopt").disabled = !S.separator;
   setMode(S.mode);
   $("#speed").value = S.speed; $("#spv").textContent = S.speed;
+  $$("[data-chk]").forEach(el => el.checked = !!S[el.dataset.chk]);
+  $("#bgmname").textContent = S.bgm ? S.bgm.split("/").pop() : "Không có";
+  $("#bgmvol").value = Math.round(S.bgm_volume * 100); $("#bgv").textContent = $("#bgmvol").value;
   $("#keys").innerHTML = KEYS.map(([k, n, u]) => `<label>${n} ${S.keys[k] ? '<span class="pill ok">đã có key</span>' : ""}</label>
     <div class="row"><input type="password" class="grow" data-key="${k}" placeholder="${S.keys[k] ? "•••••• (dán key mới để thay)" : "dán key vào đây"}">
     <a class="b" href="${u}" target="_blank">Lấy key</a></div>`).join("");
@@ -253,26 +263,32 @@ async function loadVoices() {
   $("#voice").innerHTML = (j.voices || []).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join("");
   if (S.voice && [...$("#voice").options].some(o => o.value === S.voice)) $("#voice").value = S.voice;
 }
+$$("[data-chk]").forEach(el => el.onchange = async () => { S = await api("/api/settings", {[el.dataset.chk]: el.checked}); });
+$("#bgmvol").oninput = () => $("#bgv").textContent = $("#bgmvol").value;
+$("#bgmvol").onchange = () => api("/api/settings", {bgm_volume: $("#bgmvol").value / 100});
+$("#bgmoff").onclick = async () => { await api("/api/settings", {bgm: ""}); loadSettings(); };
+$("#bgmpick").onclick = () => pickFiles("audio", async f => { await api("/api/settings", {bgm: f.path}); loadSettings(); });
 $("#speed").oninput = () => $("#spv").textContent = $("#speed").value;
 $("#speed").onchange = () => api("/api/settings", {speed: +$("#speed").value});
 $("#vtest").onclick = async () => { await api("/api/voice_test", {}); waitPreview = true; };
 let waitPreview = false;
 
 // ---------- video
-$("#pick").onclick = async () => {
+$("#pick").onclick = () => pickFiles("video", async f => {
+  toast("Đang mở video...");
+  const r = await api("/api/open", {path: f.path});
+  if (r.ok) { toast("Đã mở video."); afterOpen(); }
+});
+async function pickFiles(kind, onPick) {
   $("#mpick").classList.add("on");
-  $("#files").innerHTML = '<div class="muted">Đang tìm video...</div>';
-  const j = await api("/api/browse");
+  $("#mtitle").textContent = kind === "audio" ? "Nhạc trong máy" : "Video trong máy";
+  $("#files").innerHTML = '<div class="muted">Đang tìm...</div>';
+  const j = await api("/api/browse?kind=" + kind);
   if (!j.storage) { $("#files").innerHTML = '<div class="muted">Termux chưa được đọc bộ nhớ máy: mở Termux, gõ <b>termux-setup-storage</b>, bấm Cho phép, rồi mở lại. Hoặc dùng nút ⬆ Tải lên.</div>'; return; }
   $("#files").innerHTML = j.files.length ? j.files.map((f, i) => `<div class="f" data-i="${i}"><b>${esc(f.name)}</b><span class="muted">${esc(f.dir)} · ${(f.size / 1048576).toFixed(1)} MB</span></div>`).join("")
-    : '<div class="muted">Không thấy video nào trong Download / Movies / DCIM.</div>';
-  $$("#files .f").forEach(el => el.onclick = async () => {
-    $("#mpick").classList.remove("on");
-    toast("Đang mở video...");
-    const r = await api("/api/open", {path: j.files[+el.dataset.i].path});
-    if (r.ok) { toast("Đã mở video."); afterOpen(); }
-  });
-};
+    : '<div class="muted">Không thấy file nào (Download / Movies / DCIM / Music).</div>';
+  $$("#files .f").forEach(el => el.onclick = () => { $("#mpick").classList.remove("on"); onPick(j.files[+el.dataset.i]); });
+}
 $$("[data-close]").forEach(b => b.onclick = () => b.closest(".modal").classList.remove("on"));
 $("#file").onchange = () => {
   const f = $("#file").files[0]; if (!f) return;

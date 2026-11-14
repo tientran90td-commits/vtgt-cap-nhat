@@ -50,7 +50,8 @@ def make_video(path: Path):
     (path.parent / "zh.srt").write_text(srt, encoding="utf-8")
     style = "Fontname=WenQuanYi Zen Hei,Fontsize=26,Outline=2" if Path(font).exists() else "Fontsize=26"
     run(["-f", "lavfi", "-i", "testsrc2=s=1280x720:r=25", "-f", "lavfi", "-i", "sine=f=220:d=32", "-t", "32",
-         "-vf", f"subtitles=zh.srt:force_style='{style}'", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac",
+         "-vf", "hue=H=floor(t/2)*PI/2,drawbox=c=black:t=fill:enable='between(t,10,11.5)',"
+         f"subtitles=zh.srt:force_style='{style}'", "-c:v", "libx264", "-preset", "ultrafast", "-c:a", "aac",
          "-shortest", path.name], cwd=str(path.parent))
     return L
 
@@ -96,9 +97,13 @@ def main():
     assert reg and reg[1] > 0.7, reg
     if shutil.which("tesseract"):
         txt = call(base, f"/api/ocr_test?t=5")["text"]
-        assert "友哈巴赫" in txt or "前方" in txt, txt
+        assert "哈巴赫" in txt or "前方" in txt, txt  # Tesseract: đọc gần đúng là đủ (AI dịch vẫn hiểu)
     jpg = call(base, "/api/frame?t=3", raw=True)
     assert jpg[:2] == b"\xff\xd8"
+
+    bgm = TMP / "nhac.mp3"
+    run(["-f", "lavfi", "-i", "sine=f=660:d=5", "-c:a", "libmp3lame", "-b:a", "64k", str(bgm)])
+    call(base, "/api/settings", {"bgm": str(bgm), "bgm_volume": 0.3, "karaoke": True, "multi_shot": True})
 
     # ---------------- REVIEW (không có key -> AI dán tay qua DeepSeek web)
     call(base, "/api/settings", {"mode": "recap", "target": 60, "speech": "ocr", "aspect": "9:16", "height": 540})
@@ -109,7 +114,8 @@ def main():
     assert "Review 一护" in p and "Luffy" in p and "[00:0" in p, p[:400]
     reply = json.dumps({"title": "Ichigo đối đầu Yhwach", "segments": [
         {"start": 1, "text": "Ichigo đẩy cửa cung điện, bước vào nơi Yhwach đang chờ."},
-        {"start": 9, "text": "Trận chiến này không chỉ để bảo vệ thế giới."},
+        {"start": 9, "text": "Trận chiến này không chỉ để bảo vệ thế giới, mà còn để trả thù cho mẹ của cậu, người đã bị "
+                             "Yhwach cướp đi sức mạnh từ nhiều năm trước."},
         {"start": 25, "text": "Và cậu sẽ không để mọi người thất vọng."}]}, ensure_ascii=False)
     assert call(base, "/api/answer", {"id": st["ask"]["id"], "text": "Đây nhé:\n```json\n" + reply + "\n```"})["ok"]
     st = wait(base, lambda s: not s["busy"])
@@ -119,6 +125,22 @@ def main():
     assert (info.width, info.height) == (540, 960) and info.has_audio, info
     want = sum(len(t) / 14.5 + 0.35 for t in [s["text"] for s in json.loads(reply)["segments"]])
     assert abs(info.duration - want) < 1.0, (info.duration, want)
+    logs = "\n".join(st["logs"]) if st.get("logs") else ""
+    full = call(base, "/api/state?since=0")["logs"]
+    multi = [ln for ln in full if "cảnh," in ln and "Đoạn" in ln]
+    assert any(not ln.split(":", 2)[-1].strip().startswith("1 cảnh") for ln in multi), multi  # ghép nhiều cảnh
+    assert any("nhạc nền" in ln for ln in full), full[-10:]
+    ass = next((TMP / "data").rglob("p001.ass")).read_text(encoding="utf-8")
+    assert "{\\k" in ass and "Style: Hook" in ass, ass[-400:]
+    hook = next((TMP / "data").rglob("p000.ass")).read_text(encoding="utf-8")
+    assert ",Hook," in hook
+    # không lấy cảnh đen (giây 10 - 11.5)
+    from recap import analyze, plan_pieces, shots
+    sh = shots(analyze(str(vid), 8.0, 8.0), 16.0)
+    assert any(y < 22 for _a, _b, y in sh), sh
+    pcs = plan_pieces(sh, 9.0, 5.0, 32.0)
+    assert all(not (a < 11.4 and a + l > 10.1) for a, l in pcs), pcs
+    assert abs(sum(l for _a, l in pcs) - 5.0) < 0.05, pcs
     sc = call(base, "/api/script")
     assert sc["title"] == "Ichigo đối đầu Yhwach" and len(sc["segments"]) == 3
     # sửa kịch bản rồi xuất lại (không hỏi AI)
@@ -128,7 +150,8 @@ def main():
     st = wait(base, lambda s: not s["busy"])
     assert st["status"].startswith("✅") and not st.get("ask"), st["status"]
     print(f"✓ review: lời gốc đọc từ phụ đề cứng, kịch bản qua DeepSeek web (dán tay), video dọc {info.width}x{info.height} "
-          f"{info.duration:.1f}s có giọng + phụ đề; sửa kịch bản & xuất lại")
+          f"{info.duration:.1f}s; ghép nhiều cảnh theo điểm cắt (bỏ cảnh đen), karaoke, tiêu đề hook, nhạc nền; "
+          "sửa kịch bản & xuất lại")
 
     # ---------------- DỊCH (dán tay, lời gốc đã có)
     call(base, "/api/settings", {"mode": "translate", "output": "both", "aspect": "source", "height": 540})

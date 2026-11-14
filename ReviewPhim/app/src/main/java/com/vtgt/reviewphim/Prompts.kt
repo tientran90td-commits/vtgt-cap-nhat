@@ -16,6 +16,8 @@ Quy tắc tên riêng (quan trọng nhất):
         "hai_huoc" to "Hài hước, dí dỏm, bình luận vui nhưng vẫn kể đủ cốt truyện",
         "nghiem_tuc" to "Nghiêm túc, sâu sắc, phân tích nhân vật và ý nghĩa",
         "co_trang" to "Giọng kể cổ trang, kiếm hiệp, tiên hiệp (ta, ngươi, huynh, đệ...)",
+        "nhan_vat" to "Ngôi thứ nhất: nhân vật chính tự kể lại câu chuyện của mình (xưng tôi)",
+        "tham_tu" to "Như thám tử phân tích: đặt câu hỏi, gợi bí ẩn, hé lộ manh mối dần dần",
     )
 
     fun glossary(prefs: Prefs): String {
@@ -34,9 +36,11 @@ $NAME_RULES
 
 Yêu cầu kịch bản:
 - Văn phong: ${STYLES[style] ?: STYLES.values.first()}. Ngôi thứ ba, câu ngắn, dễ đọc thành tiếng, không ký hiệu lạ, không emoji, không chú thích.
-- Đoạn đầu là câu "hook" gây tò mò. Sau đó kể theo đúng trình tự thời gian, đủ các tình tiết chính, có cao trào và kết thúc.
+- Đoạn 1 là "hook": 1–2 câu gây tò mò, lấy từ khoảnh khắc kịch tính nhất (cảnh của đoạn này có thể ở giữa / cuối phim).
+- Từ đoạn 2 kể theo đúng trình tự thời gian, chia 3 hồi: mở đầu (~25%), diễn biến & xung đột (~50%), cao trào & kết (~25%).
+- Tránh cảnh mở đầu / danh đề / credit cuối phim; mỗi đoạn một cảnh khác nhau, không lặp lại.
 - Tổng lời kể khoảng $chars ký tự (đọc khoảng ${targetSec / 60} phút ${targetSec % 60} giây), chia thành khoảng $n đoạn, mỗi đoạn 1–3 câu (80–250 ký tự).
-- Mỗi đoạn gắn với cảnh minh họa đúng nội dung đó: "start" là số giây trong video (lấy theo mốc thời gian lời thoại). Các đoạn có "start" tăng dần và rải đều từ đầu tới cuối video.
+- Mỗi đoạn gắn với cảnh minh họa đúng nội dung đó: "start" là số giây trong video (lấy theo mốc thời gian lời thoại). Từ đoạn 2 trở đi "start" tăng dần và rải đều từ đầu tới cuối video.
 ${glossary(prefs)}
 
 Chỉ trả lời JSON, không giải thích:
@@ -115,9 +119,12 @@ $body
             val o = arr.optJSONObject(it) ?: return@mapNotNull null
             val t = o.optString("text").trim()
             if (t.isEmpty() || FOREIGN.containsMatchIn(t)) return@mapNotNull null
-            Seg(o.optDouble("start", 0.0).coerceIn(0.0, maxOf(0.0, duration - 1.0)), t)
-        }.sortedBy { it.start }
+            val lo = duration * 0.02
+            val hi = maxOf(lo, duration * 0.95 - 1.0)
+            Seg(o.optDouble("start", 0.0).coerceIn(lo, hi), t)
+        }
         if (segs.isEmpty()) throw IllegalArgumentException("Kịch bản rỗng")
-        return d.optString("title", "").trim() to segs
+        // đoạn hook (cảnh cao trào) giữ ở đầu, các đoạn sau theo thời gian
+        return d.optString("title", "").trim() to (segs.take(1) + segs.drop(1).sortedBy { it.start })
     }
 }
