@@ -17,6 +17,9 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToInt
 
+/** Định dạng số cho ffmpeg: luôn dấu chấm thập phân, không theo ngôn ngữ máy (tiếng Việt dùng dấu phẩy). */
+fun String.num(vararg args: Any?): String = String.format(java.util.Locale.US, this, *args)
+
 data class VInfo(val duration: Double, val width: Int, val height: Int, val hasAudio: Boolean)
 
 object Media {
@@ -86,7 +89,10 @@ object Ff {
             }
             val code = pr.waitFor()
             currentCoroutineContext().ensureActive()
-            if (code != 0) throw RuntimeException("ffmpeg lỗi ($code):\n" + tail.takeLast(8).joinToString("\n"))
+            if (code != 0) {
+                val why = tail.lastOrNull { it.isNotBlank() && !it.startsWith("  ") }?.trim() ?: "không rõ"
+                throw RuntimeException("ffmpeg lỗi: $why (mã $code)\n" + tail.takeLast(10).joinToString("\n"))
+            }
         } finally {
             handle?.dispose()
             if (pr.isAlive) pr.destroy()
@@ -96,9 +102,9 @@ object Ff {
     /** Âm thanh nhỏ gọn để gửi nhận dạng giọng nói (mono 16 kHz, mp3 32 kbps ~ 0.24 MB/phút). */
     suspend fun speechAudio(ctx: Context, src: File, out: File, start: Double = 0.0, dur: Double = 0.0) {
         val a = mutableListOf<String>()
-        if (start > 0) a += listOf("-ss", "%.3f".format(start))
+        if (start > 0) a += listOf("-ss", "%.3f".num(start))
         a += listOf("-i", src.absolutePath)
-        if (dur > 0) a += listOf("-t", "%.3f".format(dur))
+        if (dur > 0) a += listOf("-t", "%.3f".num(dur))
         a += listOf("-vn", "-ac", "1", "-ar", "16000", "-c:a", "libmp3lame", "-b:a", "32k", out.absolutePath)
         run(ctx, a)
     }
@@ -110,9 +116,9 @@ object Ff {
         if (dub != null) a += listOf("-i", dub.absolutePath)
         val graph = when {
             !hasAudio && dub != null -> "[1:a]$fmt[a]"
-            dub == null -> "[0:a]$fmt,volume=%.2f[a]".format(origVol)
+            dub == null -> "[0:a]$fmt,volume=%.2f[a]".num(origVol)
             origVol <= 0.0 -> "[1:a]$fmt[a]"
-            else -> "[1:a]$fmt,asplit=2[sc][d];[0:a]$fmt,volume=%.2f[o];".format(origVol) +
+            else -> "[1:a]$fmt,asplit=2[sc][d];[0:a]$fmt,volume=%.2f[o];".num(origVol) +
                 "[o][sc]sidechaincompress=threshold=0.015:ratio=10:attack=15:release=350[duck];" +
                 "[duck][d]amix=inputs=2:duration=first:normalize=0[a]"
         }
@@ -130,10 +136,10 @@ object Ff {
         } else {
             val sb = StringBuilder()
             clips.forEachIndexed { i, (s, e) ->
-                sb.append("[0:a]atrim=start=%.3f:end=%.3f,asetpts=PTS-STARTPTS,$fmt[c$i];".format(s, e))
+                sb.append("[0:a]atrim=start=%.3f:end=%.3f,asetpts=PTS-STARTPTS,$fmt[c$i];".num(s, e))
             }
             clips.indices.forEach { sb.append("[c$it]") }
-            sb.append("concat=n=${clips.size}:v=0:a=1,volume=%.2f[bg];".format(bgVol))
+            sb.append("concat=n=${clips.size}:v=0:a=1,volume=%.2f[bg];".num(bgVol))
             sb.append("[1:a]$fmt[n];[bg][n]amix=inputs=2:duration=longest:normalize=0[a]")
             sb.toString()
         }

@@ -51,6 +51,8 @@ class DeviceTest {
 
     @Test
     fun fullPipeline() = runBlocking {
+        // máy để tiếng Việt (dấu phẩy thập phân) - lỗi ffmpeg 234 từng xảy ra chỉ ở máy người dùng
+        java.util.Locale.setDefault(java.util.Locale("vi", "VN"))
         // video thử: nền đen 640x360, 8 giây, có tiếng (ffmpeg đi kèm app, mã hóa x264)
         val src = File(dir, "src.mp4")
         Ff.run(ctx, listOf("-f", "lavfi", "-i", "color=c=black:s=640x360:r=25:d=8", "-f", "lavfi",

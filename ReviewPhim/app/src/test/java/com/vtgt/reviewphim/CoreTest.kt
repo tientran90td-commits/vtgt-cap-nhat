@@ -7,6 +7,18 @@ import org.junit.Test
 
 class CoreTest {
     @Test
+    fun numbersForFfmpegIgnoreLocale() {
+        val old = java.util.Locale.getDefault()
+        try {
+            java.util.Locale.setDefault(java.util.Locale("vi", "VN"))
+            assertEquals("12,500", "%.3f".format(12.5))           // định dạng thường theo máy: dấu phẩy
+            assertEquals("atrim=start=12.500:end=13.250", "atrim=start=%.3f:end=%.3f".num(12.5, 13.25))
+        } finally {
+            java.util.Locale.setDefault(old)
+        }
+    }
+
+    @Test
     fun srt() {
         val l = parseSrt("1\n00:00:01,000 --> 00:00:02,500\n<i>Xin chào</i>\nbạn\n\n2\n00:01:00.000 --> 00:01:02.000\n{\\an8}Hai\n")
         assertEquals(2, l.size)

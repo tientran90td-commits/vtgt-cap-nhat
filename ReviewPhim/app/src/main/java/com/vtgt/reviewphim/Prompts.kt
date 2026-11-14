@@ -61,7 +61,7 @@ Bạn là biên dịch viên lồng tiếng & phụ đề tiếng Việt chuyên
         val prev = (maxOf(0, idx.first() - 4) until idx.first()).joinToString("\n") { lines[it].text }
         val body = idx.joinToString("\n") {
             val l = lines[it]
-            "${it + 1} | %.1fs | max ${maxChars(lines, it)} chars | ${l.text}".format(l.end - l.start)
+            "${it + 1} | %.1fs | max ${maxChars(lines, it)} chars | ${l.text}".num(l.end - l.start)
         }
         return """
 $TRANSLATE_RULES
