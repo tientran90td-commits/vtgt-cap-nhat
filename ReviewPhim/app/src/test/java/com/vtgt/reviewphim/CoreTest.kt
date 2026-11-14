@@ -29,7 +29,7 @@ class CoreTest {
         // hoặc từng dòng có mốc [mm:ss]
         val ts = parseTimed("[00:05] Câu một\n[01:02.5] Câu hai\n1:00:03 - Câu ba")
         assertEquals(listOf(5.0, 62.5, 3603.0), ts.map { it.start })
-        assertEquals(62.5, ts[0].end, 1e-6)
+        assertEquals(13.0, ts[0].end, 1e-6)                                  // mỗi câu tối đa 8 giây
         assertEquals("Câu ba", ts[2].text)
         assertTrue(parseTimed("không có mốc thời gian").isEmpty())
     }
