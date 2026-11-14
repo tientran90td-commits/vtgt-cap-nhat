@@ -204,6 +204,11 @@ ENCODERS = {"auto": "Tự động (dùng GPU nếu có)", "h264_amf": "GPU AMD (
 _BEST: str | None = None
 
 
+def is_android() -> bool:
+    """Đang chạy trong Termux / Android."""
+    return "ANDROID_ROOT" in os.environ or os.path.isdir("/system/app") and os.path.isdir("/data/data")
+
+
 def encoder_works(name: str) -> bool:
     try:
         run(["-f", "lavfi", "-i", "color=c=black:s=256x144:d=0.4", "-c:v", name, "-f", "null", "-"])
@@ -215,7 +220,8 @@ def encoder_works(name: str) -> bool:
 def best_encoder() -> str:
     global _BEST
     if _BEST is None:
-        _BEST = next((e for e in ("h264_nvenc", "h264_amf", "h264_qsv") if encoder_works(e)), "libx264")
+        cands = ("h264_mediacodec",) if is_android() else ("h264_nvenc", "h264_amf", "h264_qsv")
+        _BEST = next((e for e in cands if encoder_works(e)), "libx264")
     return _BEST
 
 
@@ -228,4 +234,6 @@ def encoder_args(name: str, quality: int = 21) -> list[str]:
         return ["-c:v", "h264_amf", "-quality", "balanced", "-rc", "cqp", "-qp_i", q, "-qp_p", q]
     if name == "h264_qsv":
         return ["-c:v", "h264_qsv", "-global_quality", q]
+    if name == "h264_mediacodec":  # chip mã hóa của điện thoại (Termux): không có CRF -> đặt bitrate theo chất lượng
+        return ["-c:v", "h264_mediacodec", "-b:v", f"{max(2, 40 - int(quality)) * 400}k"]
     return ["-c:v", "libx264", "-preset", "veryfast", "-crf", q]

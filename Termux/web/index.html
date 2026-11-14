@@ -1,0 +1,388 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#12121a">
+<title>Phim Việt Studio</title>
+<style>
+:root{--bg:#12121a;--card:#1c1c26;--card2:#262633;--line:#33334a;--text:#ececf4;--muted:#9a9ab0;--pri:#8b6cff;--pri2:#6c4bf4;--ok:#3ccf8e;--warn:#ffb74d;--bad:#ff6b6b;--yel:#ffd54f}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+body{padding-bottom:150px}
+header{position:sticky;top:0;z-index:5;background:var(--bg);padding:12px 16px 0;border-bottom:1px solid var(--line)}
+header .row{display:flex;align-items:center;gap:8px}
+h1{font-size:20px;margin:0;color:var(--pri)}
+.ver{color:var(--muted);font-size:12px}
+nav{display:flex;margin-top:10px}
+nav button{flex:1;background:none;border:0;color:var(--muted);padding:10px 4px;font-size:14px;border-bottom:3px solid transparent}
+nav button.on{color:var(--text);border-color:var(--pri)}
+main{max-width:720px;margin:0 auto;padding:8px 12px}
+.card{background:var(--card);border-radius:14px;padding:14px;margin:10px 0}
+.card h2{font-size:16px;margin:0 0 10px}
+label{display:block;color:var(--muted);font-size:12px;margin:10px 0 4px}
+input[type=text],input[type=password],select,textarea{font-family:inherit;width:100%;background:var(--card2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px;font-size:15px}
+textarea{min-height:90px;resize:vertical}
+button.b,a.b{font-family:inherit;text-decoration:none;display:inline-block;background:var(--card2);color:var(--text);border:1px solid var(--line);border-radius:10px;padding:10px 14px;font-size:15px}
+button.p{background:var(--pri);border-color:var(--pri);color:#fff;font-weight:600}
+button:disabled{opacity:.45}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.row>.grow{flex:1;min-width:0}
+.seg{display:flex;background:var(--card2);border-radius:12px;padding:3px}
+.seg button{flex:1;background:none;border:0;color:var(--muted);padding:10px;border-radius:10px;font-size:14px}
+.seg button.on{background:var(--pri);color:#fff}
+.muted{color:var(--muted);font-size:13px}
+.frame{position:relative;width:100%;border-radius:10px;overflow:hidden;background:#000;margin-top:8px}
+.frame img{display:block;width:100%}
+.band{position:absolute;left:0;right:0;border:2px solid var(--yel);background:rgba(255,213,79,.25)}
+input[type=range]{width:100%;accent-color:var(--pri)}
+#bar{position:fixed;left:0;right:0;bottom:0;z-index:6;background:var(--card2);border-top:1px solid var(--line);padding:10px 12px calc(10px + env(safe-area-inset-bottom))}
+#bar .inner{max-width:720px;margin:0 auto}
+.prog{height:8px;background:#0003;border-radius:6px;overflow:hidden;margin:6px 0}
+.prog>div{height:100%;width:0;background:linear-gradient(90deg,var(--pri2),var(--pri));transition:width .4s}
+#go{flex:1;height:52px;font-size:17px}
+#log{max-height:35vh;overflow:auto;font:12px/1.4 ui-monospace,monospace;color:var(--muted);white-space:pre-wrap;margin-top:8px;display:none}
+video{width:100%;border-radius:10px;margin-top:8px;background:#000}
+.item{border-top:1px solid var(--line);padding:10px 0}
+.item .t{color:var(--muted);font-size:12px;margin-bottom:4px}
+.item textarea{min-height:60px}
+.modal{position:fixed;inset:0;z-index:10;background:#000a;display:none;align-items:flex-end;justify-content:center}
+.modal.on{display:flex}
+.sheet{background:var(--card);width:100%;max-width:720px;max-height:92vh;overflow:auto;border-radius:18px 18px 0 0;padding:16px}
+.sheet h3{margin:0 0 6px}
+.files .f{padding:10px;border-bottom:1px solid var(--line)}
+.files .f b{display:block;word-break:break-all}
+.pill{display:inline-block;padding:2px 8px;border-radius:20px;background:var(--card2);font-size:12px;color:var(--muted);margin:2px 4px 2px 0}
+.pill.ok{color:var(--ok)}.pill.no{color:var(--warn)}
+a{color:var(--pri)}
+.hide{display:none!important}
+</style>
+</head>
+<body>
+<header>
+  <div class="row"><h1>🎬 Phim Việt Studio</h1><span class="ver" id="ver"></span><span class="grow"></span>
+    <button class="b" id="upd" style="padding:6px 10px;font-size:13px">🔄 Cập nhật</button></div>
+  <nav><button data-tab="make" class="on">🎬 Làm video</button><button data-tab="script">✏️ Kịch bản</button><button data-tab="set">⚙️ Cài đặt</button></nav>
+</header>
+
+<main>
+<!-- ============================== LÀM VIDEO -->
+<section id="tab-make">
+  <div class="card hide" id="res">
+    <h2>✅ Video thành phẩm</h2>
+    <video id="vid" controls playsinline></video>
+    <div class="row" style="margin-top:8px"><a id="dlres" class="b" download>⬇ Tải video</a><span class="muted grow" id="resname"></span></div>
+  </div>
+  <div class="card">
+    <h2>1. Video gốc</h2>
+    <div class="row">
+      <button class="b grow" id="pick">📂 Chọn trong máy</button>
+      <label class="b grow" style="margin:0;text-align:center;color:var(--text);font-size:15px">⬆ Tải lên<input type="file" id="file" accept="video/*" hidden></label>
+    </div>
+    <label>hoặc dán link TikTok / YouTube / Douyin / Bilibili</label>
+    <div class="row"><input type="text" id="url" class="grow" placeholder="https://..."><button class="b" id="dl">⬇ Tải</button></div>
+    <div id="vinfo" class="muted" style="margin-top:8px">Chưa chọn video.</div>
+  </div>
+
+  <div class="card">
+    <h2>2. Làm gì?</h2>
+    <div class="seg" id="mode"><button data-v="recap">🎬 Review / tóm tắt</button><button data-v="translate">🌐 Dịch nguyên video</button></div>
+    <div id="opt-recap">
+      <label>Độ dài video review</label>
+      <select data-set="target"><option value="60">1 phút</option><option value="120">2 phút</option><option value="180">3 phút</option><option value="300">5 phút</option><option value="600">10 phút</option><option value="900">15 phút</option></select>
+      <label>Văn phong</label><select data-set="style" id="styles"></select>
+    </div>
+    <div id="opt-translate" class="hide">
+      <label>Xuất ra</label>
+      <select data-set="output"><option value="both">Thuyết minh + Vietsub</option><option value="sub">Chỉ Vietsub (giữ tiếng gốc)</option><option value="dub">Chỉ thuyết minh</option></select>
+      <label>Văn phong dịch</label><select data-set="style_tr" id="styles_tr"></select>
+      <label>Tiếng gốc khi thuyết minh</label>
+      <select data-set="background"><option value="duck">Giữ nhỏ, tự nhỏ thêm lúc có giọng đọc</option><option value="separate" id="sepopt">AI tách giọng gốc, giữ nhạc nền (chậm)</option><option value="mute">Tắt hẳn</option></select>
+    </div>
+  </div>
+
+  <div class="card">
+    <h2>3. Lời gốc & phụ đề cứng</h2>
+    <label>Lấy lời gốc bằng</label>
+    <select data-set="speech"><option value="auto">Tự chọn (có key Groq thì nghe, có khung phụ đề thì đọc chữ)</option><option value="groq">🎧 Nghe lời thoại - Groq (miễn phí, cần key)</option><option value="ocr">🔤 Đọc phụ đề cứng trên hình (không cần mạng)</option></select>
+    <label>Chữ trên hình là</label>
+    <select data-set="ocr_lang"><option value="auto">Tiếng Trung (+ chữ Latin)</option><option value="zh_tw">Tiếng Trung phồn thể</option><option value="en">Tiếng Anh</option><option value="ja">Tiếng Nhật</option><option value="ko">Tiếng Hàn</option><option value="th">Tiếng Thái</option></select>
+    <div class="frame hide" id="frame"><img id="fimg" alt=""><div class="band" id="band"></div></div>
+    <div id="bandctl" class="hide">
+      <label>Khung phụ đề cứng - mép trên: <span id="tv"></span>%</label><input type="range" id="top" min="0" max="100" step="0.5">
+      <label>mép dưới: <span id="bv"></span>%</label><input type="range" id="bot" min="0" max="100" step="0.5">
+      <div class="row" style="margin-top:8px"><button class="b" id="auto">🔍 Tự tìm</button><button class="b" id="otest">🔤 Đọc thử</button><button class="b" id="nf">🖼 Khung khác</button><button class="b" id="noreg">✖ Không có</button></div>
+      <div class="muted" id="otext"></div>
+    </div>
+    <label>Che phụ đề gốc</label>
+    <select data-set="cover"><option value="auto">Tự động (làm mờ đúng khung đã đặt)</option><option value="blur">Làm mờ</option><option value="bar">Dải tối</option><option value="zoom">Phóng to cắt bỏ</option><option value="none">Không che</option></select>
+  </div>
+
+  <div class="card">
+    <h2>4. Khung hình & giọng đọc</h2>
+    <label>Khung hình</label>
+    <select data-set="aspect"><option value="9:16">Dọc 9:16 (TikTok, Reels, Shorts)</option><option value="source">Giữ khung gốc</option><option value="16:9">Ngang 16:9</option><option value="1:1">Vuông 1:1</option></select>
+    <label>Lấp khung dọc</label>
+    <select data-set="fill"><option value="blur">Nền mờ, đủ hình</option><option value="crop">Cắt đầy khung</option></select>
+    <label>Chất lượng</label>
+    <select data-set="height"><option value="540">540p (nhanh nhất)</option><option value="720">720p HD</option><option value="1080">1080p Full HD</option></select>
+    <label>Giọng đọc</label>
+    <div class="row"><select data-set="voice_engine" id="veng" class="grow"></select></div>
+    <div class="row" style="margin-top:6px"><select data-set="voice" id="voice" class="grow"></select><button class="b" id="vtest">🔊</button></div>
+    <label>Tốc độ đọc: <span id="spv"></span>%</label><input type="range" id="speed" min="-30" max="50" step="5">
+    <audio id="aud" class="hide" controls></audio>
+  </div>
+</section>
+
+<!-- ============================== KỊCH BẢN -->
+<section id="tab-script" class="hide">
+  <div class="card">
+    <div class="row"><button class="b p grow" id="rerender">🎬 Lưu & xuất lại video</button><button class="b" id="redo">🔄 AI làm lại</button></div>
+    <div class="muted" style="margin-top:8px">Sửa chữ trực tiếp (tên nhân vật, câu dịch...) rồi bấm Lưu & xuất lại.</div>
+    <div id="title-wrap" class="hide"><label>Tiêu đề</label><input type="text" id="stitle"></div>
+    <div id="items"></div>
+  </div>
+</section>
+
+<!-- ============================== CÀI ĐẶT -->
+<section id="tab-set" class="hide">
+  <div class="card">
+    <h2>AI viết kịch bản & dịch</h2>
+    <select data-set="ai"><option value="auto">Tự động: dùng AI có key (không có key → dán tay)</option><option value="manual">🐋 Luôn dán tay qua DeepSeek web (miễn phí)</option></select>
+    <div class="muted" style="margin-top:6px">Key chỉ lưu trong điện thoại này. AI nào lỗi / hết tiền thì tự sang AI kế tiếp.</div>
+    <div id="keys"></div>
+  </div>
+  <div class="card">
+    <h2>Tên riêng</h2>
+    <textarea data-set="glossary" placeholder="一护 = Ichigo&#10;林动 = Lâm Động"></textarea>
+    <div class="muted">Mỗi dòng: tên gốc = tên Việt. AI luôn dùng đúng các tên này.</div>
+    <label>Ngôn ngữ lời thoại (khi nghe bằng Groq)</label>
+    <select data-set="language"><option value="auto">Tự nhận</option><option value="zh">Tiếng Trung</option><option value="en">Tiếng Anh</option><option value="ja">Tiếng Nhật</option><option value="ko">Tiếng Hàn</option><option value="th">Tiếng Thái</option></select>
+  </div>
+  <div class="card">
+    <h2>Lưu video</h2>
+    <div class="muted" id="outdir"></div>
+    <div class="muted" id="storagehint"></div>
+  </div>
+</section>
+</main>
+
+<div id="bar"><div class="inner">
+  <div id="st" class="muted"></div>
+  <div class="prog"><div id="pb"></div></div>
+  <div class="row"><button class="b p" id="go">⚡ LÀM VIDEO</button><button class="b hide" id="stop">⏹ Hủy</button><button class="b" id="logbtn">Log</button></div>
+  <div id="log"></div>
+</div></div>
+
+<!-- chọn video trong máy -->
+<div class="modal" id="mpick"><div class="sheet"><div class="row"><h3 class="grow">Video trong máy</h3><button class="b" data-close>Đóng</button></div><div class="files" id="files"></div></div></div>
+<!-- dán tay DeepSeek -->
+<div class="modal" id="mask"><div class="sheet">
+  <h3>🐋 Nhờ DeepSeek (miễn phí)</h3>
+  <div class="muted" id="askwhat"></div>
+  <ol class="muted" style="padding-left:18px;margin:8px 0">
+    <li>Bấm <b>Chép yêu cầu</b>.</li><li>Bấm <b>Mở DeepSeek</b>, dán vào ô chat, gửi (nên dùng chung 1 cuộc trò chuyện cho các phần của cùng video).</li>
+    <li>Bấm nút chép dưới câu trả lời của DeepSeek, quay lại đây bấm <b>Dán</b> rồi <b>Dùng</b>.</li></ol>
+  <div class="row"><button class="b p grow" id="acopy">📋 Chép yêu cầu</button><button class="b grow" id="aopen">🌐 Mở DeepSeek</button></div>
+  <textarea id="aprompt" readonly style="margin-top:8px;min-height:70px;font-size:12px"></textarea>
+  <label>Câu trả lời của DeepSeek</label><textarea id="areply" style="min-height:140px"></textarea>
+  <div class="row" style="margin-top:8px"><button class="b grow" id="apaste">📋 Dán</button><button class="b p grow" id="ause">✅ Dùng</button><button class="b" id="acancel">Hủy</button></div>
+</div></div>
+
+<script>
+const $ = s => document.querySelector(s), $$ = s => [...document.querySelectorAll(s)];
+const H = {"X-PhimViet": "1", "Content-Type": "application/json"};
+async function api(path, body) {
+  const r = await fetch(path, body === undefined ? {} : {method: "POST", headers: H, body: JSON.stringify(body)});
+  const j = await r.json().catch(() => ({error: "Lỗi máy chủ"}));
+  if (j.error) toast(j.error);
+  return j;
+}
+function toast(m) { $("#st").textContent = m; }
+const fmt = t => { t = Math.max(0, t | 0); const h = t / 3600 | 0, m = (t / 60 | 0) % 60, s = t % 60;
+  return (h ? h + ":" + String(m).padStart(2, "0") : String(m).padStart(2, "0")) + ":" + String(s).padStart(2, "0"); };
+const esc = s => String(s ?? "").replace(/[&<>"]/g, c => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+
+// ---------- tabs
+$$("nav button").forEach(b => b.onclick = () => {
+  $$("nav button").forEach(x => x.classList.toggle("on", x === b));
+  $$("main>section").forEach(s => s.classList.toggle("hide", s.id !== "tab-" + b.dataset.tab));
+  if (b.dataset.tab === "script") loadScript();
+});
+
+// ---------- cài đặt
+let S = {};
+const KEYS = [["groq", "Groq - nghe lời thoại + AI, miễn phí", "https://console.groq.com/keys"],
+  ["deepseek", "DeepSeek - dịch tiếng Trung rất tốt (nạp tiền)", "https://platform.deepseek.com/api_keys"],
+  ["gemini", "Google Gemini - có gói miễn phí", "https://aistudio.google.com/apikey"],
+  ["openrouter", "OpenRouter - tự dùng DeepSeek miễn phí", "https://openrouter.ai/keys"],
+  ["openai", "OpenAI", "https://platform.openai.com/api-keys"]];
+async function loadSettings() {
+  S = await api("/api/settings");
+  $$("[data-set]").forEach(el => { const v = S[el.dataset.set]; if (v !== undefined && el.id !== "voice" && el.id !== "veng") el.value = v; });
+  $("#styles").innerHTML = Object.entries(S.styles).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
+  $("#styles").value = S.style;
+  $("#styles_tr").innerHTML = Object.entries(S.styles_tr).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
+  $("#styles_tr").value = S.style_tr;
+  $("#sepopt").disabled = !S.separator;
+  setMode(S.mode);
+  $("#speed").value = S.speed; $("#spv").textContent = S.speed;
+  $("#keys").innerHTML = KEYS.map(([k, n, u]) => `<label>${n} ${S.keys[k] ? '<span class="pill ok">đã có key</span>' : ""}</label>
+    <div class="row"><input type="password" class="grow" data-key="${k}" placeholder="${S.keys[k] ? "•••••• (dán key mới để thay)" : "dán key vào đây"}">
+    <a class="b" href="${u}" target="_blank">Lấy key</a></div>`).join("");
+  $$("[data-key]").forEach(el => el.onchange = async () => { await api("/api/settings", {["key_" + el.dataset.key]: el.value}); el.value = ""; loadSettings(); });
+  $("#outdir").textContent = "Video xuất lưu ở: " + S.out_dir;
+  loadVoices();
+}
+$$("[data-set]").forEach(el => el.onchange = async () => {
+  let v = el.value; if (["target", "height"].includes(el.dataset.set)) v = +v;
+  S = await api("/api/settings", {[el.dataset.set]: v});
+  if (el.dataset.set === "voice_engine") loadVoices();
+});
+function setMode(m) {
+  $$("#mode button").forEach(b => b.classList.toggle("on", b.dataset.v === m));
+  $("#opt-recap").classList.toggle("hide", m !== "recap");
+  $("#opt-translate").classList.toggle("hide", m !== "translate");
+  $("#go").textContent = m === "recap" ? "⚡ LÀM VIDEO REVIEW" : "⚡ VIỆT HÓA VIDEO";
+}
+$$("#mode button").forEach(b => b.onclick = async () => { setMode(b.dataset.v); await api("/api/settings", {mode: b.dataset.v}); S.mode = b.dataset.v; });
+async function loadVoices() {
+  const j = await api("/api/voices?engine=" + encodeURIComponent(S.voice_engine));
+  $("#veng").innerHTML = Object.entries(j.engines || {}).map(([k, v]) => `<option value="${k}">${esc(v)}</option>`).join("");
+  $("#veng").value = S.voice_engine;
+  $("#voice").innerHTML = (j.voices || []).map(([k, v]) => `<option value="${esc(k)}">${esc(v)}</option>`).join("");
+  if (S.voice && [...$("#voice").options].some(o => o.value === S.voice)) $("#voice").value = S.voice;
+}
+$("#speed").oninput = () => $("#spv").textContent = $("#speed").value;
+$("#speed").onchange = () => api("/api/settings", {speed: +$("#speed").value});
+$("#vtest").onclick = async () => { await api("/api/voice_test", {}); waitPreview = true; };
+let waitPreview = false;
+
+// ---------- video
+$("#pick").onclick = async () => {
+  $("#mpick").classList.add("on");
+  $("#files").innerHTML = '<div class="muted">Đang tìm video...</div>';
+  const j = await api("/api/browse");
+  if (!j.storage) { $("#files").innerHTML = '<div class="muted">Termux chưa được đọc bộ nhớ máy: mở Termux, gõ <b>termux-setup-storage</b>, bấm Cho phép, rồi mở lại. Hoặc dùng nút ⬆ Tải lên.</div>'; return; }
+  $("#files").innerHTML = j.files.length ? j.files.map((f, i) => `<div class="f" data-i="${i}"><b>${esc(f.name)}</b><span class="muted">${esc(f.dir)} · ${(f.size / 1048576).toFixed(1)} MB</span></div>`).join("")
+    : '<div class="muted">Không thấy video nào trong Download / Movies / DCIM.</div>';
+  $$("#files .f").forEach(el => el.onclick = async () => {
+    $("#mpick").classList.remove("on");
+    toast("Đang mở video...");
+    const r = await api("/api/open", {path: j.files[+el.dataset.i].path});
+    if (r.ok) { toast("Đã mở video."); afterOpen(); }
+  });
+};
+$$("[data-close]").forEach(b => b.onclick = () => b.closest(".modal").classList.remove("on"));
+$("#file").onchange = () => {
+  const f = $("#file").files[0]; if (!f) return;
+  const x = new XMLHttpRequest();
+  x.open("POST", "/api/upload?name=" + encodeURIComponent(f.name));
+  x.setRequestHeader("X-PhimViet", "1");
+  x.upload.onprogress = e => { $("#pb").style.width = (100 * e.loaded / e.total) + "%"; toast("Đang tải lên " + Math.round(100 * e.loaded / e.total) + "%"); };
+  x.onload = () => { const j = JSON.parse(x.responseText || "{}"); if (j.error) toast(j.error); else { toast("Đã mở video."); afterOpen(); } };
+  x.send(f);
+};
+$("#dl").onclick = () => api("/api/download", {url: $("#url").value});
+let V = null, ft = null;
+function afterOpen() { ft = null; refresh(true); }
+function showVideo(v) {
+  V = v;
+  if (!v) return;
+  $("#vinfo").innerHTML = `<b>${esc(v.title)}</b><br>${fmt(v.duration)} · ${v.width}x${v.height}${v.has_audio ? "" : " · không có tiếng"}` +
+    (v.source ? ` · lời gốc ${v.source} câu` : "") + (v.translated ? ` · đã dịch ${v.translated}` : "") + (v.segs ? ` · kịch bản ${v.segs} đoạn` : "");
+  $("#frame").classList.remove("hide"); $("#bandctl").classList.remove("hide");
+  if (ft === null) { ft = v.duration * 0.3; $("#fimg").src = "/api/frame?t=" + ft.toFixed(2) + "&r=" + Date.now(); }
+  const r = v.region || [0, 0.8, 1, 0.96];
+  if (document.activeElement !== $("#top") && document.activeElement !== $("#bot")) { $("#top").value = r[1] * 100; $("#bot").value = r[3] * 100; }
+  drawBand(!v.region);
+}
+function drawBand(none) {
+  const t = +$("#top").value, b = +$("#bot").value;
+  $("#tv").textContent = t; $("#bv").textContent = b;
+  const el = $("#band"); el.style.top = t + "%"; el.style.height = Math.max(0, b - t) + "%";
+  el.style.opacity = none ? .35 : 1;
+}
+$("#top").oninput = $("#bot").oninput = () => drawBand(false);
+$("#top").onchange = $("#bot").onchange = () => api("/api/region", {top: $("#top").value / 100, bottom: $("#bot").value / 100}).then(() => refresh());
+$("#auto").onclick = async () => { toast("Đang tìm phụ đề cứng..."); const j = await api("/api/region", {auto: true}); if (j.region) toast("Đã tìm thấy khung phụ đề."); refresh(); };
+$("#noreg").onclick = async () => { await api("/api/region", {clear: true}); refresh(); };
+$("#nf").onclick = () => { if (!V) return; ft = (ft + V.duration * 0.17) % V.duration; $("#fimg").src = "/api/frame?t=" + ft.toFixed(2); };
+$("#otest").onclick = async () => { $("#otext").textContent = "Đang đọc..."; const j = await api("/api/ocr_test?t=" + (ft || 0).toFixed(2)); $("#otext").textContent = j.error ? "" : "Đọc được: " + (j.text || "(không thấy chữ)"); };
+
+// ---------- chạy
+$("#go").onclick = () => api("/api/run", {}).then(() => refresh());
+$("#stop").onclick = () => api("/api/cancel", {});
+$("#logbtn").onclick = () => { const l = $("#log"); l.style.display = l.style.display === "block" ? "none" : "block"; l.scrollTop = 1e9; };
+$("#upd").onclick = () => { if (confirm("Tải bản mới nhất? Dữ liệu và video giữ nguyên.")) api("/api/update", {}); };
+
+// ---------- kịch bản
+let SC = null;
+async function loadScript() {
+  SC = await api("/api/script");
+  if (SC.error) { $("#items").innerHTML = '<div class="muted">Chưa có video.</div>'; return; }
+  const recap = SC.mode === "recap";
+  $("#title-wrap").classList.toggle("hide", !recap);
+  $("#stitle").value = SC.title || "";
+  const list = recap ? SC.segments : SC.lines;
+  if (!list.length) { $("#items").innerHTML = '<div class="muted" style="margin-top:10px">Chưa có - bấm ⚡ LÀM VIDEO trước.</div>'; return; }
+  $("#items").innerHTML = list.map((x, i) => recap
+    ? `<div class="item"><div class="t">Đoạn ${i + 1} · cảnh từ ${fmt(x.start)}</div><textarea data-i="${i}">${esc(x.text)}</textarea></div>`
+    : `<div class="item"><div class="t">${i + 1} · ${fmt(x.start)} · ${esc(x.text)}</div><textarea data-i="${i}" placeholder="(chưa dịch)">${esc(x.vi)}</textarea></div>`).join("");
+}
+async function saveScript() {
+  if (!SC || SC.error) return;
+  const vals = $$("#items textarea").map(t => t.value);
+  if (SC.mode === "recap") await api("/api/script", {title: $("#stitle").value, segments: SC.segments.map((s, i) => ({start: s.start, text: vals[i]}))});
+  else await api("/api/script", {lines: SC.lines.map((l, i) => ({...l, vi: vals[i]}))});
+}
+$("#rerender").onclick = async () => { await saveScript(); await api("/api/run", {render_only: true}); refresh(); };
+$("#redo").onclick = async () => { if (confirm("Cho AI viết / dịch lại từ đầu?")) { await api("/api/run", {redo: true}); refresh(); } };
+
+// ---------- dán tay DeepSeek
+let ASK = null;
+function showAsk(a) {
+  if (!a) { ASK = null; $("#mask").classList.remove("on"); return; }
+  if (ASK && ASK.id === a.id) return;
+  ASK = a; $("#askwhat").textContent = a.what + " · " + a.prompt.length + " ký tự";
+  $("#aprompt").value = a.prompt; $("#areply").value = ""; $("#acopy").textContent = "📋 Chép yêu cầu";
+  $("#mask").classList.add("on");
+}
+$("#acopy").onclick = async () => {
+  try { await navigator.clipboard.writeText(ASK.prompt); } catch (e) { $("#aprompt").select(); document.execCommand("copy"); }
+  $("#acopy").textContent = "✅ Đã chép";
+};
+$("#aopen").onclick = () => window.open("https://chat.deepseek.com", "_blank");
+$("#apaste").onclick = async () => { try { $("#areply").value = await navigator.clipboard.readText(); } catch (e) { toast("Nhấn giữ ô trả lời → Dán"); } };
+$("#ause").onclick = async () => { if (!$("#areply").value.trim()) return; await api("/api/answer", {id: ASK.id, text: $("#areply").value}); showAsk(null); };
+$("#acancel").onclick = async () => { await api("/api/cancel", {}); showAsk(null); };
+
+// ---------- trạng thái
+let since = 0, lastResult = null, wasBusy = false;
+async function refresh(force) {
+  const j = await fetch("/api/state?since=" + since).then(r => r.json()).catch(() => null);
+  if (!j) { toast("Mất kết nối với Termux - mở lại Termux và chạy lệnh phimviet."); return; }
+  $("#ver").textContent = "v" + j.version;
+  if (j.logs.length) { $("#log").textContent += j.logs.join("\n") + "\n"; $("#log").scrollTop = 1e9; }
+  since = j.log_count;
+  $("#st").textContent = j.status || (j.manual ? "🐋 Không có key AI: AI sẽ nhờ bạn dán qua DeepSeek web." : "");
+  $("#pb").style.width = (j.progress * 100) + "%";
+  $("#go").classList.toggle("hide", j.busy); $("#stop").classList.toggle("hide", !j.busy);
+  $("#go").disabled = !j.video;
+  $("#storagehint").innerHTML = j.storage ? "" : "Muốn video hiện trong Thư viện ảnh và chọn được video trong máy: mở Termux gõ <b>termux-setup-storage</b> rồi bấm Cho phép.";
+  if (j.video && (force || JSON.stringify(j.video) !== JSON.stringify(V))) showVideo(j.video);
+  showAsk(j.ask);
+  if (j.result && j.result !== lastResult) {
+    lastResult = j.result;
+    $("#res").classList.remove("hide");
+    $("#vid").src = "/files/" + encodeURIComponent(j.result) + "?r=" + Date.now();
+    $("#dlres").href = "/files/" + encodeURIComponent(j.result); $("#resname").textContent = j.result;
+  }
+  if (wasBusy && !j.busy && waitPreview) { waitPreview = false; const a = $("#aud"); a.src = "/files/preview.wav?r=" + Date.now(); a.classList.remove("hide"); a.play().catch(() => {}); }
+  wasBusy = j.busy;
+}
+loadSettings().then(() => refresh(true));
+setInterval(refresh, 1200);
+</script>
+</body>
+</html>

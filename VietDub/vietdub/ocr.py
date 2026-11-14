@@ -33,7 +33,7 @@ class OCRError(RuntimeError):
     pass
 
 
-def available() -> bool:
+def rapid_available() -> bool:
     import importlib.util
 
     try:
@@ -42,8 +42,109 @@ def available() -> bool:
         return False
 
 
+def available() -> bool:
+    return rapid_available() or tesseract_exe() is not None
+
+
+# ------------------------------------------------------------------ Tesseract (dự phòng: Termux / máy không cài được RapidOCR)
+# chữ Trung / Nhật / Hàn: KHÔNG trộn model tiếng Anh (trộn vào Tesseract hay đọc nhầm cả câu Hán thành chữ Latin)
+TESS_LANGS = {"auto": "chi_sim", "zh": "chi_sim", "zh_tw": "chi_tra", "en": "eng", "ja": "jpn", "ko": "kor",
+              "th": "tha", "ru": "rus", "hi": "hin", "ar": "ara", "latin": "eng+vie"}
+TESSDATA_URL = "https://raw.githubusercontent.com/tesseract-ocr/tessdata_fast/main/{}.traineddata"
+
+
+def tesseract_exe() -> str | None:
+    import shutil
+
+    return shutil.which("tesseract")
+
+
+def tessdata_dir() -> Path:
+    from .config import app_home
+
+    d = app_home() / "models" / "tessdata"
+    d.mkdir(parents=True, exist_ok=True)
+    return d
+
+
+class _Result:
+    def __init__(self, boxes, txts, scores):
+        self.boxes, self.txts, self.scores = boxes, txts, scores
+
+
+class _Tesseract:
+    """Gọi tesseract (dòng lệnh) với ảnh truyền qua stdin; trả kết quả giống RapidOCR (boxes, txts, scores)."""
+
+    def __init__(self, lang: str):
+        import requests
+
+        self.langs = TESS_LANGS.get(lang, TESS_LANGS["auto"])
+        d = tessdata_dir()
+        for code in self.langs.split("+"):
+            f = d / f"{code}.traineddata"
+            if not f.exists():  # tải model ngôn ngữ một lần (vài MB)
+                try:
+                    r = requests.get(TESSDATA_URL.format(code), timeout=120)
+                    r.raise_for_status()
+                    tmp = f.with_suffix(".part")
+                    tmp.write_bytes(r.content)
+                    tmp.replace(f)
+                except Exception as e:  # noqa: BLE001
+                    raise OCRError(f"Không tải được dữ liệu đọc chữ '{code}' cho Tesseract: {e}") from e
+
+    @staticmethod
+    def binarize(img):
+        """Tách chữ phụ đề (trắng hoặc vàng, viền tối) khỏi nền -> ảnh chữ đen trên nền trắng, rõ cho Tesseract."""
+        import numpy as np
+
+        if img.ndim == 2:
+            img = np.repeat(img[:, :, None], 3, axis=2)
+        b, g, r = (img[:, :, i].astype(np.int16) for i in range(3))  # ảnh BGR
+        # chữ phụ đề luôn có viền / bóng tối: chỉ giữ điểm sáng nằm gần điểm tối (bỏ mảng nền trắng / vàng lớn)
+        dark = np.maximum(np.maximum(r, g), b) < 90
+        near = dark.copy()
+        for dy in range(-3, 4):
+            for dx in range(-3, 4):
+                if dy or dx:
+                    near |= np.roll(np.roll(dark, dy, axis=0), dx, axis=1)
+        white = (np.minimum(np.minimum(r, g), b) > 185) & near
+        yellow = (r > 185) & (g > 160) & (b < 130) & near
+        mask = white if white.sum() >= yellow.sum() else yellow
+        out = np.where(mask, 0, 255).astype(np.uint8)
+        if out.shape[0] < 80:
+            out = out.repeat(2, axis=0).repeat(2, axis=1)
+        return out
+
+    def __call__(self, img):
+        g = self.binarize(img)
+        pgm = f"P5\n{g.shape[1]} {g.shape[0]}\n255\n".encode() + g.tobytes()
+        r = subprocess.run([tesseract_exe(), "stdin", "stdout", "--tessdata-dir", str(tessdata_dir()), "-l", self.langs,
+                            "--psm", "6", "-c", "tessedit_create_tsv=1"], input=pgm, capture_output=True, timeout=60, **no_window())
+        boxes, txts, scores = [], [], []
+        k = 2 if img.shape[0] < 80 else 1
+        line_y = (0, 0)
+        for row in r.stdout.decode("utf-8", "replace").splitlines()[1:]:
+            c = row.split("\t")
+            if len(c) < 12:
+                continue
+            x, y, w, h = (int(v) // k for v in c[6:10])
+            if c[0] == "4":  # dòng chữ: các chữ trong dòng dùng chung chiều cao dòng (giữ đúng thứ tự trái -> phải)
+                line_y = (y, y + h)
+            if c[0] != "5" or not c[11].strip():
+                continue
+            boxes.append([[x, line_y[0]], [x + w, line_y[0]], [x + w, line_y[1]], [x, line_y[1]]])
+            txts.append(c[11])
+            scores.append(max(0.0, float(c[10])) / 100)
+        return _Result(boxes, txts, scores)
+
+
 def engine(lang: str = "auto"):
-    """RapidOCR theo ngôn ngữ (model ngôn ngữ chưa có thì tự tải lần đầu)."""
+    """RapidOCR theo ngôn ngữ (model ngôn ngữ chưa có thì tự tải lần đầu); không có RapidOCR thì dùng Tesseract."""
+    if not rapid_available() and tesseract_exe():
+        key = ("tess", lang)
+        if key not in _ENGINES:
+            _ENGINES[key] = _Tesseract(lang)
+        return _ENGINES[key]
     if not available():
         raise OCRError("Chưa cài bộ đọc chữ (bấm 📦 Thư viện → Tải tất cả, hoặc chạy lại install.bat).")
     kind = LANGS.get(lang, LANGS["auto"])[1]
@@ -72,24 +173,39 @@ def engine(lang: str = "auto"):
 
 def read_image(img, lang: str = "auto", min_score: float = 0.6) -> str:
     """Đọc chữ trong 1 ảnh (numpy BGR/xám) -> 1 dòng (nhiều dòng chữ nối theo thứ tự trên -> dưới)."""
+    return read_scored(img, lang, min_score)[0]
+
+
+def is_tesseract(lang: str = "auto") -> bool:
+    return not rapid_available() and tesseract_exe() is not None
+
+
+def read_scored(img, lang: str = "auto", min_score: float = 0.6) -> tuple[str, float]:
+    """Như read_image, kèm độ tin cậy trung bình (để chọn khung đọc tốt nhất)."""
     import numpy as np
 
     if img.ndim == 2:
         img = np.repeat(img[:, :, None], 3, axis=2)
-    r = engine(lang)(img)
+    eng = engine(lang)
+    r = eng(img)
     if not r or not r.txts:
-        return ""
+        return "", 0.0
+    if isinstance(eng, _Tesseract):
+        min_score = 0.0  # Tesseract chấm điểm chữ Hán rất thấp dù đọc gần đúng: giữ hết, bỏ thì mất chữ giữa câu
     items = []
+    confs = []
     for box, txt, sc in zip(r.boxes, r.txts, r.scores):
         if sc >= min_score and txt.strip():
             ys = [p[1] for p in box]
             xs = [p[0] for p in box]
             items.append((round(sum(ys) / len(ys) / 12), min(xs), txt.strip()))
+            confs.append(float(sc))
     items.sort()
     items = [(a, b, _clean(t)) for a, b, t in items]
     items = [x for x in items if x[2]]
     cjk = any("぀" <= ch <= "鿿" or "가" <= ch <= "힯" for _, _, t in items for ch in t)
-    return _clean(("" if cjk else " ").join(t for _, _, t in items))
+    text = _clean(("" if cjk else " ").join(t for _, _, t in items))
+    return text, (sum(confs) / len(confs) if confs else 0.0)
 
 
 def _clean(t: str) -> str:
@@ -196,11 +312,13 @@ def scan(video: str, info: MediaInfo, region: tuple, work: Path, lang: str = "au
                     cur[1] = t
                     if dens > cur[3]:
                         cur[2], cur[3] = img.copy(), dens
+                    if len(cur[5]) < 2 and t - cur[0] >= 0.5 * (len(cur[5]) + 1):
+                        cur[5].append(img.copy())  # thêm khung giữa câu: Tesseract đọc vài khung, lấy khung chắc nhất
                     cur[4] = np.logical_or(cur[4], s) if _similar(cur[4], s) > 0.8 else s
                 elif has:
                     if cur is not None:
                         events.append(cur)
-                    cur = [t, t, img.copy(), dens, s]
+                    cur = [t, t, img.copy(), dens, s, []]
                 elif cur is not None and t - cur[1] > 1.6 / FPS:
                     events.append(cur)
                     cur = None
@@ -215,12 +333,14 @@ def scan(video: str, info: MediaInfo, region: tuple, work: Path, lang: str = "au
     if cur is not None:
         events.append(cur)
     lines: list[dict] = []
-    for i, (a, b, img, _d, _s) in enumerate(events):
+    tess = is_tesseract(lang)
+    for i, (a, b, img, _d, _s, extra) in enumerate(events):
         if cancel is not None and cancel.is_set():
             raise Cancelled()
         if b - a < 0.2:  # chớp qua 1 khung: bỏ (thường là nhiễu)
             continue
-        txt = read_image(img, lang)
+        txt = max((read_scored(x, lang) for x in [img, *extra]), key=lambda r: (r[1] > 0, r[1]))[0] if tess \
+            else read_image(img, lang)
         if progress:
             progress(0.6 + 0.4 * (i + 1) / max(1, len(events)), f"Đọc chữ {i + 1}/{len(events)} câu")
         if not txt:

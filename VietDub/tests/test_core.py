@@ -268,12 +268,19 @@ def check_ocr(s: Settings):
     p = Project(str(w / "Phim Trung.mp4"), s)
     reg = p.auto_region()
     assert reg and reg[1] > 0.75 and reg[0] < 0.4 and reg[2] > 0.6, reg
+    tess = ocr.is_tesseract()  # Termux / máy không có RapidOCR: Tesseract (kém chính xác hơn một chút)
     assert ocr.read_image(ocr.grab(p.video, p.info, reg, 5.0)) == L[1]          # đọc thử 1 khung
     p.set_region(reg)
     segs = p.run_transcript(log, prog)
     def bare(t):  # so chữ, bỏ dấu câu (OCR đôi khi sót / thừa dấu phẩy - không ảnh hưởng bản dịch)
         return re.sub(r"[，。！？、,.!?]", "", t)
-    assert [bare(x["text"]) for x in segs] == [bare(L[i % 4]) for i in range(8)], [x["text"] for x in segs]
+    got, want = [bare(x["text"]) for x in segs], [bare(L[i % 4]) for i in range(8)]
+    if tess:
+        import difflib
+        assert len(got) == 8 and sum(a == b for a, b in zip(got, want)) >= 6 and \
+            all(difflib.SequenceMatcher(None, a, b).ratio() > 0.7 for a, b in zip(got, want)), got
+    else:
+        assert got == want, [x["text"] for x in segs]
     assert "，，" not in "".join(x["text"] for x in segs)
     assert all(abs(x["start"] - (i * 4 + 0.5)) < 0.4 and abs(x["end"] - (i * 4 + 3.3)) < 0.5
                for i, x in enumerate(segs)), segs

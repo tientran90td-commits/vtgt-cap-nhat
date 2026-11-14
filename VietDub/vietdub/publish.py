@@ -16,6 +16,7 @@ from .config import Settings
 from .media import Cancelled, MediaInfo, frames
 
 FONT_CANDIDATES = [
+    "/system/fonts/Roboto-Bold.ttf", "/system/fonts/Roboto-Regular.ttf",
     "C:/Windows/Fonts/arialbd.ttf", "C:/Windows/Fonts/segoeuib.ttf", "C:/Windows/Fonts/tahomabd.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf", "/usr/share/fonts/dejavu/DejaVuSans-Bold.ttf",
     "/Library/Fonts/Arial Bold.ttf", "/System/Library/Fonts/Supplemental/Arial Bold.ttf",

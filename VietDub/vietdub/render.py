@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from .media import MediaError, MediaInfo, encoder_args, run
+from .media import MediaError, MediaInfo, encoder_args, is_android, run
 
 ASPECTS = {"source": "Giữ như video gốc", "16:9": "Ngang 16:9 (YouTube)", "9:16": "Dọc 9:16 (TikTok, Reels, Shorts)",
            "1:1": "Vuông 1:1"}
@@ -241,9 +241,11 @@ def render_video(video: str, info: MediaInfo, lines: list[dict], dub_wav: Path |
                          boxes=boxes, t_offset=start, length=length)
         g = g.replace(",tpad=stop_mode=clone:stop_duration=5", "")
         if burn and items:
+            android = is_android()
             write_ass(work / "vi.ass", items, W, H, int(opts.get("sub_size", 54)), opts.get("sub_position", "bottom"),
-                      color=opts.get("sub_color", "white"))
-            g = g.replace("[vb]", "[vs]") + ";[vs]subtitles=filename=vi.ass[vb]"
+                      font="Roboto" if android else "Arial", color=opts.get("sub_color", "white"))
+            fonts = ":fontsdir=/system/fonts" if android else ""  # Termux: dùng font có sẵn của Android (đủ dấu tiếng Việt)
+            g = g.replace("[vb]", "[vs]") + f";[vs]subtitles=filename=vi.ass{fonts}[vb]"
         fc.append(g + ";[vb]format=yuv420p[v]")
     ov, vv = float(opts.get("orig_volume", 0.3) or 0.0), float(opts.get("voice_volume", 1.0) or 1.0)
     src = "0:a"
