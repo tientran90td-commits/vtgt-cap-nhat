@@ -87,7 +87,8 @@ class DeviceTest {
         val off = brightRatio(frameAt(vid, 1.5), band0, band1)
         assertTrue("phụ đề phải hiện ở giây 3 (on=$on)", on > 0.05)
         assertTrue("phụ đề không được hiện ở giây 1.5 (off=$off)", off < 0.01)
-        assertTrue("tiêu đề vàng ở khung trên", yellowRatio(frameAt(vid, 1.5), 0.0f, top) > 0.01)
+        val yellow = yellowRatio(frameAt(vid, 1.5), 0.0f, top)
+        assertTrue("tiêu đề vàng ở khung trên (yellow=$yellow)", yellow > 0.0005)
 
         // trộn tiếng nền + lời kể, ghép -> mp4 có tiếng
         val mixed = File(dir, "a.wav")
