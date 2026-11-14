@@ -1,0 +1,166 @@
+package com.vtgt.reviewphim
+
+import org.json.JSONObject
+import kotlin.math.max
+import kotlin.math.min
+
+/** Một câu lời gốc (và bản dịch tiếng Việt nếu có). Thời gian tính bằng giây. */
+data class Line(val start: Double, val end: Double, val text: String, var vi: String = "")
+
+/** Một đoạn lời kể review: cảnh minh họa bắt đầu ở `start` (giây) trong video gốc. */
+data class Seg(var start: Double, var text: String)
+
+/** Một dòng phụ đề hiện trên video thành phẩm. */
+data class Cue(val start: Double, val end: Double, val text: String)
+
+fun fmtTime(s: Double): String {
+    val t = max(0, s.toInt())
+    return if (t >= 3600) "%d:%02d:%02d".format(t / 3600, t / 60 % 60, t % 60) else "%02d:%02d".format(t / 60, t % 60)
+}
+
+/** Chữ Hán / Nhật / Hàn / Thái còn sót trong câu dịch. */
+val FOREIGN = Regex("[\\u3040-\\u30ff\\u3400-\\u9fff\\uac00-\\ud7af\\u0e00-\\u0e7f]")
+
+/** Đọc JSON trong câu trả lời của AI (bỏ ```json, chữ thừa trước/sau, dấu phẩy thừa). */
+fun extractJson(text: String): JSONObject {
+    val s = text.indexOf('{')
+    val e = text.lastIndexOf('}')
+    if (s < 0 || e <= s) throw IllegalArgumentException("AI không trả về JSON: " + text.take(200))
+    val body = text.substring(s, e + 1)
+    return try {
+        JSONObject(body)
+    } catch (ex: Exception) {
+        JSONObject(body.replace(Regex(",\\s*([}\\]])"), "$1"))
+    }
+}
+
+/** Đọc file phụ đề .srt / .vtt. */
+fun parseSrt(text: String): List<Line> {
+    val re = Regex("(\\d+):(\\d+):(\\d+)[,.](\\d+)\\s*-->\\s*(\\d+):(\\d+):(\\d+)[,.](\\d+)")
+    val out = mutableListOf<Line>()
+    val rows = text.replace("\r", "").split("\n")
+    var i = 0
+    while (i < rows.size) {
+        val m = re.find(rows[i])
+        if (m == null) {
+            i++
+            continue
+        }
+        val g = m.groupValues.drop(1).map { it.toDouble() }
+        val a = g[0] * 3600 + g[1] * 60 + g[2] + g[3] / 1000
+        val b = g[4] * 3600 + g[5] * 60 + g[6] + g[7] / 1000
+        i++
+        val sb = StringBuilder()
+        while (i < rows.size && rows[i].isNotBlank()) {
+            if (re.containsMatchIn(rows[i])) break
+            sb.append(' ').append(rows[i].trim())
+            i++
+        }
+        val t = sb.toString().replace(Regex("<[^>]+>|\\{[^}]+}"), "").trim()
+        if (t.isNotEmpty()) out.add(Line(a, b, t))
+    }
+    return out
+}
+
+fun toSrt(cues: List<Cue>): String {
+    fun ts(t: Double): String {
+        val ms = (t * 1000).toLong()
+        return "%02d:%02d:%02d,%03d".format(ms / 3600000, ms / 60000 % 60, ms / 1000 % 60, ms % 1000)
+    }
+    return cues.mapIndexed { i, c -> "${i + 1}\n${ts(c.start)} --> ${ts(c.end)}\n${c.text}\n" }.joinToString("\n")
+}
+
+/** Chia lời kể dài thành các dòng phụ đề ngắn (ngắt ở dấu câu, rồi ở khoảng trắng). */
+fun chunkText(text: String, maxChars: Int): List<String> {
+    val parts = text.trim().split(Regex("(?<=[.!?…;:,])\\s+")).map { it.trim() }.filter { it.isNotEmpty() }
+    val out = mutableListOf<String>()
+    for (p in parts) {
+        if (p.length <= maxChars) {
+            if (out.isNotEmpty() && out.last().length + 1 + p.length <= maxChars && out.last().length < maxChars / 2) {
+                out[out.size - 1] = out.last() + " " + p
+            } else {
+                out.add(p)
+            }
+            continue
+        }
+        var cur = StringBuilder()
+        for (w in p.split(Regex("\\s+"))) {
+            if (cur.isNotEmpty() && cur.length + 1 + w.length > maxChars) {
+                out.add(cur.toString())
+                cur = StringBuilder()
+            }
+            if (cur.isNotEmpty()) cur.append(' ')
+            cur.append(w)
+        }
+        if (cur.isNotEmpty()) out.add(cur.toString())
+    }
+    return out
+}
+
+/** Rải các dòng phụ đề của một đoạn lời kể theo độ dài chữ trong khoảng [start, start + dur]. */
+fun splitCues(text: String, start: Double, dur: Double, maxChars: Int): List<Cue> {
+    val chunks = chunkText(text, maxChars)
+    if (chunks.isEmpty()) return emptyList()
+    val total = chunks.sumOf { it.length }.toDouble()
+    var t = start
+    return chunks.map { c ->
+        val d = dur * c.length / total
+        val cue = Cue(t, t + d, c)
+        t += d
+        cue
+    }
+}
+
+/** Tỉ lệ giống nhau của 2 chuỗi (0..1), dùng để gộp các khung hình OCR cùng một câu phụ đề. */
+fun similarity(a: String, b: String): Double {
+    if (a == b) return 1.0
+    if (a.isEmpty() || b.isEmpty()) return 0.0
+    val x = a.take(80)
+    val y = b.take(80)
+    var prev = IntArray(y.length + 1) { it }
+    for (i in 1..x.length) {
+        val cur = IntArray(y.length + 1)
+        cur[0] = i
+        for (j in 1..y.length) {
+            cur[j] = min(min(cur[j - 1] + 1, prev[j] + 1), prev[j - 1] + if (x[i - 1] == y[j - 1]) 0 else 1)
+        }
+        prev = cur
+    }
+    return 1.0 - prev[y.length].toDouble() / max(x.length, y.length)
+}
+
+/** Số ký tự tiếng Việt đọc được mỗi giây ở tốc độ bình thường. */
+const val CPS = 14.5
+
+/** Số ký tự tối đa để đọc kịp câu thứ i (tới đầu câu sau, tối đa thêm 1.5 giây). */
+fun maxChars(lines: List<Line>, i: Int): Int {
+    val ln = lines[i]
+    val nxt = lines.getOrNull(i + 1)
+    val own = ln.end - ln.start
+    val slot = max(own, min((nxt?.start ?: (ln.end + 1.0)) - ln.start, own + 1.5))
+    return max(8, (slot * CPS).toInt())
+}
+
+/** Lời thoại có mốc thời gian, gộp bớt nếu quá dài để vừa một lần gửi AI. */
+fun transcriptText(lines: List<Line>, limit: Int = 60000): String {
+    var window = 0.0
+    while (true) {
+        val sb = StringBuilder()
+        var bucketStart = -1.0
+        val bucket = StringBuilder()
+        fun flush() {
+            if (bucket.isNotEmpty()) sb.append('[').append(fmtTime(bucketStart)).append("] ").append(bucket.trim()).append('\n')
+            bucket.clear()
+        }
+        for (ln in lines) {
+            if (bucketStart < 0 || ln.start - bucketStart >= window) {
+                flush()
+                bucketStart = ln.start
+            }
+            bucket.append(ln.text.take(120)).append(' ')
+        }
+        flush()
+        if (sb.length <= limit || window > 120) return sb.toString()
+        window = if (window == 0.0) 10.0 else window * 2
+    }
+}

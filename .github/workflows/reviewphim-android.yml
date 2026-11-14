@@ -1,0 +1,100 @@
+# Dựng app Android "ReviewPhim AI" (thư mục ReviewPhim/), chạy test trên máy ảo Android,
+# rồi đăng file APK lên Release "reviewphim" của repo để tải về điện thoại / cập nhật trong app.
+name: ReviewPhim Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/movie-summary-app-0q90dq']
+    paths: ['ReviewPhim/**', '.github/workflows/reviewphim-android.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reviewphim-android
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ReviewPhim
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Unit test + build APK
+        run: gradle --no-daemon --stacktrace testDebugUnitTest assembleRelease -PvCode=${{ github.run_number }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reviewphim-build
+          path: |
+            ReviewPhim/app/build/outputs/apk/release/*.apk
+            ReviewPhim/app/build/reports/tests/
+          if-no-files-found: ignore
+
+  device-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Test trên máy ảo Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          working-directory: ReviewPhim
+          script: gradle --no-daemon --stacktrace connectedDebugAndroidTest -PvCode=${{ github.run_number }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reviewphim-device-test
+          path: ReviewPhim/app/build/reports/androidTests/
+          if-no-files-found: ignore
+
+  release:
+    needs: [build, device-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: reviewphim-build
+          path: out
+      - name: Chuẩn bị file
+        run: |
+          find out -name "*.apk"
+          cp "$(find out -name 'app-arm64-v8a-release.apk' | head -1)" ReviewPhim.apk
+          ls -la ReviewPhim.apk
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: reviewphim
+          name: ReviewPhim AI 1.0.${{ github.run_number }}
+          make_latest: false
+          body: |
+            versionCode=${{ github.run_number }}
+            App Android ReviewPhim AI - review / tóm tắt phim, dịch thuyết minh + Vietsub.
+            Tải ReviewPhim.apk về điện thoại rồi mở để cài (cho phép cài từ nguồn này nếu Android hỏi).
+          files: ReviewPhim.apk
