@@ -555,10 +555,41 @@ class MainVM(app: Application) : AndroidViewModel(app) {
     private suspend fun coroutineScopeAll(tasks: List<suspend () -> Unit>) =
         kotlinx.coroutines.coroutineScope { tasks.map { t -> async { t() } }.awaitAll() }
 
-    private suspend fun speak(text: String, out: File, r: Float): File =
-        tts.synth(text, out, voice, r, prefs.str("tts_engine"))
+    @Volatile
+    private var vsDown = false
+
+    /** Giọng đọc: VoiceStudio trên máy tính (nếu chọn và kết nối được), không thì giọng có sẵn của máy. */
+    private suspend fun speak(text: String, out: File, r: Float): File {
+        if (VoiceStudio.enabled(prefs) && !vsDown) {
+            try {
+                return VoiceStudio.synth(prefs, text, out, r)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                vsDown = true
+                log("⚠ VoiceStudio lỗi (${e.message?.take(120)}) → dùng giọng có sẵn của máy cho phần còn lại.")
+            }
+        }
+        return tts.synth(text, out, voice, r, prefs.str("tts_engine"))
+    }
+
+    /** Kiểm tra VoiceStudio trước khi đọc cả video (để không lẫn 2 giọng). */
+    private suspend fun checkVoiceStudio() {
+        vsDown = false
+        if (!VoiceStudio.enabled(prefs)) return
+        try {
+            VoiceStudio.voices(prefs)
+            log("🎙 Giọng VoiceStudio (${VoiceStudio.url(prefs)}): ${prefs.str("vs_voice").ifBlank { "mặc định" }}")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            vsDown = true
+            log("⚠ ${e.message} → dùng giọng có sẵn của máy.")
+        }
+    }
 
     private suspend fun renderRecap(v: File, i: VInfo) {
+        checkVoiceStudio()
         val dir = File(ctx.cacheDir, "tts").apply { deleteRecursively(); mkdirs() }
         val narr = File(work, "narration.wav")
         val clips = mutableListOf<Pair<Double, Double>>()
@@ -610,6 +641,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         val subs = output != "dub"
         var dubFile: File? = null
         if (dub) {
+            checkVoiceStudio()
             val dir = File(ctx.cacheDir, "tts").apply { deleteRecursively(); mkdirs() }
             dubFile = File(work, "dub.wav")
             val ls = lines
@@ -693,6 +725,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
 
     // ================================================================ nghe thử
     fun previewVoice() = launchTask("Nghe thử giọng") {
+        checkVoiceStudio()
         val f = speak("Xin chào, đây là giọng đọc review phim của bạn. Chúc bạn có video thật nhiều lượt xem!",
             File(ctx.cacheDir, "preview.wav"), rate)
         withContext(Dispatchers.Main) {

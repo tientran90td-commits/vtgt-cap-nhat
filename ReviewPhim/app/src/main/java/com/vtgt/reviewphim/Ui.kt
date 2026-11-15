@@ -294,12 +294,29 @@ private fun VoicePicker(vm: MainVM) {
             err = e.message ?: "Không mở được giọng đọc"
         }
     }
-    if (voices.isNotEmpty()) {
+    var src by remember { mutableStateOf(vm.prefs.str("tts_src", "device")) }
+    Choice("Nguồn giọng đọc", src, listOf("device" to "📱 Giọng có sẵn trong máy (offline)",
+        "voicestudio" to "🎙 VoiceStudio trên máy tính (giọng AI / giọng nhân bản)")) { src = it; vm.prefs.set("tts_src", it) }
+    if (src == "voicestudio") {
+        var vsVoices by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
+        var vsErr by remember { mutableStateOf("") }
+        var vsVoice by remember { mutableStateOf(vm.prefs.str("vs_voice")) }
+        LaunchedEffect(Unit) {
+            try {
+                vsVoices = VoiceStudio.voices(vm.prefs); vsErr = ""
+            } catch (e: Exception) {
+                vsErr = e.message ?: "Không kết nối được VoiceStudio"
+            }
+        }
+        if (vsVoices.isNotEmpty()) Choice("Giọng VoiceStudio", vsVoice, vsVoices) { vsVoice = it; vm.prefs.set("vs_voice", it) }
+        if (vsErr.isNotEmpty()) Text("$vsErr (nhập địa chỉ ở Cài đặt → VoiceStudio)", color = Color(0xFFFF8A80), fontSize = 13.sp)
+        Hint("Không kết nối được thì app tự dùng giọng có sẵn của máy.")
+    } else if (voices.isNotEmpty()) {
         Choice("Giọng đọc (tiếng Việt có sẵn trong máy)", vm.voice, listOf("" to "Mặc định của máy") + voices) {
             vm.voice = it; vm.save("voice", it)
         }
     }
-    if (err.isNotEmpty()) Text(err, color = Color(0xFFFF8A80), fontSize = 13.sp)
+    if (err.isNotEmpty() && src != "voicestudio") Text(err, color = Color(0xFFFF8A80), fontSize = 13.sp)
     Hint("Tốc độ đọc: ${"%.2f".format(vm.rate)}x")
     Slider(vm.rate, { vm.rate = it; vm.prefs.setNum("rate", it) }, valueRange = 0.8f..1.6f)
     OutlinedButton(onClick = vm::previewVoice, enabled = !vm.busy) { Text("🔊 Nghe thử") }
@@ -500,6 +517,37 @@ private fun SettingsTab(vm: MainVM) {
             var lang by remember { mutableStateOf(vm.prefs.str("src_lang", "")) }
             Choice("Ngôn ngữ lời thoại (khi nghe bằng Groq)", lang, listOf("" to "Tự nhận", "zh" to "Tiếng Trung", "en" to "Tiếng Anh",
                 "ja" to "Tiếng Nhật", "ko" to "Tiếng Hàn", "th" to "Tiếng Thái")) { lang = it; vm.prefs.set("src_lang", it) }
+        }
+        Section("🎙 VoiceStudio trên máy tính (tùy chọn)") {
+            Hint("Giọng AI chất lượng cao / giọng nhân bản của bạn từ VoiceStudio (github.com/debpalash/VoiceStudio) chạy " +
+                "trên máy tính cùng wifi. Trên máy tính: mở VoiceStudio → bật Network share → nhập địa chỉ IP và mã PIN ở đây. " +
+                "Rồi ở mục Giọng đọc chọn nguồn 'VoiceStudio'.")
+            var u by remember { mutableStateOf(vm.prefs.str("vs_url")) }
+            OutlinedTextField(u, { u = it.trim(); vm.prefs.set("vs_url", u) }, Modifier.fillMaxWidth(), singleLine = true,
+                label = { Text("Địa chỉ máy tính (vd 192.168.1.10 hoặc 192.168.1.10:3900)") })
+            var pin by remember { mutableStateOf(vm.prefs.str("vs_pin")) }
+            OutlinedTextField(pin, { pin = it.trim(); vm.prefs.set("vs_pin", pin) }, Modifier.fillMaxWidth(), singleLine = true,
+                label = { Text("Mã PIN Network share (nếu có)") })
+            var key by remember { mutableStateOf(vm.prefs.str("vs_key")) }
+            OutlinedTextField(key, { key = it.trim(); vm.prefs.set("vs_key", key) }, Modifier.fillMaxWidth(), singleLine = true,
+                label = { Text("API key (nếu máy chủ đặt OMNIVOICE_API_KEY)") }, visualTransformation = PasswordVisualTransformation())
+            var model by remember { mutableStateOf(vm.prefs.str("vs_model", "omnivoice")) }
+            OutlinedTextField(model, { model = it.trim(); vm.prefs.set("vs_model", model) }, Modifier.fillMaxWidth(), singleLine = true,
+                label = { Text("Model (mặc định omnivoice)") })
+            val scope = rememberCoroutineScope()
+            var msg by remember { mutableStateOf("") }
+            OutlinedButton(onClick = {
+                scope.launch {
+                    msg = "Đang kết nối..."
+                    msg = try {
+                        val vs = VoiceStudio.voices(vm.prefs)
+                        "✅ Kết nối được - ${vs.size} giọng: " + vs.take(6).joinToString(", ") { it.second }
+                    } catch (e: Exception) {
+                        "❌ ${e.message}"
+                    }
+                }
+            }) { Text("🔌 Kiểm tra kết nối") }
+            if (msg.isNotEmpty()) Hint(msg)
         }
         Section("Âm thanh") {
             var bg by remember { mutableStateOf(vm.prefs.num("bg_vol", 0.12f)) }

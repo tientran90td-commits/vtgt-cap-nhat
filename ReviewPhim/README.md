@@ -10,6 +10,7 @@ App điện thoại làm **video review / tóm tắt phim** và **dịch phim n�
 | Giọng đọc | Giọng tiếng Việt có sẵn trong máy (Google / Samsung TTS), miễn phí, đọc được offline |
 | Dựng | Media3 Transformer (chip mã hóa phần cứng): cắt nối cảnh, che phụ đề gốc, khung dọc 9:16, phụ đề Việt + tiêu đề. Tiếng trộn bằng ffmpeg (tiếng phim nền nhỏ, tự nhỏ thêm khi có giọng đọc) |
 | Review | Mỗi đoạn lời kể ghép vài cảnh ngắn bắt đầu đúng điểm cắt cảnh (bỏ cảnh đen), phụ đề karaoke, tiêu đề hook, nhạc nền tự nhỏ khi có giọng đọc; kịch bản hook + 3 hồi (học cơ chế từ movie-narrator, opensource-clipping, MovieShort-AI) |
+| Giọng VoiceStudio | Tùy chọn: gọi [VoiceStudio](https://github.com/debpalash/VoiceStudio) (AGPL) chạy trên máy tính cùng wifi qua API `/v1/audio/speech` - giọng AI / giọng nhân bản; app không chứa code VoiceStudio, mất kết nối thì tự dùng giọng của máy |
 | Kết quả | Lưu vào Thư viện ảnh → Movies/ReviewPhim, có nút Xem / Chia sẻ. Tab *Kịch bản* để sửa chữ rồi xuất lại |
 
 Cài đặt: tải `ReviewPhim.apk` ở mục Releases (tag `reviewphim`) của repo. App có nút **Cập nhật** tự lấy bản mới.
