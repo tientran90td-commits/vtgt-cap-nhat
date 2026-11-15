@@ -30,6 +30,17 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ReviewPhim/native/seag2p-jni
+      - name: Dựng thư viện âm vị tiếng Việt (sea-g2p, Rust) cho Android
+        working-directory: ReviewPhim/native/seag2p-jni
+        run: |
+          rustup target add aarch64-linux-android x86_64-linux-android
+          cargo install cargo-ndk --locked
+          export ANDROID_NDK_HOME="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          cargo ndk -t arm64-v8a -t x86_64 -P 29 -o ../../app/src/main/jniLibs build --release
+          find ../../app/src/main/jniLibs -name "*.so" -exec ls -la {} \;
       - name: Unit test + build APK
         run: gradle --no-daemon --stacktrace testDebugUnitTest assembleRelease -PvCode=${{ github.run_number }}
       - uses: actions/upload-artifact@v4
@@ -43,7 +54,7 @@ jobs:
 
   device-test:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 75
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -53,6 +64,25 @@ jobs:
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.11.1'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ReviewPhim/native/seag2p-jni
+      - name: Dựng thư viện âm vị tiếng Việt (sea-g2p, Rust) cho Android
+        working-directory: ReviewPhim/native/seag2p-jni
+        run: |
+          rustup target add aarch64-linux-android x86_64-linux-android
+          cargo install cargo-ndk --locked
+          export ANDROID_NDK_HOME="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          cargo ndk -t arm64-v8a -t x86_64 -P 29 -o ../../app/src/main/jniLibs build --release
+          find ../../app/src/main/jniLibs -name "*.so" -exec ls -la {} \;
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Dữ liệu chuẩn VieNeu (bản Python) để so trên máy ảo
+        run: |
+          pip install -q "vieneu==3.8.4" "sea-g2p==0.10.0"
+          python ReviewPhim/scripts/vieneu_ref.py ReviewPhim/app/src/androidTest/assets "$RUNNER_TEMP/vieneu"
+          ls -la ReviewPhim/app/src/androidTest/assets
       - name: Enable KVM
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -88,6 +118,10 @@ jobs:
           find out -name "*.apk"
           cp "$(find out -name 'app-arm64-v8a-release.apk' | head -1)" ReviewPhim.apk
           ls -la ReviewPhim.apk
+          # từ điển âm vị tiếng Việt cho giọng VieNeu (app tải về khi bật giọng AI)
+          pip download -q "sea-g2p==0.10.0" --no-deps --only-binary :all: -d whl
+          unzip -o -j "$(ls whl/*.whl | head -1)" 'sea_g2p/sea_g2p.bin' -d .
+          ls -la sea_g2p.bin
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: reviewphim
@@ -97,4 +131,7 @@ jobs:
             versionCode=${{ github.run_number }}
             App Android ReviewPhim AI - review / tóm tắt phim, dịch thuyết minh + Vietsub.
             Tải ReviewPhim.apk về điện thoại rồi mở để cài (cho phép cài từ nguồn này nếu Android hỏi).
-          files: ReviewPhim.apk
+            sea_g2p.bin: từ điển âm vị cho giọng VieNeu (app tự tải, không cần tải tay).
+          files: |
+            ReviewPhim.apk
+            sea_g2p.bin

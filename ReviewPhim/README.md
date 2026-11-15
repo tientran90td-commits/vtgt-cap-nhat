@@ -10,6 +10,7 @@ App điện thoại làm **video review / tóm tắt phim** và **dịch phim n�
 | Giọng đọc | Giọng tiếng Việt có sẵn trong máy (Google / Samsung TTS), miễn phí, đọc được offline |
 | Dựng | Media3 Transformer (chip mã hóa phần cứng): cắt nối cảnh, che phụ đề gốc, khung dọc 9:16, phụ đề Việt + tiêu đề. Tiếng trộn bằng ffmpeg (tiếng phim nền nhỏ, tự nhỏ thêm khi có giọng đọc) |
 | Review | Mỗi đoạn lời kể ghép vài cảnh ngắn bắt đầu đúng điểm cắt cảnh (bỏ cảnh đen), phụ đề karaoke, tiêu đề hook, nhạc nền tự nhỏ khi có giọng đọc; kịch bản hook + 3 hồi (học cơ chế từ movie-narrator, opensource-clipping, MovieShort-AI) |
+| Giọng VieNeu + nhân bản giọng | Giọng AI tiếng Việt [VieNeu-TTS v3 Nano](https://github.com/pnnbao97/VieNeu-TTS) chạy ngay trên điện thoại (onnxruntime, offline sau khi tải ~450 MB một lần). Ghi âm 8-15 giây hoặc chọn file để nhân bản giọng (chỉ giọng của bạn / người đã đồng ý). Âm vị tiếng Việt bằng [sea-g2p](https://github.com/pnnbao97/sea-g2p) (Rust, qua JNI) |
 | Giọng VoiceStudio | Tùy chọn: gọi [VoiceStudio](https://github.com/debpalash/VoiceStudio) (AGPL) chạy trên máy tính cùng wifi qua API `/v1/audio/speech` - giọng AI / giọng nhân bản; app không chứa code VoiceStudio, mất kết nối thì tự dùng giọng của máy |
 | Kết quả | Lưu vào Thư viện ảnh → Movies/ReviewPhim, có nút Xem / Chia sẻ. Tab *Kịch bản* để sửa chữ rồi xuất lại |
 
@@ -17,4 +18,4 @@ Cài đặt: tải `ReviewPhim.apk` ở mục Releases (tag `reviewphim`) của 
 
 APK được GitHub Actions dựng (`.github/workflows/reviewphim-android.yml`): test trên JVM + test trên máy ảo Android (ffmpeg, dựng hình có phụ đề, trộn tiếng), rồi mới đăng Release.
 
-Mã nguồn mở dùng: [youtubedl-android](https://github.com/yausername/youtubedl-android) (GPL-3.0, gồm yt-dlp + ffmpeg), AndroidX Media3, ML Kit Text Recognition, OkHttp.
+Mã nguồn mở dùng: [youtubedl-android](https://github.com/yausername/youtubedl-android) (GPL-3.0, gồm yt-dlp + ffmpeg), AndroidX Media3, ML Kit Text Recognition, OkHttp, ONNX Runtime (MIT), VieNeu-TTS và sea-g2p (Apache-2.0, giấy phép trong assets của app).

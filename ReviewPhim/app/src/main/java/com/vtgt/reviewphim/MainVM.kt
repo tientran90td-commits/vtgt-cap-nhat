@@ -45,6 +45,9 @@ class MainVM(app: Application) : AndroidViewModel(app) {
     private val ctx get() = getApplication<Application>()
     val prefs = Prefs(app)
     val tts = Tts(app)
+    val vieneu = VieNeuTts(app)
+    var vnVoices by mutableStateOf<List<String>>(emptyList())     // giọng VieNeu: giọng bạn nhân bản + giọng có sẵn
+    var vnReady by mutableStateOf(false)
     val updater = Updater(app)
 
     // ---- video & dữ liệu
@@ -560,6 +563,17 @@ class MainVM(app: Application) : AndroidViewModel(app) {
 
     /** Giọng đọc: VoiceStudio trên máy tính (nếu chọn và kết nối được), không thì giọng có sẵn của máy. */
     private suspend fun speak(text: String, out: File, r: Float): File {
+        if (prefs.str("tts_src") == "vieneu" && !vnDown) {
+            try {
+                return vieneu.synth(text, prefs.str("vn_voice", "Minh Quân"), out, r / 1.1f * 1.05f,
+                    if (prefs.bool("vn_fast", false)) 8 else 16)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                vnDown = true
+                log("⚠ VieNeu lỗi (${e.message?.take(120)}) → dùng giọng có sẵn của máy cho phần còn lại.")
+            }
+        }
         if (VoiceStudio.enabled(prefs) && !vsDown) {
             try {
                 return VoiceStudio.synth(prefs, text, out, r)
@@ -571,6 +585,62 @@ class MainVM(app: Application) : AndroidViewModel(app) {
             }
         }
         return tts.synth(text, out, voice, r, prefs.str("tts_engine"))
+    }
+
+    @Volatile
+    private var vnDown = false
+
+    fun refreshVieNeu() {
+        vnVoices = try {
+            VieNeu.allVoices(ctx).keys.toList()
+        } catch (e: Exception) {
+            emptyList()
+        }
+        vnReady = VieNeu.ready(ctx)
+    }
+
+    /** Tải mô hình VieNeu (một lần). */
+    fun downloadVieNeu() = launchTask("Tải giọng AI VieNeu", keepAlive = true) {
+        vieneu.ensure(clone = true, log = ::log) { p, s -> prog(p, s) }
+        withContext(Dispatchers.Main) { refreshVieNeu() }
+    }
+
+    /** Nhân bản giọng từ file (ghi âm / nhạc / video có giọng nói), lưu thành giọng mới. */
+    fun cloneVoice(name: String, uri: Uri? = null, file: File? = null) = launchTask("Nhân bản giọng", keepAlive = true) {
+        val nm = name.trim().ifBlank { "Giọng của tôi" }
+        vieneu.ensure(clone = true, log = ::log) { p, s -> prog(p * 0.8f, s) }
+        val src = file ?: File(ctx.cacheDir, "clone_src").also { f ->
+            withContext(Dispatchers.IO) {
+                ctx.contentResolver.openInputStream(uri!!)?.use { i -> f.outputStream().use { o -> i.copyTo(o) } }
+                    ?: throw IllegalStateException("Không đọc được file giọng mẫu.")
+            }
+        }
+        prog(0.85f, "Nhân bản giọng...")
+        val v = vieneu.clone(nm, src, ::log)
+        prefs.set("vn_voice", v.name)
+        withContext(Dispatchers.Main) { refreshVieNeu() }
+        log("✅ Đã nhân bản giọng \"${v.name}\" - chọn ở mục Giọng đọc. Bấm 🔊 Nghe thử để nghe.")
+    }
+
+    fun deleteVoice(name: String) {
+        VieNeu.deleteVoice(ctx, name)
+        if (prefs.str("vn_voice") == name) prefs.set("vn_voice", "")
+        refreshVieNeu()
+    }
+
+    /** Trước khi đọc cả video bằng VieNeu: có mô hình chưa (chưa thì tải), không được thì dùng giọng của máy. */
+    private suspend fun checkVieNeu() {
+        vnDown = false
+        if (prefs.str("tts_src") != "vieneu") return
+        try {
+            vieneu.ensure(clone = false, log = ::log) { p, s -> prog(progress, "$s (${(p * 100).toInt()}%)") }
+            log("🦜 Giọng VieNeu trên máy: ${prefs.str("vn_voice").ifBlank { "Minh Quân" }}${if (prefs.bool("vn_fast", false)) " (đọc nhanh)" else ""}")
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            vnDown = true
+            log("⚠ Không chuẩn bị được giọng VieNeu (${e.message?.take(120)}) → dùng giọng có sẵn của máy.")
+        }
     }
 
     /** Kiểm tra VoiceStudio trước khi đọc cả video (để không lẫn 2 giọng). */
@@ -590,6 +660,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
 
     private suspend fun renderRecap(v: File, i: VInfo) {
         checkVoiceStudio()
+        checkVieNeu()
         val dir = File(ctx.cacheDir, "tts").apply { deleteRecursively(); mkdirs() }
         val narr = File(work, "narration.wav")
         val clips = mutableListOf<Pair<Double, Double>>()
@@ -646,6 +717,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         var dubFile: File? = null
         if (dub) {
             checkVoiceStudio()
+        checkVieNeu()
             val dir = File(ctx.cacheDir, "tts").apply { deleteRecursively(); mkdirs() }
             dubFile = File(work, "dub.wav")
             val ls = lines
@@ -730,6 +802,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
     // ================================================================ nghe thử
     fun previewVoice() = launchTask("Nghe thử giọng") {
         checkVoiceStudio()
+        checkVieNeu()
         val f = speak("Xin chào, đây là giọng đọc review phim của bạn. Chúc bạn có video thật nhiều lượt xem!",
             File(ctx.cacheDir, "preview.wav"), rate)
         withContext(Dispatchers.Main) {
@@ -744,6 +817,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
 
     override fun onCleared() {
         tts.shutdown()
+        vieneu.close()
         super.onCleared()
     }
 }

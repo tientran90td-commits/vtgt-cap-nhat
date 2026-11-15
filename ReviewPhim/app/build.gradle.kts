@@ -54,6 +54,9 @@ android {
         jniLibs {
             useLegacyPackaging = true   // yt-dlp / ffmpeg chạy dưới dạng file thực thi -> phải giải nén thư viện
         }
+        jniLibs {
+            pickFirsts += setOf("**/libc++_shared.so")
+        }
         resources {
             excludes += setOf("META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*")
         }
@@ -95,6 +98,7 @@ dependencies {
     implementation("androidx.media3:media3-common:$media3")
     implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
+    implementation("com.microsoft.onnxruntime:onnxruntime-android:1.20.0")   // VieNeu-TTS chạy trên máy
     implementation("io.github.junkfood02.youtubedl-android:library:$ydl")
     implementation("io.github.junkfood02.youtubedl-android:ffmpeg:$ydl")
 

@@ -296,8 +296,11 @@ private fun VoicePicker(vm: MainVM) {
     }
     var src by remember { mutableStateOf(vm.prefs.str("tts_src", "device")) }
     Choice("Nguồn giọng đọc", src, listOf("device" to "📱 Giọng có sẵn trong máy (offline)",
+        "vieneu" to "🦜 VieNeu AI ngay trên máy + nhân bản giọng (offline)",
         "voicestudio" to "🎙 VoiceStudio trên máy tính (giọng AI / giọng nhân bản)")) { src = it; vm.prefs.set("tts_src", it) }
-    if (src == "voicestudio") {
+    if (src == "vieneu") {
+        VieNeuPanel(vm)
+    } else if (src == "voicestudio") {
         var vsVoices by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
         var vsErr by remember { mutableStateOf("") }
         var vsVoice by remember { mutableStateOf(vm.prefs.str("vs_voice")) }
@@ -316,10 +319,94 @@ private fun VoicePicker(vm: MainVM) {
             vm.voice = it; vm.save("voice", it)
         }
     }
-    if (err.isNotEmpty() && src != "voicestudio") Text(err, color = Color(0xFFFF8A80), fontSize = 13.sp)
+    if (err.isNotEmpty() && src == "device") Text(err, color = Color(0xFFFF8A80), fontSize = 13.sp)
     Hint("Tốc độ đọc: ${"%.2f".format(vm.rate)}x")
     Slider(vm.rate, { vm.rate = it; vm.prefs.setNum("rate", it) }, valueRange = 0.8f..1.6f)
     OutlinedButton(onClick = vm::previewVoice, enabled = !vm.busy) { Text("🔊 Nghe thử") }
+}
+
+@Composable
+private fun VieNeuPanel(vm: MainVM) {
+    val ctx = LocalContext.current
+    LaunchedEffect(Unit) { vm.refreshVieNeu() }
+    var voice by remember { mutableStateOf(vm.prefs.str("vn_voice", "Minh Quân")) }
+    if (!vm.vnReady) {
+        Hint("Giọng AI tiếng Việt VieNeu-TTS chạy ngay trên điện thoại, không cần mạng sau khi tải (~450 MB, một lần).")
+        Button(onClick = vm::downloadVieNeu, enabled = !vm.busy) { Text("⬇ Tải giọng AI VieNeu") }
+    }
+    if (vm.vnVoices.isNotEmpty()) {
+        Choice("Giọng VieNeu", voice, vm.vnVoices.map { it to it }) { voice = it; vm.prefs.set("vn_voice", it) }
+    }
+    var fast by remember { mutableStateOf(vm.prefs.bool("vn_fast", false)) }
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Checkbox(fast, { fast = it; vm.prefs.setBool("vn_fast", it) })
+        Text("Đọc nhanh hơn (8 bước, hơi kém tự nhiên)", fontSize = 14.sp)
+    }
+    // ---- nhân bản giọng
+    var name by remember { mutableStateOf("") }
+    var recording by remember { mutableStateOf(false) }
+    var secs by remember { mutableIntStateOf(0) }
+    val rec = remember { mutableStateOf<android.media.MediaRecorder?>(null) }
+    val recFile = remember { java.io.File(ctx.cacheDir, "giong_mau.m4a") }
+    val pickAudio = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) {
+        it?.let { u -> vm.cloneVoice(name, uri = u) }
+    }
+    val askMic = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    LaunchedEffect(recording) {
+        secs = 0
+        while (recording) {
+            kotlinx.coroutines.delay(1000)
+            secs++
+            if (secs >= 20) recording = false.also { rec.value?.let { r -> runCatching { r.stop() }; r.release() }; rec.value = null }
+        }
+    }
+    Text("🎙 Nhân bản giọng", fontWeight = FontWeight.SemiBold)
+    Hint("Ghi âm 8-15 giây bạn đọc một đoạn bất kỳ (chỗ yên tĩnh, nói rõ), hoặc chọn file có giọng người đó. " +
+        "Chỉ nhân bản giọng của bạn hoặc người đã đồng ý.")
+    OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), singleLine = true, label = { Text("Tên giọng mới") })
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!recording) {
+            Button(onClick = {
+                if (androidx.core.content.ContextCompat.checkSelfPermission(ctx, android.Manifest.permission.RECORD_AUDIO) !=
+                    android.content.pm.PackageManager.PERMISSION_GRANTED) {
+                    askMic.launch(android.Manifest.permission.RECORD_AUDIO)
+                    return@Button
+                }
+                val r = (if (android.os.Build.VERSION.SDK_INT >= 31) android.media.MediaRecorder(ctx)
+                else @Suppress("DEPRECATION") android.media.MediaRecorder()).apply {
+                    setAudioSource(android.media.MediaRecorder.AudioSource.MIC)
+                    setOutputFormat(android.media.MediaRecorder.OutputFormat.MPEG_4)
+                    setAudioEncoder(android.media.MediaRecorder.AudioEncoder.AAC)
+                    setAudioSamplingRate(44100)
+                    setAudioEncodingBitRate(128000)
+                    setOutputFile(recFile.path)
+                    prepare()
+                    start()
+                }
+                rec.value = r
+                recording = true
+            }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("⏺ Ghi âm") }
+        } else {
+            Button(onClick = {
+                rec.value?.let { r -> runCatching { r.stop() }; r.release() }
+                rec.value = null
+                recording = false
+                vm.cloneVoice(name, file = recFile)
+            }, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB3261E)), modifier = Modifier.weight(1f)) {
+                Text("⏹ Dừng & nhân bản (${secs}s)")
+            }
+        }
+        OutlinedButton(onClick = { pickAudio.launch("audio/*") }, enabled = !vm.busy && !recording, modifier = Modifier.weight(1f)) {
+            Text("📂 Chọn file")
+        }
+    }
+    val mine = vm.vnVoices.filter { it in VieNeu.userVoices(ctx) }
+    mine.forEach { n ->
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text("🎙 $n", modifier = Modifier.weight(1f), fontSize = 14.sp)
+            TextButton(onClick = { vm.deleteVoice(n) }) { Text("Xóa") }
+        }
+    }
 }
 
 // ==================================================================== thanh dưới: nút làm + tiến độ + log
