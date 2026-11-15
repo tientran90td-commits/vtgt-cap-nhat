@@ -99,7 +99,10 @@ jobs:
           disable-animations: true
           emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
           working-directory: ReviewPhim
-          script: gradle --no-daemon --stacktrace connectedDebugAndroidTest -PvCode=${{ github.run_number }}
+          script: |
+            adb logcat -c || true
+            gradle --no-daemon --stacktrace connectedDebugAndroidTest -PvCode=${{ github.run_number }} || (adb logcat -d -s VieNeuTest:I TestRunner:* AndroidRuntime:E | tail -200; exit 1)
+            adb logcat -d -s VieNeuTest:I TestRunner:* | tail -100
       - uses: actions/upload-artifact@v4
         if: always()
         with:
