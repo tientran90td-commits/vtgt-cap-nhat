@@ -168,7 +168,17 @@ Dialogue: 0,0:00:10.00,0:00:12.00,Default,,0,0,0,,前方, 正是友哈巴赫
         // khoảng câu thoại ngắn hơn lời kể: nới ra nhưng không vượt đoạn trước / sau
         val q = Shots.planIn(sh, 50.0, 52.0, 8.0, 48.0, 60.0)
         assertEquals(8.0, q.sumOf { it.second }, 1e-6)
-        assertTrue("$q", q.all { (a, d) -> a >= 48.0 - 1e-6 && a + d <= 60.0 + 1e-6 })
+        assertTrue("chỉ nới tối đa 2 giây mỗi bên: $q", q.all { (a, d) -> a >= 48.0 - 1e-6 && a + d <= 54.0 + 1e-6 })
+        // đoạn thoại chỉ có 1 cảnh sáng: dùng lại cảnh đó (lượt sau lấy phần khác), không lan sang cảnh tối / xa
+        val sh2 = listOf(Shots.Shot(96.0, 99.0, 10.0), Shots.Shot(99.0, 103.0, 100.0), Shots.Shot(103.0, 110.0, 10.0))
+        val c = Shots.planIn(sh2, 100.0, 102.0, 6.0, 95.0, 110.0)
+        assertEquals(listOf(99.0 to 3.6, 100.0 to 2.4), c.map { (a, d) -> a to Math.round(d * 10) / 10.0 })
+        // AI gợi ý dùng lại cảnh ở chỗ khác
+        val r = Shots.planIn(sh2, 100.0, 102.0, 6.0, 95.0, 110.0, listOf(Shots.Shot(10.0, 14.0, 100.0)))
+        assertEquals(listOf(99.0 to 3.0, 10.0 to 3.0), r)
+        val (_, rs) = Prompts.parseRecap("{\"segments\":[{\"from\":2,\"to\":2,\"text\":\"a\",\"reuse\":[1,99]}]}", 100.0,
+            listOf(Line(10.0, 12.0, "x"), Line(20.0, 22.0, "y")))
+        assertEquals(listOf(9.5 to 12.5), rs[0].reuse)                       // câu không tồn tại bị bỏ
     }
 
     @Test

@@ -616,7 +616,11 @@ class MainVM(app: Application) : AndroidViewModel(app) {
                     val from = max(wl, a0 - dur)
                     val to = min(wh, b0 + dur)
                     val sh = Shots.shots(Shots.analyze(ctx, v, from, to - from), to)
-                    Shots.planIn(sh, a0, b0, dur, wl, min(wh, i.duration))
+                    val extra = s.reuse.flatMap { (ra, rb) ->
+                        val e2 = min(i.duration, min(rb, ra + 15.0))
+                        if (e2 - ra < 1.0) emptyList() else Shots.shots(Shots.analyze(ctx, v, ra, e2 - ra), e2)
+                    }
+                    Shots.planIn(sh, a0, b0, dur, wl, min(wh, i.duration), extra)
                 } else listOf(min(a0, max(0.0, i.duration - dur)) to dur)
                 w.silenceTo(t + 0.15)
                 w.write(pcm)

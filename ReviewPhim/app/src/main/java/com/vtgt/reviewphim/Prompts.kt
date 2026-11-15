@@ -62,7 +62,7 @@ Yêu cầu kịch bản:
 - Văn phong: ${STYLES[style] ?: STYLES.values.first()}. Ngôi thứ ba, câu ngắn, dễ đọc thành tiếng, không ký hiệu lạ, không emoji, không chú thích.
 - Đoạn 1 là "hook": 1–2 câu gây tò mò, lấy từ khoảnh khắc kịch tính nhất (cảnh của đoạn này có thể ở giữa / cuối phim).
 - Từ đoạn 2 kể theo đúng trình tự thời gian, chia 3 hồi: mở đầu (~25%), diễn biến & xung đột (~50%), cao trào & kết (~25%).
-- Tránh cảnh mở đầu / danh đề / credit cuối phim; mỗi đoạn một cảnh khác nhau, không lặp lại.
+- Tránh cảnh mở đầu / danh đề / credit cuối phim. Được DÙNG LẠI cảnh khi hợp nội dung: đoạn kể nhắc lại nhân vật / sự việc / trận đấu ở chỗ khác thì thêm "reuse": [số câu có cảnh đó] để chiếu lại cảnh ấy.
 - Tổng lời kể khoảng $chars ký tự (đọc khoảng ${targetSec / 60} phút ${targetSec % 60} giây), chia thành khoảng $n đoạn, mỗi đoạn 1–3 câu (80–250 ký tự).
 - CHỈ kể những gì có trong lời thoại bên dưới. KHÔNG bịa thêm tình tiết, nhân vật, kết cục lấy từ hiểu biết bên ngoài; chỗ nào lời thoại không rõ thì kể chung chung, không đoán.
 - Mỗi đoạn ghi rõ nó kể lại các câu thoại số mấy: "from" và "to" là số thứ tự câu (#) ở danh sách bên dưới, đúng chỗ sự việc đó xảy ra (thường 3–15 câu). Video sẽ chiếu đúng cảnh của các câu đó, nên đoạn kể phải khớp nội dung các câu này.
@@ -70,7 +70,7 @@ Yêu cầu kịch bản:
 ${glossary(prefs)}
 
 Chỉ trả lời JSON, không giải thích:
-{"title": "tiêu đề video review hấp dẫn, tối đa 70 ký tự", "segments": [{"from": 12, "to": 18, "text": "lời kể..."}], "names": {"tên gốc trong lời thoại": "tên tiếng Việt đã dùng"}}
+{"title": "tiêu đề video review hấp dẫn, tối đa 70 ký tự", "segments": [{"from": 12, "to": 18, "text": "lời kể...", "reuse": [3]}], "names": {"tên gốc trong lời thoại": "tên tiếng Việt đã dùng"}}
 
 LỜI THOẠI (số câu, mốc thời gian, lời gốc):
 ${transcriptIds(lines)}
@@ -156,7 +156,11 @@ Trả lời CHỈ bằng phụ đề định dạng SRT chuẩn, mốc thời gi
             if (from >= 1 && lines.isNotEmpty()) {  // neo theo số câu thoại: lấy đúng thời gian của các câu đó
                 val a = (from - 1).coerceIn(0, lines.size - 1)
                 val b = (o.optInt("to", from) - 1).coerceIn(a, lines.size - 1)
-                return@mapNotNull Seg(lines[a].start, t, lines[b].end)
+                val ra = o.optJSONArray("reuse")
+                val reuse = (0 until (ra?.length() ?: 0)).mapNotNull { k ->
+                    lines.getOrNull(ra!!.optInt(k, 0) - 1)?.let { l -> maxOf(0.0, l.start - 0.5) to l.end + 0.5 }
+                }.take(4)
+                return@mapNotNull Seg(lines[a].start, t, lines[b].end, reuse)
             }
             val lo = duration * 0.02
             val hi = maxOf(lo, duration * 0.95 - 1.0)

@@ -101,33 +101,62 @@ object Shots {
      * Cảnh cho 1 đoạn kể neo theo câu thoại [a, b]: chọn vài cảnh rải đều trong khoảng đó (không trôi sang nội dung
      * khác). Khoảng ngắn hơn lời kể thì nới dần ra hai bên nhưng không quá [lo, hi] (khoảng của đoạn trước / sau).
      */
-    fun planIn(sh: List<Shot>, a: Double, b: Double, need: Double, lo: Double, hi: Double): List<Pair<Double, Double>> {
+    fun planIn(sh: List<Shot>, a: Double, b: Double, need: Double, lo: Double, hi: Double,
+               extra: List<Shot> = emptyList()): List<Pair<Double, Double>> {
         var s = a
         var e = b
-        while (e - s < need && (s > lo + 0.01 || e < hi - 0.01)) {  // nới đều hai bên
+        var k = 0
+        while (e - s < need && k < 2 && (s > lo + 0.01 || e < hi - 0.01)) {  // nới tối đa 2 giây mỗi bên
             s = max(lo, s - 1.0)
             e = min(hi, e + 1.0)
+            k++
         }
-        val good = sh.filter { it.b > s && it.a < e && it.y >= DARK_Y }
-            .map { Shot(max(it.a, s), min(it.b, e), it.y) }.filter { it.b - it.a >= MIN_SHOT }
-        if (good.isEmpty() || e - s < need) {  // không đủ cảnh: lấy liền mạch từ giữa khoảng
+        fun good(list: List<Shot>, s0: Double, e0: Double) = list.filter { it.b > s0 && it.a < e0 && it.y >= DARK_Y }
+            .map { max(it.a, s0) to min(it.b, e0) }.filter { it.second - it.first >= MIN_SHOT }
+        val pool = good(sh, s, e).toMutableList()
+        if (pool.sumOf { it.second - it.first } < need) {  // thêm cảnh AI gợi ý dùng lại (nhắc lại nhân vật / sự việc)
+            for (x in good(extra, -1e9, 1e9)) if (x !in pool) pool.add(x)
+        }
+        if (pool.isEmpty()) {  // không dò được cảnh: lấy liền mạch quanh khoảng câu thoại
             val st = max(lo, min((s + e - need) / 2, hi - need)).coerceAtLeast(0.0)
             return listOf(st to need)
         }
-        val k = max(1, kotlin.math.ceil(need / MAX_SHOT).toInt())
-        val pick = if (good.size <= k) good else (0 until k).map { good[(it * good.size) / k] }
-        val each = need / pick.size
         val out = mutableListOf<Pair<Double, Double>>()
-        var debt = 0.0
-        for (p in pick) {  // mỗi cảnh lấy phần đầu; cảnh ngắn thì phần thiếu dồn cho cảnh sau
-            val want = each + debt
-            val take = min(p.b - p.a, want)
-            out.add(p.a to take)
-            debt = want - take
+        if (pool.sumOf { it.second - it.first } >= need) {  // đủ hình: rải đều
+            val n = max(1, kotlin.math.ceil(need / MAX_SHOT).toInt())
+            val pick = if (pool.size <= n) pool else (0 until n).map { pool[(it * pool.size) / n] }
+            val each = need / pick.size
+            var debt = 0.0
+            for ((x, y) in pick) {
+                val want = each + debt
+                val take = min(y - x, want)
+                out.add(x to take)
+                debt = want - take
+            }
+            var i = 0
+            while (debt > 0.05 && i < pool.size * 3) {  // cảnh chọn quá ngắn: bù bằng cảnh khác trong khoảng
+                val (x, y) = pool[i % pool.size]
+                val take = minOf(y - x, debt, MAX_SHOT)
+                out.add(x to take)
+                debt -= take
+                i++
+            }
+            return out
         }
-        if (debt > 0.05) {  // vẫn thiếu: kéo dài mẩu cuối (lấy tiếp liền mạch)
-            val (la, ld) = out.last()
-            out[out.size - 1] = min(la, max(0.0, hi - ld - debt)) to ld + debt
+        // không đủ hình mới: DÙNG LẠI các cảnh hợp nội dung (lượt sau lấy phần khác của cảnh)
+        var got = 0.0
+        var rnd = 0
+        while (got < need - 0.05 && rnd < 20) {
+            for ((x, y) in pool) {
+                if (got >= need - 0.05) break
+                val len = y - x
+                val off = if (rnd % 2 == 1 && len - min(len / 2, 1.0) >= MIN_SHOT) min(len / 2, 1.0) else 0.0
+                val take = minOf(len - off, MAX_SHOT, need - got)
+                if (take < 0.3) continue
+                out.add(x + off to take)
+                got += take
+            }
+            rnd++
         }
         return out
     }

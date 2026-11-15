@@ -8,7 +8,9 @@ import kotlin.math.min
 data class Line(val start: Double, val end: Double, val text: String, var vi: String = "")
 
 /** Một đoạn lời kể review: cảnh minh họa bắt đầu ở `start` (giây) trong video gốc. */
-data class Seg(var start: Double, var text: String, var end: Double = -1.0)
+data class Seg(var start: Double, var text: String, var end: Double = -1.0,
+               /** Cảnh ở chỗ khác hợp với đoạn kể (AI gợi ý "reuse") - được chiếu lại. */
+               var reuse: List<Pair<Double, Double>> = emptyList())
 
 /** Một dòng phụ đề hiện trên video thành phẩm. */
 data class Cue(val start: Double, val end: Double, val text: String)
