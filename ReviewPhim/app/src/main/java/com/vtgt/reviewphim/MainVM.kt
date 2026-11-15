@@ -37,7 +37,8 @@ import kotlin.math.min
  * target: "deepseek" | "gemini"; file: file cần gửi kèm (âm thanh cho Gemini nghe).
  */
 data class ManualAsk(val step: String, val target: String, val prompt: String, val note: String = "",
-                     val file: Uri? = null, val fileName: String = "", val canApi: Boolean = false)
+                     val files: List<Uri> = emptyList(), val fileName: String = "", val canApi: Boolean = false,
+                     val mime: String = "audio/mpeg")
 
 const val RETRY_API = "\u0000api"
 
@@ -58,6 +59,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
     var lines by mutableStateOf<List<Line>>(emptyList())        // lời gốc (+ bản dịch khi ở chế độ dịch)
     var recapTitle by mutableStateOf("")
     var segs by mutableStateOf<List<Seg>>(emptyList())          // kịch bản review
+    var scenes by mutableStateOf<List<Line>>(emptyList())       // AI xem hình: mô tả diễn biến hình ảnh theo mốc thời gian
 
     // ---- lựa chọn (nhớ lại lần sau)
     var mode by mutableStateOf(prefs.str("mode", "recap"))       // recap | translate
@@ -73,6 +75,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
     var voice by mutableStateOf(prefs.str("voice"))
     var rate by mutableFloatStateOf(prefs.num("rate", 1.1f))
     var multiShot by mutableStateOf(prefs.bool("multi_shot", true))
+    var watch by mutableStateOf(prefs.bool("watch", true))      // AI xem hình cả video (không chỉ nghe lời thoại)
     var karaoke by mutableStateOf(prefs.bool("karaoke", true))
     var hookTitle by mutableStateOf(prefs.bool("hook_title", true))
     var bgmName by mutableStateOf(prefs.str("bgm_name"))
@@ -159,6 +162,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
             preview = pv
             lines = emptyList()
             segs = emptyList()
+            scenes = emptyList()
             recapTitle = ""
             result = null
         }
@@ -211,6 +215,12 @@ class MainVM(app: Application) : AndroidViewModel(app) {
             else -> if (groq) "Lời gốc: Groq nghe tự động (lỗi thì chuyển sang 🖐 nhờ Gemini)" to false
             else "Lời gốc: 🖐 chưa có key Groq → đưa file âm thanh cho Gemini nghe, dán lại" to true
         }
+        if (mode == "recap" && watch && segs.isEmpty()) out += when {
+            scenes.isNotEmpty() -> "Xem hình: đã có ${scenes.size} cảnh" to false
+            Ai.manual(prefs) || Ai.visionChain(prefs).isEmpty() ->
+                "Xem hình: 🖐 gửi ảnh khung hình cho Gemini, dán lại (~${watchRounds(10)} lần)" to true
+            else -> "Xem hình: AI xem ~${Watch.estimateSheets(info?.duration ?: 0.0)} ảnh khung hình (lỗi thì 🖐 gửi cho Gemini)" to false
+        }
         val n = if (mode == "recap") 1 else maxOf(1, (lines.size + 119) / 120)
         val what = if (mode == "recap") "Viết kịch bản review" else "Dịch"
         out += when {
@@ -223,6 +233,8 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         return out
     }
 
+    private fun watchRounds(per: Int): Int = (Watch.estimateSheets(info?.duration ?: 0.0) + per - 1) / per
+
     private fun geminiParts(): Int = maxOf(1, ((info?.duration ?: 0.0) / GEMINI_PART + 0.999).toInt())
 
     fun resetScript() {
@@ -233,6 +245,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
 
     fun resetAll() {
         lines = emptyList()
+        scenes = emptyList()
         resetScript()
     }
 
@@ -242,6 +255,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         val i = info!!
         if (lines.isEmpty()) transcript(v, i)
         if (mode == "recap") {
+            if (segs.isEmpty() && watch && scenes.isEmpty()) watchVideo(v, i)
             if (segs.isEmpty()) writeRecap(i)
             renderRecap(v, i)
         } else {
@@ -318,11 +332,13 @@ class MainVM(app: Application) : AndroidViewModel(app) {
     private class SkipApi : Exception()
 
     /** Gọi API chạy riêng; trong lúc chờ hiện số giây + nút "Làm tay ngay" (bấm là bỏ chờ ngay, không treo). */
-    private suspend fun callApi(step: String, prompt: String): String {
+    private suspend fun callApi(step: String, prompt: String, images: List<File> = emptyList()): String {
         skipApi = false
         withContext(Dispatchers.Main) { apiWaiting = true }
         val call = viewModelScope.async(Dispatchers.IO) {
-            Ai.chat(prefs, "Bạn là trợ lý biên tập video tiếng Việt. Làm đúng yêu cầu, chỉ trả lời JSON.", prompt, ::log)
+            if (images.isEmpty()) Ai.chat(prefs, "Bạn là trợ lý biên tập video tiếng Việt. Làm đúng yêu cầu, chỉ trả lời JSON.", prompt, ::log)
+            else Ai.chat(prefs, "Bạn xem ảnh khung hình video và tả lại diễn biến bằng tiếng Việt, đúng định dạng được yêu cầu.",
+                prompt, ::log, json = false, images = images)
         }
         val t0 = System.currentTimeMillis()
         try {
@@ -380,6 +396,10 @@ class MainVM(app: Application) : AndroidViewModel(app) {
                 geminiTranscript(v, i)
             }
         }
+        if (l.isEmpty() && mode == "recap" && watch) {
+            log("Không có lời thoại → kể theo hình ảnh (AI xem cả video).")
+            return
+        }
         if (l.isEmpty()) throw IllegalStateException(
             if (stt == "ocr") "Không đọc được chữ nào: chỉnh lại vùng phụ đề cho đúng chỗ chữ." else "Không nghe được lời thoại nào.")
         withContext(Dispatchers.Main) { lines = l }
@@ -404,7 +424,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
             while (got.isEmpty()) {
                 val r = askManual(ManualAsk("Lời gốc ${if (n > 1) "phần ${k + 1}/$n" else ""}".trim(), "gemini",
                     Prompts.transcribe(title, k + 1, n, mins),
-                    "Gửi kèm file \"$name\" (đã lưu ở Download/ReviewPhim) cho Gemini.", uri, name))
+                    "Gửi kèm file \"$name\" (đã lưu ở Download/ReviewPhim) cho Gemini.", listOf(uri), name))
                 got = parseTimed(r, off)
                 if (got.isEmpty()) log("Không đọc được phụ đề trong câu trả lời - cần dạng SRT (00:00:01,000 --> ...). Dán lại.")
             }
@@ -414,10 +434,93 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         return Stt.cleanLines(out.sortedBy { it.start })
     }
 
-    private suspend fun saveToDownloads(f: File, name: String): Uri = withContext(Dispatchers.IO) {
+    // ================================================================ AI xem hình cả video
+    /**
+     * Chụp khung hình suốt video, ghép ảnh có mốc thời gian, nhờ AI nhìn ảnh tả diễn biến (cảnh hành động không thoại
+     * cũng có). Có key Gemini / OpenRouter / Groq / OpenAI thì tự gửi; không thì 🖐 gửi ảnh cho Gemini và dán lại.
+     */
+    private suspend fun watchVideo(v: File, i: VInfo) {
+        prog(0.3f, "AI xem hình: chụp khung hình...")
+        val dir = File(ctx.cacheDir, "watch").apply { deleteRecursively(); mkdirs() }
+        val sheets = Watch.sheets(v, i, dir) { prog(0.3f + it * 0.04f, "Chụp khung hình ${(it * 100).toInt()}%") }
+        if (sheets.isEmpty()) {
+            log("⚠ Không chụp được khung hình nào - chỉ dùng lời thoại.")
+            return
+        }
+        val st = Watch.step(i.duration)
+        log("👁 Chụp ${sheets.sumOf { it.times.size }} khung hình (mỗi ${"%.0f".num(st)} giây, bỏ cảnh đen / trùng) → ${sheets.size} ảnh ghép.")
+        val useApi = !Ai.manual(prefs) && Ai.visionChain(prefs).isNotEmpty()
+        val groups = sheets.chunked(if (useApi) 5 else 10)
+        val out = mutableListOf<Line>()
+        for ((k, g) in groups.withIndex()) {
+            val lo = g.first().times.first()
+            val hi = g.last().times.last()
+            val step = "Xem hình ${if (groups.size > 1) "phần ${k + 1}/${groups.size}" else ""}".trim()
+            val prompt = Prompts.watch(title, k + 1, groups.size, lo, hi, g.size,
+                lines.filter { it.end >= lo - 3 && it.start <= hi + 3 }, prefs)
+            var got = emptyList<Line>()
+            if (useApi && !apiDown) {
+                try {
+                    got = Watch.parse(callApi(step, prompt, g.map { it.file }), lo, hi, st)
+                    if (got.isEmpty()) log("⚠ AI không tả được cảnh nào ở phần ${k + 1} → 🖐 gửi ảnh cho Gemini.")
+                } catch (e: SkipApi) {
+                    apiDown = true
+                    log("🖐 Bạn chọn làm tay - bỏ qua API.")
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    apiDown = true
+                    log("⚠ AI xem hình lỗi (${e.message?.take(120)}) → 🖐 gửi ảnh cho Gemini.")
+                }
+            }
+            if (got.isEmpty()) got = watchManual(g, step, prompt, lo, hi, st)
+            out += got
+            prog(0.34f + 0.06f * (k + 1) / groups.size, "AI xem hình ${k + 1}/${groups.size}")
+            log("👁 Phần ${k + 1}/${groups.size} (${fmtTime(lo)}–${fmtTime(hi)}): ${got.size} cảnh.")
+        }
+        dir.deleteRecursively()
+        withContext(Dispatchers.Main) { scenes = out.sortedBy { it.start } }
+        log("👁 AI đã xem cả video: ${out.size} cảnh (kể cả cảnh không có lời thoại).")
+    }
+
+    /** 🖐 Lưu ảnh ghép vào Download/ReviewPhim, bạn gửi cho Gemini (app / web) cùng yêu cầu rồi dán câu trả lời lại. */
+    private suspend fun watchManual(g: List<Watch.Sheet>, step: String, prompt: String, lo: Double, hi: Double,
+                                    st: Double): List<Line> {
+        val base = title.take(40).replace(Regex("[\\\\/:*?\"<>|]"), " ").trim()
+        val uris = g.map { s -> saveToDownloads(s.file, "$base ${s.file.name}", "image/jpeg") }
+        try {
+            while (true) {
+                val r = askManual(ManualAsk(step, "gemini", prompt,
+                    "Gửi kèm ${g.size} ảnh khung hình (đã lưu ở Download/ReviewPhim) cho Gemini - nút 📤 bên dưới gửi cả ảnh lẫn yêu cầu.",
+                    uris, "${g.size} ảnh khung hình", canApi = Ai.visionChain(prefs).isNotEmpty(), mime = "image/jpeg"))
+                if (r == RETRY_API) {
+                    try {
+                        apiDown = false
+                        val got = Watch.parse(callApi(step, prompt, g.map { it.file }), lo, hi, st)
+                        if (got.isNotEmpty()) return got
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        apiDown = true
+                        log("⚠ Vẫn lỗi (${e.message?.take(100)}).")
+                    }
+                    continue
+                }
+                val got = Watch.parse(r, lo, hi, st)
+                if (got.isNotEmpty()) return got
+                log("Không đọc được dòng nào dạng \"mm:ss-mm:ss | mô tả\" - dán lại câu trả lời của Gemini.")
+            }
+        } finally {
+            withContext(kotlinx.coroutines.NonCancellable + Dispatchers.IO) {
+                uris.forEach { runCatching { ctx.contentResolver.delete(it, null, null) } }  // dọn ảnh tạm trong Download
+            }
+        }
+    }
+
+    private suspend fun saveToDownloads(f: File, name: String, mime: String = "audio/mpeg"): Uri = withContext(Dispatchers.IO) {
         val values = ContentValues().apply {
             put(MediaStore.Downloads.DISPLAY_NAME, name)
-            put(MediaStore.Downloads.MIME_TYPE, "audio/mpeg")
+            put(MediaStore.Downloads.MIME_TYPE, mime)
             put(MediaStore.Downloads.RELATIVE_PATH, Environment.DIRECTORY_DOWNLOADS + "/ReviewPhim")
             put(MediaStore.Downloads.IS_PENDING, 1)
         }
@@ -457,13 +560,15 @@ class MainVM(app: Application) : AndroidViewModel(app) {
     private suspend fun writeRecap(i: VInfo) {
         prog(0.32f, "AI viết kịch bản review...")
         log("AI viết kịch bản review ~${targetSec / 60} phút...")
-        val prompt = Prompts.recap(title, i.duration, lines, min(targetSec, (i.duration * 0.9).toInt().coerceAtLeast(30)),
+        val tl = Watch.timeline(lines, scenes)
+        if (tl.isEmpty()) throw IllegalStateException("Chưa có lời thoại hay mô tả hình nào để viết kịch bản.")
+        val prompt = Prompts.recap(title, i.duration, tl, min(targetSec, (i.duration * 0.9).toInt().coerceAtLeast(30)),
             style, prefs)
         var last: Exception? = null
         repeat(2) {
             try {
                 val reply = askAi("Viết kịch bản review", prompt)
-                val (t, s) = Prompts.parseRecap(reply, i.duration, lines)
+                val (t, s) = Prompts.parseRecap(reply, i.duration, tl)
                 rememberNames(reply)
                 withContext(Dispatchers.Main) {
                     recapTitle = t.ifBlank { title }

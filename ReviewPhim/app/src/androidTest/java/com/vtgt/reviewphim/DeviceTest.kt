@@ -145,6 +145,32 @@ class DeviceTest {
     }
 
     @Test
+    fun watchSheetsOnDevice() = runBlocking {
+        // 60 giây: đổi cảnh mỗi 6 giây, giây 12-24 màn hình đen (không được chụp)
+        val src = File(dir, "watch.mp4")
+        Ff.run(ctx, listOf("-f", "lavfi", "-i", "testsrc2=s=640x360:r=25:d=60",
+            "-vf", "hue=H=floor(t/6)*PI/3,drawbox=c=black:t=fill:enable='between(t,12,24)'",
+            "-c:v", "libx264", "-g", "50", "-pix_fmt", "yuv420p", src.absolutePath))
+        val i = Media.probe(src)
+        val out = File(dir, "watch").apply { deleteRecursively() }
+        val sheets = Watch.sheets(src, i, out) {}
+        val times = sheets.flatMap { it.times }
+        assertTrue("phải chụp được khung: $times", times.size >= 6)
+        assertTrue("không chụp cảnh đen: $times", times.none { it in 12.5..23.5 })
+        assertEquals(times.sorted(), times)
+        assertTrue(sheets.all { it.file.length() > 5000 && it.times.size <= Watch.GRID * Watch.GRID })
+        val bmp = android.graphics.BitmapFactory.decodeFile(sheets[0].file.path)
+        assertEquals(Watch.GRID * 256 + (Watch.GRID - 1) * 4, bmp.width)
+        // kịch bản có mô tả hình: yêu cầu gửi AI phải dặn kể cả cảnh không thoại
+        val tl = Watch.timeline(listOf(Line(1.0, 2.0, "hello")), listOf(Line(13.0, 20.0, "Hai người đánh nhau")))
+        val pr = Prompts.recap("Phim", 60.0, tl, 60, "hap_dan", Prefs(ctx))
+        assertTrue(pr.contains("#2 [00:13] [HÌNH] Hai người đánh nhau"))
+        assertTrue(pr.contains("KHÔNG bỏ qua các cảnh hành động"))
+        val w = Prompts.watch("Phim", 1, 1, 0.0, 60.0, sheets.size, listOf(Line(1.0, 2.0, "hello")), Prefs(ctx))
+        assertTrue(w.contains("mm:ss-mm:ss | mô tả") && w.contains("[00:01] hello"))
+    }
+
+    @Test
     fun speechAudioIsSmall() = runBlocking {
         val src = File(dir, "s.mp4")
         Ff.run(ctx, listOf("-f", "lavfi", "-i", "sine=f=200:d=60", "-c:a", "aac", src.absolutePath))

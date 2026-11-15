@@ -51,9 +51,14 @@ object Ai {
     fun manual(prefs: Prefs): Boolean = prefs.str("ai", "auto") == "manual" || chain(prefs).isEmpty()
 
     /** Gửi 1 yêu cầu theo thứ tự các AI có key; AI hỏng / hết tiền / hết lượt -> sang AI kế tiếp. */
-    suspend fun chat(prefs: Prefs, system: String, user: String, log: (String) -> Unit, json: Boolean = true): String {
-        val provs = chain(prefs)
-        if (provs.isEmpty()) throw AiError("Chưa nhập key AI nào (mục Cài đặt).")
+    /** AI nhìn được ảnh (DeepSeek không nhìn được ảnh). */
+    fun visionChain(prefs: Prefs): List<Prov> = chain(prefs).filter { it.id != "deepseek" }
+
+    suspend fun chat(prefs: Prefs, system: String, user: String, log: (String) -> Unit, json: Boolean = true,
+                     images: List<java.io.File> = emptyList()): String {
+        val provs = if (images.isEmpty()) chain(prefs) else visionChain(prefs)
+        if (provs.isEmpty()) throw AiError(if (images.isEmpty()) "Chưa nhập key AI nào (mục Cài đặt)."
+            else "Chưa có key AI nhìn được ảnh (Gemini / OpenRouter / Groq / OpenAI).")
         var last: Exception? = null
         val t00 = System.currentTimeMillis()
         for ((i, p) in provs.withIndex()) {
@@ -61,9 +66,9 @@ object Ai {
             if (i > 0) log("🔀 Chuyển sang ${p.name} (vì: ${last?.message?.take(140)})")
             for (attempt in 0 until 2) {
                 try {
-                    val model = model(p, prefs)
+                    val model = if (images.isEmpty()) model(p, prefs) else visionModel(p, prefs)
                     val t0 = System.currentTimeMillis()
-                    val out = call(p, model, prefs.key(p.id), system, user, json)
+                    val out = call(p, model, prefs.key(p.id), system, user, json, images)
                     log("AI ${p.name} ($model) trả lời sau ${(System.currentTimeMillis() - t0) / 1000}s")
                     return out
                 } catch (e: CancellationException) {
@@ -89,14 +94,20 @@ object Ai {
 
     private class RetryLater(msg: String, val waitSec: Int) : Exception(msg)
 
-    private suspend fun call(p: Prov, model: String, key: String, system: String, user: String, json: Boolean): String =
+    private suspend fun call(p: Prov, model: String, key: String, system: String, user: String, json: Boolean,
+                             images: List<java.io.File> = emptyList()): String =
         withContext(Dispatchers.IO) {
+            val content: Any = if (images.isEmpty()) user else JSONArray().apply {
+                put(JSONObject().put("type", "text").put("text", user))
+                for (f in images) put(JSONObject().put("type", "image_url").put("image_url", JSONObject()
+                    .put("url", "data:image/jpeg;base64," + android.util.Base64.encodeToString(f.readBytes(), android.util.Base64.NO_WRAP))))
+            }
             val body = JSONObject()
                 .put("model", model)
-                .put("temperature", 0.7)
+                .put("temperature", if (images.isEmpty()) 0.7 else 0.3)
                 .put("messages", JSONArray()
                     .put(JSONObject().put("role", "system").put("content", system))
-                    .put(JSONObject().put("role", "user").put("content", user)))
+                    .put(JSONObject().put("role", "user").put("content", content)))
             if (json) body.put("response_format", JSONObject().put("type", "json_object"))
             if (model.startsWith("openai/gpt-oss")) body.put("reasoning_effort", "low")
             var (code, text) = post("${p.base}/chat/completions", key, body)
@@ -163,6 +174,26 @@ object Ai {
         } ?: p.models.getOrNull(1) ?: "deepseek/deepseek-chat"
         resolved[p.id] = pick
         return pick
+    }
+
+    /** Model nhìn được ảnh: Gemini Flash, GPT mini, Llama 4 trên Groq, model miễn phí có thị giác trên OpenRouter. */
+    private suspend fun visionModel(p: Prov, prefs: Prefs): String = when (p.id) {
+        "groq" -> "meta-llama/llama-4-scout-17b-16e-instruct"
+        "openrouter" -> resolved["openrouter-vision"] ?: (openRouterVision(try {
+            listModels(p, prefs.key(p.id))
+        } catch (e: Exception) {
+            emptyList()
+        }) ?: "google/gemma-3-27b-it:free").also { resolved["openrouter-vision"] = it }
+        else -> model(p, prefs)
+    }
+
+    fun openRouterVision(ids: List<String>): String? {
+        val free = ids.filter { it.endsWith(":free") }
+        for (fam in listOf("google/gemini", "qwen2.5-vl|qwen3-vl|qwen-vl", "llama-4", "gemma-3", "mistral-small-3")) {
+            val r = Regex(fam)
+            free.filter { r.containsMatchIn(it.lowercase()) && "thinking" !in it }.maxByOrNull { version(it.substringAfter('/')) }?.let { return it }
+        }
+        return null
     }
 
     private fun version(s: String): Double =

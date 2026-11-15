@@ -197,4 +197,47 @@ Dialogue: 0,0:00:10.00,0:00:12.00,Default,,0,0,0,,前方, 正是友哈巴赫
         assertEquals("deepseek/deepseek-chat-v3.1:free", Ai.openRouterFree(ids))
         assertNull(Ai.openRouterFree(listOf("google/gemini-2.5-flash")))
     }
+
+    @Test
+    fun watchParse() {
+        val reply = """
+            Dưới đây là diễn biến:
+            00:05-00:20 | Luffy lao tới đấm bay gã mặc giáp đen
+            **00:24** - Cô gái tóc đỏ rút kiếm
+            [01:02 - 01:10] Hai bên giao chiến, cháy nổ khắp nơi
+            09:59 | mốc bịa ngoài khoảng ảnh
+            00:30 | x
+        """.trimIndent()
+        val sc = Watch.parse(reply, 0.0, 70.0, 2.0)
+        assertEquals(listOf(5.0, 24.0, 62.0), sc.map { it.start })
+        assertEquals(20.0, sc[0].end, 1e-9)
+        assertEquals("Cô gái tóc đỏ rút kiếm", sc[1].text)
+        assertEquals(44.0, sc[1].end, 1e-9)                      // không có mốc cuối: tới cảnh sau, tối đa 20 giây
+        assertEquals(70.0, sc[2].end, 1e-9)
+        assertEquals(3723.0, Watch.parseClock("1:02:03"), 1e-9)
+        // lời thoại + hình xếp theo thời gian, dòng hình có nhãn [HÌNH]
+        val tl = Watch.timeline(listOf(Line(10.0, 12.0, "你好"), Line(30.0, 31.0, "走")), sc)
+        assertEquals(listOf(5.0, 10.0, 24.0, 30.0, 62.0), tl.map { it.start })
+        assertTrue(tl[0].text.startsWith(Watch.TAG))
+        assertEquals(listOf(Line(1.0, 2.0, "a")), Watch.timeline(listOf(Line(1.0, 2.0, "a")), emptyList()))
+        // kịch bản neo vào dòng hình (cảnh hành động không thoại) lấy đúng thời gian cảnh đó
+        val (_, segs) = Prompts.parseRecap("{\"segments\":[{\"from\":3,\"to\":3,\"text\":\"Cô gái rút kiếm.\"}]}", 100.0, tl)
+        assertEquals(24.0, segs[0].start, 1e-9)
+        assertEquals(44.0, segs[0].end, 1e-9)
+        // phim càng dài chụp càng thưa
+        assertEquals(2.0, Watch.step(600.0), 1e-9)
+        assertEquals(12.0, Watch.step(3 * 3600.0), 1e-9)
+        assertTrue(Watch.estimateSheets(7200.0) in 15..30)
+        assertEquals(256 to 144, Watch.cellSize(1920, 1080))
+        assertEquals(144 to 256, Watch.cellSize(1080, 1920))
+    }
+
+    @Test
+    fun openRouterVisionModel() {
+        val ids = listOf("deepseek/deepseek-chat-v3.1:free", "google/gemma-3-27b-it:free", "meta-llama/llama-4-maverick:free",
+            "qwen/qwen2.5-vl-72b-instruct:free", "openai/gpt-4o")
+        assertEquals("qwen/qwen2.5-vl-72b-instruct:free", Ai.openRouterVision(ids))
+        assertEquals("google/gemma-3-27b-it:free", Ai.openRouterVision(listOf("google/gemma-3-27b-it:free", "x/y:free")))
+        assertNull(Ai.openRouterVision(listOf("deepseek/deepseek-chat-v3.1:free")))
+    }
 }

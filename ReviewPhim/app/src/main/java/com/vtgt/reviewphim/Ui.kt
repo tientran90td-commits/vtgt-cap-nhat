@@ -197,6 +197,11 @@ private fun MakeTab(vm: MainVM) {
                 Choice("Độ dài video review", vm.targetSec, listOf(60 to "1 phút", 120 to "2 phút", 180 to "3 phút",
                     300 to "5 phút", 600 to "10 phút", 900 to "15 phút")) { vm.targetSec = it; vm.save("target", "$it") }
                 Choice("Văn phong", vm.style, Prompts.STYLES.map { it.key to it.value }) { vm.style = it; vm.save("style", it) }
+                Toggle("👁 AI xem hình cả video (kể cả cảnh hành động không có thoại)", vm.watch) {
+                    vm.watch = it; vm.prefs.setBool("watch", it)
+                }
+                if (vm.watch) Hint("App chụp khung hình suốt video, ghép ảnh có mốc thời gian để AI (Gemini...) xem và tả lại diễn biến. " +
+                    "Có key Gemini thì tự làm; không thì 🖐 gửi ảnh cho app Gemini rồi dán câu trả lời.")
                 Toggle("Ghép nhiều cảnh ngắn theo điểm cắt cảnh (bỏ cảnh đen)", vm.multiShot) {
                     vm.multiShot = it; vm.prefs.setBool("multi_shot", it)
                 }
@@ -538,7 +543,7 @@ private fun ManualDialog(a: ManualAsk, vm: MainVM) {
         Surface(Modifier.fillMaxWidth().padding(12.dp), shape = RoundedCornerShape(16.dp)) {
             Column(Modifier.padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 Text("🖐 Làm tay: ${a.step}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Text(if (gemini) "1. Bấm Chép yêu cầu.  2. Bấm Gửi file cho Gemini (hoặc mở Gemini, đính kèm file " +
+                Text(if (gemini) "1. Bấm Chép yêu cầu.  2. Bấm 📤 Gửi cho Gemini (hoặc mở Gemini, đính kèm " +
                     "\"${a.fileName}\" trong Download/ReviewPhim), dán yêu cầu, gửi.  3. Chép câu trả lời, quay lại đây - app tự dán, bấm Dùng."
                 else "1. Bấm Chép yêu cầu.  2. Mở DeepSeek, dán vào ô chat, gửi (nên dùng chung 1 cuộc trò chuyện cho các phần của " +
                     "cùng video).  3. Bấm nút chép dưới câu trả lời, quay lại đây - app tự dán, bấm Dùng.", fontSize = 13.sp)
@@ -549,15 +554,19 @@ private fun ManualDialog(a: ManualAsk, vm: MainVM) {
                     }
                     OutlinedButton(onClick = { openApp() }, modifier = Modifier.weight(1f)) { Text("🌐 Mở $who") }
                 }
-                a.file?.let { f ->
+                if (a.files.isNotEmpty()) {
                     OutlinedButton(onClick = {
                         clip.setText(AnnotatedString(a.prompt)); copied = true
-                        val send = Intent(Intent.ACTION_SEND).setType("audio/mpeg").putExtra(Intent.EXTRA_STREAM, f)
-                            .putExtra(Intent.EXTRA_TEXT, a.prompt).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                        val send = (if (a.files.size == 1) Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, a.files[0])
+                        else Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(a.files)))
+                            .setType(a.mime).putExtra(Intent.EXTRA_TEXT, a.prompt).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
                         val g = Intent(send).setPackage("com.google.android.apps.bard")
                         ctx.startActivity((if (g.resolveActivity(ctx.packageManager) != null) g
-                        else Intent.createChooser(send, "Gửi file cho Gemini")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                    }, modifier = Modifier.fillMaxWidth()) { Text("📤 Gửi file âm thanh cho Gemini (kèm yêu cầu)") }
+                        else Intent.createChooser(send, "Gửi cho Gemini")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                    }, modifier = Modifier.fillMaxWidth()) {
+                        Text(if (a.mime.startsWith("image")) "📤 Gửi ${a.files.size} ảnh khung hình cho Gemini (kèm yêu cầu)"
+                        else "📤 Gửi file âm thanh cho Gemini (kèm yêu cầu)")
+                    }
                 }
                 Hint("Yêu cầu (${a.prompt.length} ký tự): " + a.prompt.take(240).replace("\n", " ") + "...")
                 OutlinedTextField(reply, { reply = it }, Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 260.dp),

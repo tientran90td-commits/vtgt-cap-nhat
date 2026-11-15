@@ -49,12 +49,32 @@ Quy tắc tên riêng (quan trọng nhất):
         return add.size
     }
 
-    /** Viết kịch bản review / tóm tắt từ lời thoại. */
+    /** Nhờ AI xem các ảnh ghép khung hình (mỗi ô ghi mốc thời gian) và tả diễn biến hình ảnh. */
+    fun watch(title: String, part: Int, parts: Int, lo: Double, hi: Double, images: Int, dialogue: List<Line>, prefs: Prefs): String {
+        val talk = dialogue.joinToString("\n") { "[${fmtTime(it.start)}] ${it.text.trim()}" }.take(2500)
+        return """
+Mình gửi kèm $images ảnh ghép khung hình của video "$title"${if (parts > 1) " (phần $part/$parts)" else ""}, từ ${fmtTime(lo)} đến ${fmtTime(hi)}. Mỗi ảnh có nhiều ô, mỗi ô là 1 khung hình, góc trên bên trái ô ghi mốc thời gian của khung đó. Đọc các ô từ trái sang phải, từ trên xuống dưới, các ảnh theo thứ tự.
+
+Hãy XEM KỸ từng ô và tả lại DIỄN BIẾN HÌNH ẢNH bằng tiếng Việt như người đang xem phim: ai đang làm gì, đánh nhau / rượt đuổi / chiêu thức / cháy nổ, ai thắng ai thua, biểu cảm, sự kiện quan trọng, bối cảnh đổi sang đâu, chữ quan trọng trên màn hình. KHÔNG bỏ sót cảnh hành động không có lời thoại.
+- Mỗi dòng 1 sự việc, đúng dạng: mm:ss-mm:ss | mô tả ngắn (tối đa 25 từ). Mốc lấy đúng số ghi trên ô. Gộp các ô liên tiếp cùng một sự việc thành 1 dòng.
+- Gọi nhân vật bằng tên nếu biết (từ tên phim / lời thoại bên dưới), không thì tả ngoại hình (cô gái tóc đỏ, gã mặc giáp đen...) và gọi thống nhất.
+- Chỉ tả những gì thấy trong ảnh, không đoán thêm. Bỏ qua ô đen, logo, danh đề, credit.
+Chỉ trả lời các dòng mô tả, không giải thích gì thêm.
+${glossary(prefs)}
+${if (talk.isNotBlank()) "\nLỜI THOẠI TRONG KHOẢNG NÀY (chỉ để biết tên nhân vật, tham khảo):\n$talk" else ""}
+""".trim()
+    }
+
+    /** Viết kịch bản review / tóm tắt từ lời thoại (+ mô tả hình ảnh "[HÌNH]" nếu AI đã xem cả video). */
     fun recap(title: String, duration: Double, lines: List<Line>, targetSec: Int, style: String, prefs: Prefs): String {
         val chars = (targetSec * CPS).toInt()
         val n = (targetSec / 11).coerceIn(4, 80)
+        val seen = lines.any { it.text.startsWith(Watch.TAG) }
+        val src = if (seen) "diễn biến (lời thoại + mô tả hình ảnh)" else "lời thoại"
+        val actionRule = if (!seen) "" else "\n- KHÔNG bỏ qua các cảnh hành động / cảnh hay không có thoại (dòng [HÌNH]): kể lại sinh động, " +
+            "đó thường là cao trào và hợp làm hook. Kết hợp hình và lời thoại để hiểu đúng ai làm gì."
         return """
-Bạn là biên kịch kênh REVIEW PHIM tiếng Việt trên TikTok / YouTube. Dưới đây là lời thoại (đánh số, có mốc thời gian) của video "$title" dài ${fmtTime(duration)}. Hãy viết kịch bản review / tóm tắt bằng tiếng Việt chuẩn, có dấu đầy đủ.
+Bạn là biên kịch kênh REVIEW PHIM tiếng Việt trên TikTok / YouTube. Dưới đây là ${if (seen) "DIỄN BIẾN gồm lời thoại và mô tả hình ảnh (dòng bắt đầu bằng [HÌNH] là AI đã xem từng cảnh và tả lại)" else "lời thoại"} (đánh số, có mốc thời gian) của video "$title" dài ${fmtTime(duration)}. Hãy viết kịch bản review / tóm tắt bằng tiếng Việt chuẩn, có dấu đầy đủ.
 
 $NAME_RULES
 
@@ -64,16 +84,16 @@ Yêu cầu kịch bản:
 - Từ đoạn 2 kể theo đúng trình tự thời gian, chia 3 hồi: mở đầu (~25%), diễn biến & xung đột (~50%), cao trào & kết (~25%).
 - Tránh cảnh mở đầu / danh đề / credit cuối phim. Được DÙNG LẠI cảnh khi hợp nội dung: đoạn kể nhắc lại nhân vật / sự việc / trận đấu ở chỗ khác thì thêm "reuse": [số câu có cảnh đó] để chiếu lại cảnh ấy.
 - Tổng lời kể khoảng $chars ký tự (đọc khoảng ${targetSec / 60} phút ${targetSec % 60} giây), chia thành khoảng $n đoạn, mỗi đoạn 1–3 câu (80–250 ký tự).
-- CHỈ kể những gì có trong lời thoại bên dưới. KHÔNG bịa thêm tình tiết, nhân vật, kết cục lấy từ hiểu biết bên ngoài; chỗ nào lời thoại không rõ thì kể chung chung, không đoán.
-- Mỗi đoạn ghi rõ nó kể lại các câu thoại số mấy: "from" và "to" là số thứ tự câu (#) ở danh sách bên dưới, đúng chỗ sự việc đó xảy ra (thường 3–15 câu). Video sẽ chiếu đúng cảnh của các câu đó, nên đoạn kể phải khớp nội dung các câu này.
+- CHỈ kể những gì có trong $src bên dưới. KHÔNG bịa thêm tình tiết, nhân vật, kết cục lấy từ hiểu biết bên ngoài; chỗ nào không rõ thì kể chung chung, không đoán.$actionRule
+- Mỗi đoạn ghi rõ nó kể lại các dòng số mấy: "from" và "to" là số thứ tự dòng (#) ở danh sách bên dưới, đúng chỗ sự việc đó xảy ra (thường 3–15 dòng). Video sẽ chiếu đúng cảnh của các dòng đó, nên đoạn kể phải khớp nội dung các dòng này.
 - Từ đoạn 2 trở đi "from" tăng dần, các đoạn không chồng lên nhau, rải từ đầu tới cuối lời thoại.
 ${glossary(prefs)}
 
 Chỉ trả lời JSON, không giải thích:
 {"title": "tiêu đề video review hấp dẫn, tối đa 70 ký tự", "segments": [{"from": 12, "to": 18, "text": "lời kể...", "reuse": [3]}], "names": {"tên gốc trong lời thoại": "tên tiếng Việt đã dùng"}}
 
-LỜI THOẠI (số câu, mốc thời gian, lời gốc):
-${transcriptIds(lines)}
+${if (seen) "DIỄN BIẾN (số dòng, mốc thời gian, lời thoại gốc hoặc [HÌNH] mô tả cảnh):" else "LỜI THOẠI (số câu, mốc thời gian, lời gốc):"}
+${transcriptIds(lines, if (seen) 80000 else 60000)}
 """.trim()
     }
 
