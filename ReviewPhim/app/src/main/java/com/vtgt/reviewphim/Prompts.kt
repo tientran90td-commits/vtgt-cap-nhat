@@ -54,7 +54,7 @@ Quy tắc tên riêng (quan trọng nhất):
         val chars = (targetSec * CPS).toInt()
         val n = (targetSec / 11).coerceIn(4, 80)
         return """
-Bạn là biên kịch kênh REVIEW PHIM tiếng Việt trên TikTok / YouTube. Dưới đây là lời thoại (có mốc thời gian) của video "$title" dài ${fmtTime(duration)}. Hãy viết kịch bản review / tóm tắt bằng tiếng Việt chuẩn, có dấu đầy đủ.
+Bạn là biên kịch kênh REVIEW PHIM tiếng Việt trên TikTok / YouTube. Dưới đây là lời thoại (đánh số, có mốc thời gian) của video "$title" dài ${fmtTime(duration)}. Hãy viết kịch bản review / tóm tắt bằng tiếng Việt chuẩn, có dấu đầy đủ.
 
 $NAME_RULES
 
@@ -64,14 +64,16 @@ Yêu cầu kịch bản:
 - Từ đoạn 2 kể theo đúng trình tự thời gian, chia 3 hồi: mở đầu (~25%), diễn biến & xung đột (~50%), cao trào & kết (~25%).
 - Tránh cảnh mở đầu / danh đề / credit cuối phim; mỗi đoạn một cảnh khác nhau, không lặp lại.
 - Tổng lời kể khoảng $chars ký tự (đọc khoảng ${targetSec / 60} phút ${targetSec % 60} giây), chia thành khoảng $n đoạn, mỗi đoạn 1–3 câu (80–250 ký tự).
-- Mỗi đoạn gắn với cảnh minh họa đúng nội dung đó: "start" là số giây trong video (lấy theo mốc thời gian lời thoại). Từ đoạn 2 trở đi "start" tăng dần và rải đều từ đầu tới cuối video.
+- CHỈ kể những gì có trong lời thoại bên dưới. KHÔNG bịa thêm tình tiết, nhân vật, kết cục lấy từ hiểu biết bên ngoài; chỗ nào lời thoại không rõ thì kể chung chung, không đoán.
+- Mỗi đoạn ghi rõ nó kể lại các câu thoại số mấy: "from" và "to" là số thứ tự câu (#) ở danh sách bên dưới, đúng chỗ sự việc đó xảy ra (thường 3–15 câu). Video sẽ chiếu đúng cảnh của các câu đó, nên đoạn kể phải khớp nội dung các câu này.
+- Từ đoạn 2 trở đi "from" tăng dần, các đoạn không chồng lên nhau, rải từ đầu tới cuối lời thoại.
 ${glossary(prefs)}
 
 Chỉ trả lời JSON, không giải thích:
-{"title": "tiêu đề video review hấp dẫn, tối đa 70 ký tự", "segments": [{"start": 12.5, "text": "lời kể..."}], "names": {"tên gốc trong lời thoại": "tên tiếng Việt đã dùng"}}
+{"title": "tiêu đề video review hấp dẫn, tối đa 70 ký tự", "segments": [{"from": 12, "to": 18, "text": "lời kể..."}], "names": {"tên gốc trong lời thoại": "tên tiếng Việt đã dùng"}}
 
-LỜI THOẠI:
-${transcriptText(lines)}
+LỜI THOẠI (số câu, mốc thời gian, lời gốc):
+${transcriptIds(lines)}
 """.trim()
     }
 
@@ -143,13 +145,19 @@ Trả lời CHỈ bằng phụ đề định dạng SRT chuẩn, mốc thời gi
         return got.filter { (i, v) -> i in idx && !FOREIGN.containsMatchIn(v) }
     }
 
-    fun parseRecap(text: String, duration: Double): Pair<String, List<Seg>> {
+    fun parseRecap(text: String, duration: Double, lines: List<Line> = emptyList()): Pair<String, List<Seg>> {
         val d = extractJson(text)
         val arr = d.optJSONArray("segments") ?: throw IllegalArgumentException("Thiếu danh sách đoạn (segments)")
         val segs = (0 until arr.length()).mapNotNull {
             val o = arr.optJSONObject(it) ?: return@mapNotNull null
             val t = o.optString("text").trim()
             if (t.isEmpty() || FOREIGN.containsMatchIn(t)) return@mapNotNull null
+            val from = o.optInt("from", 0)
+            if (from >= 1 && lines.isNotEmpty()) {  // neo theo số câu thoại: lấy đúng thời gian của các câu đó
+                val a = (from - 1).coerceIn(0, lines.size - 1)
+                val b = (o.optInt("to", from) - 1).coerceIn(a, lines.size - 1)
+                return@mapNotNull Seg(lines[a].start, t, lines[b].end)
+            }
             val lo = duration * 0.02
             val hi = maxOf(lo, duration * 0.95 - 1.0)
             Seg(o.optDouble("start", 0.0).coerceIn(lo, hi), t)

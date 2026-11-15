@@ -460,7 +460,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         repeat(2) {
             try {
                 val reply = askAi("Viết kịch bản review", prompt)
-                val (t, s) = Prompts.parseRecap(reply, i.duration)
+                val (t, s) = Prompts.parseRecap(reply, i.duration, lines)
                 rememberNames(reply)
                 withContext(Dispatchers.Main) {
                     recapTitle = t.ifBlank { title }
@@ -568,25 +568,25 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         var shotsUsed = 0
         Wav.Writer(narr).use { w ->
             var t = 0.0
-            var usedEnd = 0.0
-            val starts = segs.map { it.start }
+            val order = segs.drop(1).sortedBy { it.start }  // các đoạn kể theo thời gian (đoạn 0 là hook)
             for ((k, s) in segs.withIndex()) {
                 prog(0.4f + 0.3f * k / segs.size, "Đọc giọng ${k + 1}/${segs.size}")
                 val wav = speak(s.text, File(dir, "s$k.wav"), rate)
                 val pcm = Wav.read(wav)
                 val dur = pcm.seconds + 0.35
-                var start = s.start
-                if (k > 0 && start < usedEnd) start = usedEnd  // không chiếu lại cảnh vừa dùng
-                start = start.coerceIn(0.0, max(0.0, i.duration - dur - 0.5))
-                // ghép nhiều cảnh ngắn bắt đầu ở điểm cắt cảnh, bỏ cảnh đen (cửa sổ tới đoạn kể sau)
+                // khoảng hình của đoạn kể: đúng thời gian các câu thoại AI chỉ ra (#from - #to)
+                val a0 = s.start.coerceIn(0.0, max(0.0, i.duration - 1.0))
+                val b0 = (if (s.end > s.start) s.end else s.start + dur).coerceIn(a0, i.duration)
+                val idx = order.indexOf(s)
+                val lo = if (idx > 0) order[idx - 1].let { p -> if (p.end > p.start) p.end else p.start } else 0.0
+                val hi = order.getOrNull(idx + 1)?.start ?: i.duration
+                val (wl, wh) = min(lo, a0) to max(hi, b0)
                 val pieces = if (multiShot) {
-                    val nxt = starts.drop(k + 1).firstOrNull { it > start + dur }
-                    val win = minOf(maxOf(dur + 2.0, minOf(dur * 3.0, (nxt ?: (start + dur * 3.0)) - start, 45.0)),
-                        i.duration - start)
-                    val sh = Shots.shots(Shots.analyze(ctx, v, start - 0.5, win + 0.5), start + win)
-                    Shots.plan(sh, start, dur, i.duration)
-                } else listOf(start to dur)
-                if (k > 0) usedEnd = pieces.maxOf { it.first + it.second }
+                    val from = max(wl, a0 - dur)
+                    val to = min(wh, b0 + dur)
+                    val sh = Shots.shots(Shots.analyze(ctx, v, from, to - from), to)
+                    Shots.planIn(sh, a0, b0, dur, wl, min(wh, i.duration))
+                } else listOf(min(a0, max(0.0, i.duration - dur)) to dur)
                 w.silenceTo(t + 0.15)
                 w.write(pcm)
                 cues += splitCues(s.text, t + 0.15, pcm.seconds, maxChars)
@@ -619,11 +619,14 @@ class MainVM(app: Application) : AndroidViewModel(app) {
                 for ((k, l) in ls.withIndex()) {
                     if (l.vi.isBlank()) continue
                     prog(0.65f * k / ls.size + 0.05f, "Đọc giọng ${k + 1}/${ls.size}")
-                    val slot = maxChars(ls, k) / CPS
+                    // thời gian còn lại tới câu sau, tính cả phần câu trước đọc lố -> đọc nhanh hơn để không trễ dồn
+                    val at = max(l.start, w.seconds)
+                    val nextStart = ls.getOrNull(k + 1)?.start ?: (l.end + 1.5)
+                    val slot = max(0.6, min(nextStart, max(l.end, at) + 1.5) - at)
                     var r = rate
                     var pcm = Wav.read(speak(l.vi, File(dir, "l$k.wav"), r))
-                    if (pcm.seconds > slot * 1.05 && r < rate * 1.35f) {
-                        r = (rate * min(1.35, pcm.seconds / slot)).toFloat()
+                    if (pcm.seconds > slot * 1.03 && r < rate * 1.5f) {
+                        r = (rate * min(1.5, pcm.seconds / slot * 1.03)).toFloat()
                         pcm = Wav.read(speak(l.vi, File(dir, "l$k.wav"), r))
                     }
                     if (w.seconds > l.start + 0.3) late++

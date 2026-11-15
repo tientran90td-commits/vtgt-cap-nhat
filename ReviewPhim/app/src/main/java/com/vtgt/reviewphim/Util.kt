@@ -8,7 +8,7 @@ import kotlin.math.min
 data class Line(val start: Double, val end: Double, val text: String, var vi: String = "")
 
 /** Một đoạn lời kể review: cảnh minh họa bắt đầu ở `start` (giây) trong video gốc. */
-data class Seg(var start: Double, var text: String)
+data class Seg(var start: Double, var text: String, var end: Double = -1.0)
 
 /** Một dòng phụ đề hiện trên video thành phẩm. */
 data class Cue(val start: Double, val end: Double, val text: String)
@@ -198,6 +198,24 @@ fun maxChars(lines: List<Line>, i: Int): Int {
     val own = ln.end - ln.start
     val slot = max(own, min((nxt?.start ?: (ln.end + 1.0)) - ln.start, own + 1.5))
     return max(8, (slot * CPS).toInt())
+}
+
+/** Lời thoại ĐÁNH SỐ để AI chỉ rõ đoạn kể nằm ở câu nào (#from - #to) -> app lấy đúng hình của các câu đó. */
+fun transcriptIds(lines: List<Line>, limit: Int = 60000): String {
+    if (lines.isEmpty()) return ""
+    var group = 1
+    while (true) {
+        val blocks = lines.indices.chunked(group)
+        val cap = max(40, limit / blocks.size - 24)
+        val sb = StringBuilder()
+        for (b in blocks) {
+            val id = if (b.size == 1) "#${b[0] + 1}" else "#${b.first() + 1}-${b.last() + 1}"
+            val txt = b.joinToString(" ") { lines[it].text.trim() }.take(cap)
+            sb.append(id).append(" [").append(fmtTime(lines[b.first()].start)).append("] ").append(txt).append('\n')
+        }
+        if (sb.length <= limit || group >= 64) return sb.toString().take(limit)
+        group *= 2
+    }
 }
 
 /** Lời thoại có mốc thời gian để gửi AI. Phim dài: gộp theo khoảng thời gian và cắt bớt chữ mỗi khoảng cho vừa giới hạn. */

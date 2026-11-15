@@ -97,6 +97,41 @@ object Shots {
         return merged
     }
 
+    /**
+     * Cảnh cho 1 đoạn kể neo theo câu thoại [a, b]: chọn vài cảnh rải đều trong khoảng đó (không trôi sang nội dung
+     * khác). Khoảng ngắn hơn lời kể thì nới dần ra hai bên nhưng không quá [lo, hi] (khoảng của đoạn trước / sau).
+     */
+    fun planIn(sh: List<Shot>, a: Double, b: Double, need: Double, lo: Double, hi: Double): List<Pair<Double, Double>> {
+        var s = a
+        var e = b
+        while (e - s < need && (s > lo + 0.01 || e < hi - 0.01)) {  // nới đều hai bên
+            s = max(lo, s - 1.0)
+            e = min(hi, e + 1.0)
+        }
+        val good = sh.filter { it.b > s && it.a < e && it.y >= DARK_Y }
+            .map { Shot(max(it.a, s), min(it.b, e), it.y) }.filter { it.b - it.a >= MIN_SHOT }
+        if (good.isEmpty() || e - s < need) {  // không đủ cảnh: lấy liền mạch từ giữa khoảng
+            val st = max(lo, min((s + e - need) / 2, hi - need)).coerceAtLeast(0.0)
+            return listOf(st to need)
+        }
+        val k = max(1, kotlin.math.ceil(need / MAX_SHOT).toInt())
+        val pick = if (good.size <= k) good else (0 until k).map { good[(it * good.size) / k] }
+        val each = need / pick.size
+        val out = mutableListOf<Pair<Double, Double>>()
+        var debt = 0.0
+        for (p in pick) {  // mỗi cảnh lấy phần đầu; cảnh ngắn thì phần thiếu dồn cho cảnh sau
+            val want = each + debt
+            val take = min(p.b - p.a, want)
+            out.add(p.a to take)
+            debt = want - take
+        }
+        if (debt > 0.05) {  // vẫn thiếu: kéo dài mẩu cuối (lấy tiếp liền mạch)
+            val (la, ld) = out.last()
+            out[out.size - 1] = min(la, max(0.0, hi - ld - debt)) to ld + debt
+        }
+        return out
+    }
+
     /** Karaoke: số ký tự đã "đọc tới" ở tỉ lệ thời gian p (0..1) của dòng phụ đề - chữ đổi màu theo giọng đọc. */
     fun karaokeChars(text: String, p: Double): Int {
         if (p <= 0) return 0

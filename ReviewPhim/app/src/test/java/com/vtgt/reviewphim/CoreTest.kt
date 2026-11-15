@@ -141,6 +141,37 @@ Dialogue: 0,0:00:10.00,0:00:12.00,Default,,0,0,0,,前方, 正是友哈巴赫
     }
 
     @Test
+    fun recapAnchoredToDialogue() {
+        val lines = (0 until 40).map { Line(it * 10.0, it * 10.0 + 4.0, "câu $it") }
+        val t = transcriptIds(lines)
+        assertTrue(t.startsWith("#1 [00:00] câu 0\n#2 [00:10] câu 1"))
+        val long = transcriptIds((0 until 3000).map { Line(it * 2.0, it * 2.0 + 1.5, "câu thoại khá dài số $it để thử") }, 20000)
+        assertTrue(long.length <= 20000 && long.startsWith("#1-"))                     // phim dài: gộp khối câu
+        // AI chỉ ra đoạn kể ứng với câu #31-#34 (hook) và #3-#5 -> đúng thời gian các câu đó
+        val (_, segs) = Prompts.parseRecap("{\"segments\":[{\"from\":31,\"to\":34,\"text\":\"hook\"}," +
+            "{\"from\":3,\"to\":5,\"text\":\"mở đầu\"}]}", 400.0, lines)
+        assertEquals(300.0, segs[0].start, 1e-6)
+        assertEquals(334.0, segs[0].end, 1e-6)
+        assertEquals(20.0, segs[1].start, 1e-6)
+        assertEquals(44.0, segs[1].end, 1e-6)
+    }
+
+    @Test
+    fun planInStaysInsideRange() {
+        // cảnh mỗi 5 giây, cảnh 30-35 tối
+        val sh = (0 until 20).map { Shots.Shot(it * 5.0, it * 5.0 + 5.0, if (it == 6) 5.0 else 100.0) }
+        val p = Shots.planIn(sh, 20.0, 44.0, 9.0, 10.0, 60.0)
+        assertEquals(9.0, p.sumOf { it.second }, 1e-6)
+        assertTrue("trong khoảng câu thoại: $p", p.all { (a, d) -> a >= 20.0 - 1e-6 && a + d <= 44.0 + 1e-6 })
+        assertTrue("bỏ cảnh tối: $p", p.none { (a, d) -> a < 35.0 && a + d > 30.0 })
+        assertTrue("rải đều, không dồn đầu khoảng: $p", p.last().first >= 30.0)
+        // khoảng câu thoại ngắn hơn lời kể: nới ra nhưng không vượt đoạn trước / sau
+        val q = Shots.planIn(sh, 50.0, 52.0, 8.0, 48.0, 60.0)
+        assertEquals(8.0, q.sumOf { it.second }, 1e-6)
+        assertTrue("$q", q.all { (a, d) -> a >= 48.0 - 1e-6 && a + d <= 60.0 + 1e-6 })
+    }
+
+    @Test
     fun karaoke() {
         val s = "Ichigo đẩy cửa cung điện"
         assertEquals(0, Shots.karaokeChars(s, 0.0))
