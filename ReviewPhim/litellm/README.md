@@ -1,4 +1,4 @@
-# LiteLLM cho ReviewPhim AI - đỡ lỗi quá tải khi gửi AI
+# Máy chủ AI riêng cho ReviewPhim AI (LiteLLM / new-api / Ollama) - đỡ lỗi quá tải khi gửi AI
 
 [LiteLLM](https://www.litellm.ai/) (mã nguồn mở, MIT) là trạm trung chuyển chạy trên máy tính / máy chủ: app gửi yêu cầu
 tới LiteLLM, LiteLLM gửi tiếp cho Gemini / DeepSeek / Groq... và:
@@ -43,3 +43,22 @@ Cài [Ollama](https://ollama.com), chạy `ollama pull qwen2.5:14b` (viết / d�
   (đặt biến môi trường `OLLAMA_HOST=0.0.0.0` để điện thoại kết nối được).
 
 AI chạy ở nhà viết / dịch kém DeepSeek / Gemini một bậc và chậm hơn trên máy không có card đồ họa mạnh.
+
+## Cách khác: new-api (có trang web quản lý key)
+
+[new-api](https://github.com/QuantumNous/new-api) (Go, AGPL-3.0) cũng là trạm trung chuyển chuẩn OpenAI, có **trang web**
+để thêm key / kênh (Gemini, DeepSeek, Claude, OpenAI...), đặt ưu tiên, thử lại sang kênh khác, xem thống kê lượt dùng.
+Cần Docker (Docker Desktop trên Windows):
+
+```bash
+docker run --name new-api -d --restart unless-stopped -p 3000:3000 -v "%cd%/data:/data" calciumion/new-api:latest
+```
+
+Mở `http://localhost:3000` → làm theo hướng dẫn tạo tài khoản quản trị → thêm kênh (key AI) → tạo **key** (token).
+Trong app: địa chỉ `192.168.x.x:3000`, key vừa tạo, model là tên model đã khai báo trong kênh (vd `gemini-2.5-flash`).
+
+## App tự thử lại thế nào
+
+Kể cả không có máy chủ riêng, app đã: xoay nhiều key của cùng 1 AI (nhập cách nhau dấu phẩy), chờ tăng dần 2 → 4 → 8
+giây + ngẫu nhiên khi AI báo quá tải (đúng thời gian AI yêu cầu nếu có header Retry-After - cách của thư viện tenacity),
+rồi chuyển AI kế, cuối cùng mới chuyển sang 🖐 làm tay.

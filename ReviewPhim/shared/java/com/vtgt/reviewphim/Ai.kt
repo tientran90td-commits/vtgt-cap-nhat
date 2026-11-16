@@ -94,7 +94,7 @@ object Ai {
             val ks = keysOf(p, prefs)
             val start = (keyAt[p.id] ?: 0) % ks.size
             var tried = 0          // số key đã thử của AI này
-            var waited = false     // đã chờ thử lại 1 lần chưa
+            var waits = 0          // số lần đã chờ để thử lại (chờ tăng dần như tenacity)
             while (tried < ks.size && System.currentTimeMillis() - t00 <= BUDGET_MS) {
                 val ki = (start + tried) % ks.size
                 try {
@@ -114,11 +114,12 @@ object Ai {
                         tried++
                         continue
                     }
-                    if (waited) break
-                    waited = true
-                    val w = minOf(e.waitSec, 6)
-                    log("${e.message} - thử lại sau ${w}s")
-                    delay(w * 1000L)
+                    val left = BUDGET_MS - (System.currentTimeMillis() - t00)
+                    val ms = backoff(waits, e.waitSec)
+                    if (waits >= 3 || ms > left - 5000) break
+                    waits++
+                    log("${e.message} - thử lại sau ${ms / 1000}s (lần $waits/3)")
+                    delay(ms)
                     tried = 0
                 } catch (e: KeyError) {                      // key hết tiền / hết lượt / sai: sang key kế
                     last = e
@@ -127,9 +128,9 @@ object Ai {
                     tried++
                 } catch (e: IOException) {
                     last = AiError("${p.name}: ${if (e is java.io.InterruptedIOException) "chờ quá lâu không trả lời" else "lỗi mạng / không kết nối được"}")
-                    if (waited || p.id == "custom") break
-                    waited = true
-                    delay(3000L)
+                    if (waits >= 2 || p.id == "custom") break
+                    waits++
+                    delay(backoff(waits, 0))
                 } catch (e: Exception) {
                     last = e
                     break
@@ -140,6 +141,16 @@ object Ai {
     }
 
     private class RetryLater(msg: String, val waitSec: Int) : Exception(msg)
+
+    /**
+     * Thời gian chờ trước lần thử lại thứ [n] (0..): tăng dần 2 → 4 → 8 giây + ngẫu nhiên tới 1 giây (cách tenacity
+     * "wait_exponential + jitter"); AI báo phải chờ bao lâu ([asked] giây, header Retry-After) thì chờ đủ (tối đa 30 giây).
+     */
+    fun backoff(n: Int, asked: Int, rnd: kotlin.random.Random = kotlin.random.Random): Long {
+        val exp = (2000L shl n.coerceIn(0, 4)).coerceAtMost(16_000L)
+        val want = if (asked > 0) maxOf(exp, asked.coerceAtMost(30) * 1000L) else exp
+        return want + rnd.nextLong(0, 1000)
+    }
 
     /** Lỗi do key (hết tiền, hết lượt, sai key): đổi key khác của cùng AI. */
     private class KeyError(msg: String) : Exception(msg)
@@ -160,28 +171,32 @@ object Ai {
                     .put(JSONObject().put("role", "user").put("content", content)))
             if (json) body.put("response_format", JSONObject().put("type", "json_object"))
             if (model.startsWith("openai/gpt-oss")) body.put("reasoning_effort", "low")
-            var (code, text) = post("$base/chat/completions", key, body)
+            var (code, text, after) = post("$base/chat/completions", key, body)
             if (code == 400 && json && text.contains("response_format")) {
                 body.remove("response_format")
                 val r = post("$base/chat/completions", key, body)
                 code = r.first
                 text = r.second
+                after = r.third
             }
-            check(p, code, text)
+            check(p, code, text, after)
             val msg = JSONObject(text).getJSONArray("choices").getJSONObject(0).getJSONObject("message")
             msg.optString("content", "")
         }
 
-    private fun post(url: String, key: String, body: JSONObject): Pair<Int, String> {
+    /** (mã HTTP, nội dung, số giây AI yêu cầu chờ - header Retry-After). */
+    private fun post(url: String, key: String, body: JSONObject): Triple<Int, String, Int?> {
         val req = Request.Builder().url(url)
             .header("Authorization", "Bearer $key")
             .header("X-Title", "ReviewPhim AI")
             .post(body.toString().toRequestBody(JSON_TYPE))
             .build()
-        http.newCall(req).execute().use { r -> return r.code to (r.body?.string() ?: "") }
+        http.newCall(req).execute().use { r ->
+            return Triple(r.code, r.body?.string() ?: "", r.header("Retry-After")?.trim()?.toDoubleOrNull()?.toInt())
+        }
     }
 
-    private fun check(p: Prov, code: Int, text: String) {
+    private fun check(p: Prov, code: Int, text: String, after: Int? = null) {
         if (code in 200..299) return
         val low = text.lowercase()
         when {
@@ -190,8 +205,8 @@ object Ai {
             code == 401 || code == 403 -> throw KeyError("${p.name}: key sai hoặc không có quyền (HTTP $code)")
             code == 429 && ("perday" in low || "per day" in low) -> throw KeyError("${p.name}: hết lượt miễn phí hôm nay")
             code == 429 || code >= 500 -> {
-                val wait = Regex("retry[^0-9]{0,12}(\\d+)", RegexOption.IGNORE_CASE).find(text)?.groupValues?.get(1)
-                    ?.toIntOrNull()?.coerceIn(3, 60) ?: 8
+                val wait = after ?: Regex("retry[^0-9]{0,12}(\\d+)", RegexOption.IGNORE_CASE).find(text)?.groupValues?.get(1)
+                    ?.toIntOrNull()?.coerceIn(3, 60) ?: 0
                 throw RetryLater("${p.name} đang bận (HTTP $code)", wait)
             }
             code == 404 || (code == 400 && "model" in low) -> {

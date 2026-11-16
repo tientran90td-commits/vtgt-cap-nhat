@@ -249,4 +249,15 @@ Dialogue: 0,0:00:10.00,0:00:12.00,Default,,0,0,0,,前方, 正是友哈巴赫
         assertEquals("https://g.com/v1beta/openai", Ai.normBase("https://g.com/v1beta/openai"))
         assertEquals("", Ai.normBase("  "))
     }
+
+    @Test
+    fun retryBackoff() {
+        val r = kotlin.random.Random(7)
+        assertTrue(Ai.backoff(0, 0, r) in 2000L..2999L)
+        assertTrue(Ai.backoff(1, 0, r) in 4000L..4999L)
+        assertTrue(Ai.backoff(2, 0, r) in 8000L..8999L)
+        assertTrue(Ai.backoff(9, 0, r) in 16000L..16999L)      // tối đa 16 giây
+        assertTrue(Ai.backoff(0, 20, r) in 20000L..20999L)     // AI bảo chờ 20 giây (Retry-After)
+        assertTrue(Ai.backoff(0, 300, r) in 30000L..30999L)    // nhưng không quá 30 giây
+    }
 }
