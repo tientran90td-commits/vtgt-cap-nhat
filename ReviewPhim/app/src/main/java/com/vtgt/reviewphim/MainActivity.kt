@@ -35,12 +35,12 @@ class MainActivity : ComponentActivity() {
                 primary = Color(0xFF8B6CFF), secondary = Color(0xFFFFD54F),
                 background = Color(0xFF12121A), surface = Color(0xFF1C1C26), surfaceVariant = Color(0xFF262633),
             )) {
-                HomeScreen(film, manga, long, mode) { setMode(it) }
+                HomeScreen(film, manga, long, mode) { switchMode(it) }
             }
         }
     }
 
-    private fun setMode(m: String) {
+    private fun switchMode(m: String) {
         mode = m
         film.prefs.set("app_mode", m)
     }
@@ -60,7 +60,7 @@ class MainActivity : ComponentActivity() {
                 val list: List<Uri> = (if (Build.VERSION.SDK_INT >= 33) i.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
                 else i.getParcelableArrayListExtra(Intent.EXTRA_STREAM)) ?: return
                 if (list.isEmpty()) return
-                setMode("manga")
+                switchMode("manga")
                 manga.openImages(list)
             }
             Intent.ACTION_SEND -> {
@@ -69,25 +69,25 @@ class MainActivity : ComponentActivity() {
                 val type = i.type ?: ""
                 if (u != null) {
                     when {
-                        type.startsWith("video/") -> { setMode("film"); film.openVideo(u) }
-                        type.startsWith("image/") -> { setMode("manga"); manga.openImages(listOf(u)) }
-                        else -> { setMode("manga"); manga.openFile(u) }
+                        type.startsWith("video/") -> { switchMode("film"); film.openVideo(u) }
+                        type.startsWith("image/") -> { switchMode("manga"); manga.openImages(listOf(u)) }
+                        else -> { switchMode("manga"); manga.openFile(u) }
                     }
                     return
                 }
                 val t = i.getStringExtra(Intent.EXTRA_TEXT) ?: return
                 val url = Download.findUrl(t)
                 if (url != null && t.length < 500) {
-                    setMode("film")
+                    switchMode("film")
                     film.download(url)
                 } else if (t.length > 200) {
-                    setMode("manga")
+                    switchMode("manga")
                     manga.pasteText(t, i.getStringExtra(Intent.EXTRA_SUBJECT) ?: "Truyện")
                 }
             }
             Intent.ACTION_VIEW -> i.data?.let { d ->
-                if (contentResolver.getType(d)?.startsWith("video/") == true) { setMode("film"); film.openVideo(d) }
-                else { setMode("manga"); manga.openFile(d) }
+                if (contentResolver.getType(d)?.startsWith("video/") == true) { switchMode("film"); film.openVideo(d) }
+                else { switchMode("manga"); manga.openFile(d) }
             }
         }
     }
