@@ -32,7 +32,7 @@ class KeepAliveService : Service() {
         startForeground(1, n, ServiceInfo.FOREGROUND_SERVICE_TYPE_DATA_SYNC)
         if (lock == null) {
             lock = getSystemService(PowerManager::class.java)
-                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "reviewphim:work").apply { acquire(3 * 60 * 60 * 1000L) }
+                .newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "reviewphim:work").apply { acquire(14 * 60 * 60 * 1000L) }
         }
         return START_NOT_STICKY
     }

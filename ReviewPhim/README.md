@@ -1,4 +1,4 @@
-# ReviewPhim AI & MangaRecap AI (Android)
+# ReviewPhim AI · MangaRecap AI · LongRecap AI (Android)
 
 App điện thoại làm **video review / tóm tắt phim** và **dịch phim nước ngoài sang tiếng Việt** (thuyết minh + Vietsub), tự làm hết trên máy.
 
@@ -30,7 +30,17 @@ Học cơ chế từ mã nguồn mở (ý tưởng, code tự viết): [manga-re
 
 Code AI, giọng đọc, dựng video, trộn tiếng dùng chung với ReviewPhim ở thư mục `shared/`.
 
-Cài đặt: tải `ReviewPhim.apk` / `MangaRecap.apk` ở mục Releases (tag `reviewphim`) của repo. App có nút **Cập nhật** tự lấy bản mới.
+## LongRecap AI (app thứ 3, thư mục `longvid/`) - video dài tới 10 tiếng
+
+| Loại | Cách làm |
+|---|---|
+| 📖 Truyện audio | EPUB (chia chương theo mục lục, ảnh minh họa + bìa), TXT (tự chia theo dòng "Chương ..."), dán chữ, hoặc link chương đầu (lấy liên tiếp tới 1000 chương). **Đọc nguyên văn** (truyện tiếng Việt đọc thẳng không cần AI; truyện nước ngoài AI dịch từng đoạn) hoặc **AI kể lại** rút gọn theo độ dài chọn (30 phút - 10 giờ) |
+| 📚 Cả bộ truyện tranh | Nhiều CBZ / ZIP / PDF (mỗi file 1 chương) hoặc link chương; mỗi chương AI đọc tranh + viết lời kể (chia độ dài theo số trang), chiếu từng khung tranh |
+| 🎬 Cả bộ phim | Nhiều tập (file / link yt-dlp); mỗi tập nghe lời thoại + xem hình + kịch bản review như ReviewPhim, chia độ dài theo độ dài tập |
+
+Video dài làm theo **từng phần** (chương / tập): mỗi phần dựng xong lưu lại, dừng / tắt app vẫn **làm tiếp** từ phần dở; cuối cùng nối các phần (không mã hóa lại) thành 1 video, hoặc lưu từng phần riêng. AI nhớ nội dung phần trước để nối mạch, tên nhân vật thống nhất. Mức "Tiết kiệm" cho truyện audio ~0.16 GB / giờ (ảnh tĩnh 5 khung/giây). Kèm mục lục chương (dán vào mô tả YouTube) và phụ đề .srt của cả video.
+
+Cài đặt: tải `ReviewPhim.apk` / `MangaRecap.apk` / `LongRecap.apk` ở mục Releases (tag `reviewphim`) của repo. App có nút **Cập nhật** tự lấy bản mới.
 
 APK được GitHub Actions dựng (`.github/workflows/reviewphim-android.yml`): test trên JVM + test trên máy ảo Android (ffmpeg, dựng hình có phụ đề, trộn tiếng), rồi mới đăng Release.
 

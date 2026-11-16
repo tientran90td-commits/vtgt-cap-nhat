@@ -28,7 +28,9 @@ data class Illus(val pos: Int, val file: File)
 
 /** Truyện đã nhập: truyện tranh (pages) hoặc tiểu thuyết (text + ảnh minh họa). */
 data class Book(val kind: String, val title: String, val pages: List<Page> = emptyList(), val text: String = "",
-                val illus: List<Illus> = emptyList(), val cover: File? = null) {
+                val illus: List<Illus> = emptyList(), val cover: File? = null,
+                /** Vị trí bắt đầu các chương trong văn bản (EPUB: theo mục lục / spine) và tên chương. */
+                val marks: List<Pair<Int, String>> = emptyList()) {
     val manga get() = kind == "manga"
     /** Truyện cuộn dọc (manhwa / webtoon): các khúc đã cắt theo khoảng trắng, không tách khung nữa. */
     val webtoon get() = pages.count { it.strip } * 2 > pages.size
@@ -423,11 +425,15 @@ object Books {
                     tmp.delete()
                 }
             }
+            val marks = mutableListOf<Pair<Int, String>>()
             for ((k, id) in spine.withIndex()) {
                 currentCoroutineContext().ensureActive()
                 val (path, type) = items[id] ?: continue
                 if ("html" !in type && !path.endsWith("html", true) && !path.endsWith("htm", true)) continue
                 val html = read(path) ?: continue
+                val head = Regex("(?is)<h[1-3][^>]*>(.*?)</h[1-3]>").find(html)?.groupValues?.get(1)
+                    ?: Regex("(?is)<title[^>]*>(.*?)</title>").find(html)?.groupValues?.get(1)
+                marks += sb.length to htmlToText(head ?: "").replace("\n", " ").trim().take(120)
                 val from = path.substringBeforeLast('/', "")
                 for ((n, part) in htmlToText(html).split('\u0001').withIndex()) {
                     if (part.isBlank()) continue
@@ -441,7 +447,7 @@ object Books {
             }
             val cover = coverId?.let { items[it] }?.let { saveImage(it.first) } ?: illus.firstOrNull()?.file
             if (sb.isBlank()) throw IllegalStateException("EPUB không có chữ nào đọc được.")
-            Book("novel", title, text = sb.toString().trim(), illus = illus, cover = cover)
+            Book("novel", title, text = sb.toString().trim(), illus = illus, cover = cover, marks = marks)
         }
     }
 

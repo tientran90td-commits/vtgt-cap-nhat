@@ -51,8 +51,10 @@ jobs:
           path: |
             ReviewPhim/app/build/outputs/apk/release/*.apk
             ReviewPhim/manga/build/outputs/apk/release/*.apk
+            ReviewPhim/longvid/build/outputs/apk/release/*.apk
             ReviewPhim/app/build/reports/tests/
             ReviewPhim/manga/build/reports/tests/
+            ReviewPhim/longvid/build/reports/tests/
           if-no-files-found: ignore
 
   device-test:
@@ -112,6 +114,7 @@ jobs:
           path: |
             ReviewPhim/app/build/reports/androidTests/
             ReviewPhim/manga/build/reports/androidTests/
+            ReviewPhim/longvid/build/reports/androidTests/
           if-no-files-found: ignore
 
   release:
@@ -127,7 +130,8 @@ jobs:
           find out -name "*.apk"
           cp "$(find out -name 'app-arm64-v8a-release.apk' | head -1)" ReviewPhim.apk
           cp "$(find out -name 'manga-arm64-v8a-release.apk' | head -1)" MangaRecap.apk
-          ls -la ReviewPhim.apk MangaRecap.apk
+          cp "$(find out -name 'longvid-arm64-v8a-release.apk' | head -1)" LongRecap.apk
+          ls -la ReviewPhim.apk MangaRecap.apk LongRecap.apk
           # từ điển âm vị tiếng Việt cho giọng VieNeu (app tải về khi bật giọng AI)
           pip download -q "sea-g2p==0.10.0" --no-deps --only-binary :all: -d whl
           unzip -o -j "$(ls whl/*.whl | head -1)" 'sea_g2p/sea_g2p.bin' -d .
@@ -135,15 +139,17 @@ jobs:
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: reviewphim
-          name: ReviewPhim AI & MangaRecap AI 1.0.${{ github.run_number }}
+          name: ReviewPhim AI · MangaRecap AI · LongRecap AI 1.0.${{ github.run_number }}
           make_latest: false
           body: |
             versionCode=${{ github.run_number }}
             App Android ReviewPhim AI - review / tóm tắt phim, dịch thuyết minh + Vietsub.
             Tải ReviewPhim.apk về điện thoại rồi mở để cài (cho phép cài từ nguồn này nếu Android hỏi).
+            LongRecap.apk: app làm video dài tới 10 tiếng (truyện audio, tóm tắt cả bộ truyện tranh / cả bộ phim nhiều tập).
             MangaRecap.apk: app tóm tắt truyện tranh (manga / manhwa / manhua) và light novel thành video.
             sea_g2p.bin: từ điển âm vị cho giọng VieNeu (app tự tải, không cần tải tay).
           files: |
             ReviewPhim.apk
             MangaRecap.apk
+            LongRecap.apk
             sea_g2p.bin

@@ -156,7 +156,7 @@ object Slides {
 
     @androidx.annotation.OptIn(UnstableApi::class)
     suspend fun render(ctx: Context, slides: List<Slide>, w: Int, h: Int, cues: List<Cue>, karaoke: Boolean, hook: String,
-                       out: File, progress: (Float) -> Unit) {
+                       out: File, fps: Int = 30, bitrate: Int = 0, motion: Boolean = true, progress: (Float) -> Unit) {
         var offset = 0.0
         val items = slides.map { s ->
             val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
@@ -164,8 +164,9 @@ object Slides {
             val visible = if (s.scroll && o.outHeight > 0) min(1f, h.toFloat() / o.outHeight) else 1f
             val local = cues.filter { it.end > offset && it.start < offset + s.dur }.map { Cue(it.start - offset, it.end - offset, it.text) }
             val hookHere = if (hook.isNotBlank() && offset < 2.6) hook else ""
-            val effects = mutableListOf<Effect>(
-                Motion(s.dur, visible, s.scroll),
+            val effects = mutableListOf<Effect>()
+            if (motion || s.scroll) effects += Motion(s.dur, visible, s.scroll)
+            effects += listOf(
                 Presentation.createForWidthAndHeight(w, h, Presentation.LAYOUT_SCALE_TO_FIT_WITH_CROP),
                 OverlayEffect(ImmutableList.of<TextureOverlay>(SubtitleOverlay(w, h, local, h * 0.80f, "", -1f, karaoke,
                     hookHere, 2.6 - offset))),
@@ -173,42 +174,10 @@ object Slides {
             val mi = MediaItem.Builder().setUri(android.net.Uri.fromFile(s.image)).setMimeType(MimeTypes.IMAGE_JPEG)
                 .setImageDurationMs((s.dur * 1000).toLong()).build()
             offset += s.dur
-            EditedMediaItem.Builder(mi).setFrameRate(30).setEffects(Effects(listOf(), effects)).build()
+            EditedMediaItem.Builder(mi).setFrameRate(fps).setEffects(Effects(listOf(), effects)).build()
         }
         val comp = Composition.Builder(listOf(EditedMediaItemSequence(items))).build()
-        export(ctx, comp, out, progress)
+        com.vtgt.reviewphim.Render.export(ctx, comp, out, bitrate, progress)
     }
 
-    @androidx.annotation.OptIn(UnstableApi::class)
-    private suspend fun export(ctx: Context, comp: Composition, out: File, progress: (Float) -> Unit) =
-        withContext(Dispatchers.Main) {
-            suspendCancellableCoroutine<Unit> { cont ->
-                val handler = Handler(Looper.getMainLooper())
-                val tr = Transformer.Builder(ctx)
-                    .setVideoMimeType(MimeTypes.VIDEO_H264)
-                    .addListener(object : Transformer.Listener {
-                        override fun onCompleted(composition: Composition, exportResult: ExportResult) {
-                            if (cont.isActive) cont.resume(Unit)
-                        }
-
-                        override fun onError(composition: Composition, exportResult: ExportResult, exportException: ExportException) {
-                            if (cont.isActive) cont.resumeWithException(
-                                RuntimeException("Dựng video lỗi: ${exportException.errorCodeName} ${exportException.message}", exportException))
-                        }
-                    })
-                    .build()
-                out.delete()
-                tr.start(comp, out.absolutePath)
-                val holder = ProgressHolder()
-                val tick = object : Runnable {
-                    override fun run() {
-                        if (!cont.isActive) return
-                        if (tr.getProgress(holder) == Transformer.PROGRESS_STATE_AVAILABLE) progress(holder.progress / 100f)
-                        handler.postDelayed(this, 500)
-                    }
-                }
-                handler.post(tick)
-                cont.invokeOnCancellation { handler.post { tr.cancel() } }
-            }
-        }
 }

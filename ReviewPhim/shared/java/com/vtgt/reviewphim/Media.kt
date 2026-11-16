@@ -154,14 +154,27 @@ object Ff {
     }
 
     /** Ghép hình (đã dựng) + tiếng -> mp4 xem được trên mọi máy. */
-    suspend fun mux(ctx: Context, video: File, audio: File, out: File) {
+    suspend fun mux(ctx: Context, video: File, audio: File, out: File, aBitrate: String = "160k") {
         val base = listOf("-i", video.absolutePath, "-i", audio.absolutePath, "-map", "0:v:0", "-map", "1:a:0",
             "-c:v", "copy", "-shortest", "-movflags", "+faststart")
+        // âm thanh luôn 44.1 kHz stereo: các phần ghép nối (video dài) giống hệt thông số
+        val fmt = listOf("-ar", "44100", "-ac", "2")
         try {
-            run(ctx, base + listOf("-c:a", "aac", "-b:a", "160k", out.absolutePath))
+            run(ctx, base + fmt + listOf("-c:a", "aac", "-b:a", aBitrate, out.absolutePath))
         } catch (e: RuntimeException) {
             if (e is kotlinx.coroutines.CancellationException) throw e
-            run(ctx, base + listOf("-c:a", "libmp3lame", "-b:a", "160k", out.absolutePath))
+            run(ctx, base + fmt + listOf("-c:a", "libmp3lame", "-b:a", aBitrate, out.absolutePath))
+        }
+    }
+
+    /** Nối nhiều video cùng thông số (dựng cùng cách) thành 1 file, không mã hóa lại (nhanh, giữ chất lượng). */
+    suspend fun concat(ctx: Context, parts: List<File>, out: File) {
+        val list = File(out.parentFile, "concat_list.txt")
+        list.writeText(parts.joinToString("\n") { "file '" + it.absolutePath.replace("'", "'\\''") + "'" })
+        try {
+            run(ctx, listOf("-f", "concat", "-safe", "0", "-i", list.absolutePath, "-map", "0", "-c", "copy", out.absolutePath))
+        } finally {
+            list.delete()
         }
     }
 }

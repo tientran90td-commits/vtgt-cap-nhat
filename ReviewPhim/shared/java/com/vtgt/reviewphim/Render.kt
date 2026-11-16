@@ -43,6 +43,7 @@ enum class Aspect(val label: String) {
     SOURCE("Giữ khung gốc"),
     VERTICAL_FIT("Dọc 9:16 - đủ hình, tiêu đề phía trên"),
     VERTICAL_FILL("Dọc 9:16 - cắt đầy khung"),
+    HORIZONTAL("Ngang 16:9 - YouTube (đủ hình)"),
 }
 
 /**
@@ -80,6 +81,7 @@ object Render {
                 val k = min(1.0, spec.quality.toDouble() / short)
                 even(spec.info.width * k) to even(spec.info.height * k)
             }
+            Aspect.HORIZONTAL -> even(spec.quality * 16.0 / 9) to spec.quality
             else -> spec.quality to even(spec.quality * 16.0 / 9)
         }
     }
@@ -96,7 +98,7 @@ object Render {
         return (h - vh) / 2 to vh
     }
 
-    suspend fun video(ctx: Context, spec: RenderSpec, out: File, progress: (Float) -> Unit) {
+    suspend fun video(ctx: Context, spec: RenderSpec, out: File, bitrate: Int = 0, progress: (Float) -> Unit) {
         val (w, h) = outSize(spec)
         val (vTop, vH) = videoRect(spec, w, h)
         val subY = (vTop + vH * (spec.subBand.first + spec.subBand.second) / 2).coerceIn(h * 0.1f, h * 0.92f)
@@ -122,15 +124,22 @@ object Render {
             EditedMediaItem.Builder(mi).setRemoveAudio(true).setEffects(Effects(listOf(), effects)).build()
         }
         val comp = Composition.Builder(listOf(EditedMediaItemSequence(items))).build()
-        export(ctx, comp, out, progress)
+        export(ctx, comp, out, bitrate, progress)
     }
 
-    private suspend fun export(ctx: Context, comp: Composition, out: File, progress: (Float) -> Unit) =
+    /** Xuất video bằng Media3 Transformer (H.264). [bitrate] > 0: đặt bitrate hình (video dài cần file nhỏ). */
+    @androidx.annotation.OptIn(androidx.media3.common.util.UnstableApi::class)
+    suspend fun export(ctx: Context, comp: Composition, out: File, bitrate: Int = 0, progress: (Float) -> Unit) =
         withContext(Dispatchers.Main) {
             suspendCancellableCoroutine<Unit> { cont ->
                 val handler = Handler(Looper.getMainLooper())
                 val tr = Transformer.Builder(ctx)
                     .setVideoMimeType(MimeTypes.VIDEO_H264)
+                    .apply {
+                        if (bitrate > 0) setEncoderFactory(androidx.media3.transformer.DefaultEncoderFactory.Builder(ctx)
+                            .setRequestedVideoEncoderSettings(androidx.media3.transformer.VideoEncoderSettings.Builder()
+                                .setBitrate(bitrate).build()).build())
+                    }
                     .addListener(object : Transformer.Listener {
                         override fun onCompleted(composition: Composition, exportResult: ExportResult) {
                             if (cont.isActive) cont.resume(Unit)

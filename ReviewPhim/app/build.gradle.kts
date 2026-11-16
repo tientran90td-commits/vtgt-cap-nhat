@@ -66,6 +66,7 @@ android {
     // code / tài nguyên dùng chung với app MangaRecap (thư mục ../shared)
     sourceSets["main"].apply {
         java.srcDir("../shared/java")
+        java.srcDir("../shared-video/java")
         res.srcDir("../shared/res")
         assets.srcDir("../shared/assets")
         jniLibs.srcDir("../shared/jniLibs")
