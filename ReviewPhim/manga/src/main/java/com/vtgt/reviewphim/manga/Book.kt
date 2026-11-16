@@ -296,6 +296,7 @@ object Books {
 
     /** Ảnh từ file: thu nhỏ về rộng ≤ 1080, trang dài thì đọc từng vùng (không nạp cả dải dài vào bộ nhớ). */
     fun sliceFile(f: File, dir: File, label: String, start: Int): List<Page> {
+        dir.mkdirs()
         val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(f.path, o)
         if (o.outWidth <= 0 || o.outHeight <= 0) throw IllegalArgumentException("ảnh hỏng")
