@@ -356,6 +356,9 @@ private fun ScriptTab(vm: MangaVM) {
         }
         var t by remember(vm.recapTitle) { mutableStateOf(vm.recapTitle) }
         OutlinedTextField(t, { t = it; vm.recapTitle = it }, Modifier.fillMaxWidth().padding(horizontal = 12.dp), label = { Text("Tiêu đề") })
+        if (vm.book?.manga == true) Box(Modifier.padding(horizontal = 12.dp)) {
+            Hint("[#12] / [#12.3] cuối câu = câu đó chiếu trang dòng 12 / khung 3 của trang đó (khớp giọng với tranh, không được đọc lên). Sửa số để đổi tranh.")
+        }
         LazyColumn(Modifier.fillMaxSize().imePadding()) {
             itemsIndexed(vm.segs, key = { i, s -> "$i-${s.start}" }) { i, s ->
                 var text by remember(s) { mutableStateOf(s.text) }

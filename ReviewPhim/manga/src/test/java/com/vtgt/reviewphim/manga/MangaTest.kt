@@ -171,4 +171,18 @@ class MangaTest {
         assertTrue(Web.isImageUrl("https://a.b/1.JPG?x=1") && !Web.isImageUrl("https://a.b/chap-1"))
         assertEquals("https://a.b/x/y.jpg", Web.absolute("https://a.b/x/z.html", "y.jpg"))
     }
+
+    @Test
+    fun syncBeats() {
+        val b = Sync.beats("Jin-Woo bước vào hầm ngục [#3.1]. Bức tượng bỗng mở mắt [#3.3]! Mọi người hoảng loạn. Hắn bị đâm. [#5]", 2, 5, 6)
+        assertEquals(listOf(
+            Sync.Beat("Jin-Woo bước vào hầm ngục.", 2, 0),
+            Sync.Beat("Bức tượng bỗng mở mắt!", 2, 2),
+            Sync.Beat("Mọi người hoảng loạn.", 2, -1),
+            Sync.Beat("Hắn bị đâm.", 4, -1)), b)
+        // ghi chú ngoài truyện bị bỏ qua, câu không ghi chú theo dòng đầu đoạn
+        assertEquals(listOf(Sync.Beat("Câu A.", 1, -1), Sync.Beat("Câu B.", 1, -1)), Sync.beats("Câu A [#99]. Câu B.", 1, 2, 6))
+        assertEquals(listOf(Sync.Beat("Không có ghi chú gì cả", 3, -1)), Sync.beats("Không có ghi chú gì cả", 3, 4, 6))
+        assertEquals("A, B.", Sync.clean("A [#2.1], B [ #3 ] ."))
+    }
 }

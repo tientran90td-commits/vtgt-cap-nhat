@@ -113,6 +113,42 @@ class MangaDeviceTest {
     }
 
     @Test
+    fun voiceSyncedToPanels() = runBlocking {
+        val page = jpg(File(dir, "spage.jpg"), 600, 840) { c ->
+            c.drawColor(Color.WHITE)
+            val p = Paint().apply { color = Color.DKGRAY }
+            c.drawRect(20f, 20f, 580f, 280f, p)
+            c.drawRect(20f, 300f, 290f, 580f, p)
+            c.drawRect(310f, 300f, 580f, 580f, p)
+            c.drawRect(20f, 600f, 580f, 820f, p)
+        }
+        val book = Book("manga", "T", listOf(Page(page, 600, 840, "Trang 1")))
+        val items = listOf(Item("(1) mở đầu (2) ... (4) cao trào", page = 0, label = "Trang 1"))
+        val segs = listOf(com.vtgt.reviewphim.Seg(0.0, "Mở đầu [#1.1]. Cao trào ở khung bốn [#1.4]. Tiếp theo.", 1.0))
+        val cache = HashMap<Int, List<File>>()
+        val narr = File(dir, "sync.wav")
+        val (slides, cues, t) = Sync.build(segs, items, narr, 30,
+            shots = { pg -> Sync.shotsOf(book, pg, true, true, File(dir, "sk"), cache) },
+            card = { page },
+            frame = { f -> f to false },
+            speak = { _, key -> File(dir, "$key.wav").also { f -> com.vtgt.reviewphim.Wav.Writer(f).use { it.silenceTo(1.0) } } },
+            progress = { _, _ -> })
+        assertEquals(4, cache[0]!!.size)
+        // câu 1 -> khung 1, câu 2 -> khung 4, câu 3 (không ghi chú) -> khung chưa chiếu tiếp theo (hết thì quay lại khung 1)
+        assertEquals(listOf("p0_k0.jpg", "p0_k3.jpg", "p0_k0.jpg"), slides.map { it.image.name })
+        assertEquals(3, cues.size)
+        assertEquals(t, slides.sumOf { it.dur }, 1e-6)
+        assertEquals(t, com.vtgt.reviewphim.Wav.duration(narr), 0.05)
+        assertTrue(cues.none { it.text.contains("[#") })
+        // khi AI đọc tranh: số khung tròn đỏ được vẽ lên ảnh ghép
+        val sh = Story.sheets(book.pages, File(dir, "numsheet")) { Panels.boxes(page, true) }
+        val bmp = BitmapFactory.decodeFile(sh[0].file.path)
+        val k = Story.CELL_H / 840f
+        val px = bmp.getPixel((20 * k + 28 - 14).toInt(), (20 * k + 28 + 70).toInt())   // trong vòng tròn, cạnh số
+        assertTrue("có số khung đỏ: ${Integer.toHexString(px)}", Color.red(px) > 150 && Color.green(px) < 120)
+    }
+
+    @Test
     fun cbzAndEpub() = runBlocking {
         // CBZ: thứ tự trang theo số (2 trước 10)
         val cbz = File(dir, "t.cbz")

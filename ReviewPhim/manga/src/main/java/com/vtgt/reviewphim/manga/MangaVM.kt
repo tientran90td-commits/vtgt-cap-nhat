@@ -437,7 +437,11 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
     private suspend fun readManga(b: Book) {
         prog(0.02f, "Chuẩn bị ảnh trang cho AI đọc...")
         val dir = File(ctx.cacheDir, "doc").apply { deleteRecursively(); mkdirs() }
-        val sheets = withContext(Dispatchers.Default) { Story.sheets(b.pages, dir) }
+        // trang theo trang (không phải cuộn dọc) + bật chiếu từng khung: đánh số khung để AI tả theo khung, lời kể chỉ đúng khung
+        val numbered = panelZoom && !b.webtoon
+        val sheets = withContext(Dispatchers.Default) {
+            Story.sheets(b.pages, dir, if (numbered) { i -> try { Panels.boxes(b.pages[i].file, rtl) } catch (e: Exception) { emptyList() } } else null)
+        }
         val useApi = !Ai.manual(prefs) && Ai.visionChain(prefs).isNotEmpty()
         val groups = sheets.chunked(if (useApi) 3 else 10)
         val notes = HashMap<Int, String>()
@@ -447,7 +451,7 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
             val last = g.last().pages.last() + 1
             val step = "Đọc tranh ${if (groups.size > 1) "phần ${k + 1}/${groups.size}" else ""}".trim()
             val prompt = Story.readPages(title, k + 1, groups.size, g.size, first, last, prefs,
-                notes.keys.sorted().takeLast(8).mapNotNull { notes[it] })
+                notes.keys.sorted().takeLast(8).mapNotNull { notes[it] }, numbered)
             var got = emptyMap<Int, String>()
             if (useApi && !apiDown) {
                 try {
@@ -683,7 +687,18 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
         val maxChars = if (vertical) 30 else 44
         val name = recapTitle.ifBlank { title }
         log("Đọc giọng ${segs.size} đoạn, dựng ${w}x$h...")
-        Wav.Writer(narr).use { wr ->
+        if (b.manga) {  // truyện tranh: đọc từng câu, chiếu đúng trang / khung tranh câu đó nói tới
+            val cache = HashMap<Int, List<File>>()
+            val (sl, cs, _) = Sync.build(segs, items, narr, maxChars,
+                shots = { pg -> Sync.shotsOf(b, pg, zoom, rtl, panelDir, cache).also { if (it.size > 1 && !panelsOf.containsKey("$pg")) { panelsOf["$pg"] = it; nPanels += it.size } } },
+                card = { made.getOrPut("card") { Slides.titleCard(name, "", w, h, File(frames, "card.jpg")) to false }.first },
+                frame = { f -> made.getOrPut(f.path) { withContext(Dispatchers.Default) {
+                    if (f.parentFile == frames) f to false else Slides.frame(f, w, h, File(frames, "f${made.size}.jpg")) } } },
+                speak = { text, key -> speak(text, File(ttsDir, "$key.wav"), rate) },
+                progress = { k, n -> prog(0.4f + 0.3f * k / n, "Đọc giọng ${k + 1}/$n (khớp tranh từng câu)") })
+            slides += sl
+            cues += cs
+        } else Wav.Writer(narr).use { wr ->
             var t = 0.0
             for ((k, s) in segs.withIndex()) {
                 prog(0.4f + 0.3f * k / segs.size, "Đọc giọng ${k + 1}/${segs.size}")

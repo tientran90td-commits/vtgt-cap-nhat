@@ -114,29 +114,44 @@ object Panels {
     }
 
     /** Ảnh trang -> các file khung tranh (cắt từ ảnh gốc, có lề nhỏ). Trang 1 khung thì trả về chính trang đó. */
-    fun crops(page: File, rtl: Boolean, dir: File, tag: String): List<File> {
+    /**
+     * Các khung tranh của trang theo thứ tự đọc, tọa độ ảnh gốc (khung 1 = số 1 khi đánh số cho AI đọc).
+     * Rỗng nếu cả trang chỉ là 1 khung.
+     */
+    fun boxes(page: File, rtl: Boolean): List<Box> {
         val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
         BitmapFactory.decodeFile(page.path, o)
         val pw = o.outWidth
-        val ph = o.outHeight
-        if (pw <= 0 || ph <= 0) return listOf(page)
+        if (pw <= 0 || o.outHeight <= 0) return emptyList()
         val small = BitmapFactory.decodeFile(page.path, BitmapFactory.Options().apply {
             inSampleSize = max(1, Integer.highestOneBit(max(1, pw / SCALE_W)))
-        }) ?: return listOf(page)
+        }) ?: return emptyList()
         val sw = small.width
         val sh = small.height
         val px = IntArray(sw * sh)
         small.getPixels(px, 0, sw, 0, 0, sw, sh)
         small.recycle()
         val gray = IntArray(px.size) { val c = px[it]; ((c shr 16 and 255) * 3 + (c shr 8 and 255) * 6 + (c and 255)) / 10 }
-        val boxes = detect(gray, sw, sh, rtl)
-        if (boxes.size <= 1) return listOf(page)
+        val found = detect(gray, sw, sh, rtl)
+        if (found.size <= 1) return emptyList()
         val k = pw.toDouble() / sw
+        return found.map { Box((it.l * k).roundToInt(), (it.t * k).roundToInt(), (it.r * k).roundToInt(), (it.b * k).roundToInt()) }
+    }
+
+    fun crops(page: File, rtl: Boolean, dir: File, tag: String): List<File> {
+        val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+        BitmapFactory.decodeFile(page.path, o)
+        val pw = o.outWidth
+        val ph = o.outHeight
+        if (pw <= 0 || ph <= 0) return listOf(page)
+        val boxes = boxes(page, rtl)
+        if (boxes.size <= 1) return listOf(page)
+        val k = 1.0
         val dec = BitmapRegionDecoder.newInstance(page.path) ?: return listOf(page)
         dir.mkdirs()
         return try {
             boxes.mapIndexed { i, bx ->
-                val pad = (4 * k).roundToInt()
+                val pad = max(4, pw / 150)
                 val r = Rect(max(0, (bx.l * k).roundToInt() - pad), max(0, (bx.t * k).roundToInt() - pad),
                     min(pw, (bx.r * k).roundToInt() + pad), min(ph, (bx.b * k).roundToInt() + pad))
                 val bmp = dec.decodeRegion(r, null)

@@ -939,7 +939,11 @@ class LongVM(app: Application) : AndroidViewModel(app) {
         val d = p.partDir(part)
         val pages = pagesOf(p, part)
         if (pages.isEmpty()) throw IllegalStateException("Chương không có trang ảnh.")
-        val sheets = withContext(Dispatchers.Default) { Story.sheets(pages, File(d, "doc").apply { deleteRecursively() }) }
+        val numbered = panelZoom && !Book("manga", "", pages).webtoon
+        val sheets = withContext(Dispatchers.Default) {
+            Story.sheets(pages, File(d, "doc").apply { deleteRecursively() },
+                if (numbered) { k -> try { Panels.boxes(pages[k].file, rtl) } catch (e: Exception) { emptyList() } } else null)
+        }
         val groups = sheets.chunked(if (!Ai.manual(prefs) && Ai.visionChain(prefs).isNotEmpty()) 3 else 10)
         val notes = HashMap<Int, String>()
         for ((k, g) in groups.withIndex()) {
@@ -947,7 +951,7 @@ class LongVM(app: Application) : AndroidViewModel(app) {
             val first = g.first().pages.first() + 1
             val last = g.last().pages.last() + 1
             val prev = notes.keys.sorted().takeLast(8).mapNotNull { notes[it] }.ifEmpty { listOf(p.memory.takeLast(600)).filter { it.isNotBlank() } }
-            val prompt = Story.readPages("${p.title} - ${part.name}", k + 1, groups.size, g.size, first, last, prefs, prev)
+            val prompt = Story.readPages("${p.title} - ${part.name}", k + 1, groups.size, g.size, first, last, prefs, prev, numbered)
             val got = askVision("Đọc tranh ${part.name} (${k + 1}/${groups.size})", prompt, g.map { it.file },
                 "Gửi kèm ${g.size} ảnh trang (P$first–P$last) cho Gemini - nút 📤 gửi cả ảnh lẫn yêu cầu.",
                 { Story.parsePages(it, first, last) }, { it.isNotEmpty() }) ?: emptyMap()
@@ -1010,40 +1014,17 @@ class LongVM(app: Application) : AndroidViewModel(app) {
         val tts = File(d, "tts").apply { deleteRecursively(); mkdirs() }
         val frames = File(d, "frames").apply { deleteRecursively(); mkdirs() }
         val narr = File(d, "narration.wav")
-        val slides = mutableListOf<Slide>()
-        val cues = mutableListOf<Cue>()
         val made = HashMap<String, Pair<File, Boolean>>()
-        val panelsOf = HashMap<String, List<File>>()
+        val cache = HashMap<Int, List<File>>()
         val zoom = !book.webtoon && panelZoom
-        Wav.Writer(narr).use { wr ->
-            var t = 0.0
-            for ((k, s) in segs.withIndex()) {
-                sub(0.4f + 0.4f * k / segs.size, "Đọc giọng ${k + 1}/${segs.size}")
-                val pcm = Wav.read(speak(s.text, File(tts, "s$k.wav"), rate))
-                val dur = pcm.seconds + 0.35
-                val e = if (s.end > s.start) s.end.toInt() else s.start.toInt() + 1
-                var files = Story.visuals(book, items, s.start.toInt(), e)
-                if (zoom) files = files.flatMap { pg ->
-                    panelsOf.getOrPut(pg.path) {
-                        withContext(Dispatchers.Default) { try { Panels.crops(pg, rtl, File(frames, "khung"), "p${panelsOf.size}") } catch (x: Exception) { listOf(pg) } }
-                    }
-                }
-                if (files.isEmpty()) files = listOf(Slides.titleCard(p.title, part.name, w, h, File(frames, "card.jpg")))
-                for ((f, du) in Story.share(files, dur, if (zoom) 1.6 else 2.2)) {
-                    val (img, scroll) = made.getOrPut(f.path) {
-                        withContext(Dispatchers.Default) {
-                            if (f.parentFile == frames) f to false else Slides.frame(f, w, h, File(frames, "f${made.size}.jpg"))
-                        }
-                    }
-                    slides += Slide(img, du, scroll)
-                }
-                wr.silenceTo(t + 0.15)
-                wr.write(pcm)
-                cues += splitCues(s.text, t + 0.15, pcm.seconds, maxChars())
-                t += dur
-                wr.silenceTo(t)
-            }
-        }
+        // đọc từng câu, chiếu đúng trang / khung tranh câu đó nói tới ([#12.3] trong lời kể)
+        val (slides, cues, _) = com.vtgt.reviewphim.manga.Sync.build(segs, items, narr, maxChars(),
+            shots = { pg -> com.vtgt.reviewphim.manga.Sync.shotsOf(book, pg, zoom, rtl, File(frames, "khung"), cache) },
+            card = { made.getOrPut("card") { Slides.titleCard(p.title, part.name, w, h, File(frames, "card.jpg")) to false }.first },
+            frame = { f -> made.getOrPut(f.path) { withContext(Dispatchers.Default) {
+                if (f.parentFile == frames) f to false else Slides.frame(f, w, h, File(frames, "f${made.size}.jpg")) } } },
+            speak = { text, key -> speak(text, File(tts, "$key.wav"), rate) },
+            progress = { k, n -> sub(0.4f + 0.4f * k / n, "Đọc giọng ${k + 1}/$n") })
         tts.deleteRecursively()
         val vid = File(d, "video_only.mp4")
         Slides.render(ctx, slides, w, h, cues, karaoke, "", vid, pr.fps, pr.vbit, pr.motion) { sub(0.85f + 0.12f * it, "Dựng hình ${(it * 100).toInt()}%") }
