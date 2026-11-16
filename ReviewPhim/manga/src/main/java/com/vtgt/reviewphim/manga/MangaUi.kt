@@ -110,6 +110,7 @@ private fun MakeTab(vm: MangaVM) {
     val pickBgm = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let { u -> vm.setBgm(u) } }
     var paste by remember { mutableStateOf(false) }
     var linkBox by remember { mutableStateOf(false) }
+    var gallery by remember { mutableStateOf(false) }
     var browser by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 6.dp)) {
         Section("1. Truyện") {
@@ -145,6 +146,12 @@ private fun MakeTab(vm: MangaVM) {
                 }
                 OutlinedTextField(vm.title, { vm.title = it }, Modifier.fillMaxWidth(), singleLine = true,
                     label = { Text("Tên truyện (giúp AI gọi đúng tên nhân vật)") })
+                if (b.manga) OutlinedButton(onClick = { gallery = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("👁 Xem trước ${b.pages.size} trang đã tải (xóa trang thừa / quảng cáo)")
+                }
+                if (!b.manga && b.illus.isNotEmpty()) OutlinedButton(onClick = { gallery = true }, modifier = Modifier.fillMaxWidth()) {
+                    Text("👁 Xem ${b.illus.size} ảnh minh họa")
+                }
                 if (!b.manga) OutlinedButton(onClick = { pickIllus.launch("image/*") }, enabled = !vm.busy) {
                     Text("🖼 Thêm ảnh bìa / minh họa")
                 }
@@ -202,6 +209,13 @@ private fun MakeTab(vm: MangaVM) {
     }
     if (paste) PasteDialog(vm) { paste = false }
     if (linkBox) LinkDialog(vm, { linkBox = false }) { u -> browser = u }
+    vm.book?.let { b ->
+        if (gallery) {
+            if (b.manga) PageGallery(b.title, b.pages, vm.busy, onDelete = vm::deletePages) { gallery = false }
+            else PageGallery(b.title, b.illus.mapIndexed { i, il -> Page(il.file, 0, 0, "Ảnh ${i + 1}") }, vm.busy,
+                onDelete = vm::deleteIllus) { gallery = false }
+        }
+    }
     browser?.let { BrowserDialog(vm, it) { browser = null } }
 }
 

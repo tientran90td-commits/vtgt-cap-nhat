@@ -234,6 +234,22 @@ class LongVM(app: Application) : AndroidViewModel(app) {
             ?.forEach { it.delete() }
     }
 
+    /** Xóa trang của 1 chương truyện tranh (ảnh quảng cáo lọt lưới...) - chương đó phải đọc / dựng lại. */
+    fun deletePages(part: Part, idx: Set<Int>) {
+        val p = project ?: return
+        if (busy || idx.isEmpty()) return
+        val pages = pagesOf(p, part)
+        val keep = pages.filterIndexed { i, _ -> i !in idx }
+        if (keep.isEmpty()) return
+        pages.filterIndexed { i, _ -> i in idx }.forEach { it.file.delete() }
+        File(p.partDir(part), "pages.json").writeText(JSONArray().apply {
+            keep.forEach { pg -> put(JSONObject().put("w", pg.w).put("h", pg.h).put("label", pg.label).put("strip", pg.strip).put("f", pg.file.name)) }
+        }.toString())
+        part.weight = keep.size.toDouble()
+        if (part.state > 0) redoPart(part) else edit { }
+        log("🗑 ${part.name}: xóa ${idx.size} trang, còn ${keep.size} trang.")
+    }
+
     private fun need(kind: String): Project {
         val p = project ?: throw IllegalStateException("Tạo hoặc chọn dự án trước.")
         if (p.kind != kind) throw IllegalStateException("Dự án này là ${kindName(p.kind)} - tạo dự án mới cho ${kindName(kind)}.")

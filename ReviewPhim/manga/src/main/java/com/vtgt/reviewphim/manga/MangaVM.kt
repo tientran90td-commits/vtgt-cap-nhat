@@ -291,6 +291,29 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
         } else throw IllegalStateException("Chưa lấy được ảnh / chữ nào.")
     }
 
+    /** Xóa các trang (ảnh quảng cáo lọt lưới, trang bìa...) - phải đọc lại tranh vì số trang đổi. */
+    fun deletePages(idx: Set<Int>) {
+        val b = book ?: return
+        if (busy || idx.isEmpty()) return
+        val keep = b.pages.filterIndexed { i, _ -> i !in idx }
+        if (keep.isEmpty()) return
+        b.pages.filterIndexed { i, _ -> i in idx }.forEach { it.file.delete() }
+        book = b.copy(pages = keep)
+        if (items.isNotEmpty() || segs.isNotEmpty()) log("Đã xóa ${idx.size} trang → AI sẽ đọc lại tranh khi làm video.")
+        else log("🗑 Đã xóa ${idx.size} trang, còn ${keep.size} trang.")
+        items = emptyList()
+        segs = emptyList()
+        recapTitle = ""
+    }
+
+    fun deleteIllus(idx: Set<Int>) {
+        val b = book ?: return
+        if (busy) return
+        val gone = b.illus.filterIndexed { i, _ -> i in idx }.map { it.file }.toSet()
+        book = b.copy(illus = b.illus.filterIndexed { i, _ -> i !in idx }, cover = b.cover.takeIf { it !in gone })
+        log("🗑 Đã bỏ ${idx.size} ảnh minh họa.")
+    }
+
     /** Light novel: thêm ảnh bìa / ảnh minh họa (rải đều theo truyện). */
     fun addIllus(uris: List<Uri>) = launchTask("Thêm ảnh minh họa") {
         val b = book ?: throw IllegalStateException("Mở truyện chữ trước.")

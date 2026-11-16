@@ -321,6 +321,11 @@ private fun VoicePicker(vm: LongVM) {
 private fun ProgressTab(vm: LongVM) {
     @Suppress("UNUSED_VARIABLE") val r = vm.rev
     val p = vm.project
+    var gallery by remember { mutableStateOf<Part?>(null) }
+    gallery?.let { pt ->
+        if (p != null) com.vtgt.reviewphim.manga.PageGallery("${p.title} - ${pt.name}", vm.pagesOf(p, pt), vm.busy,
+            onDelete = { vm.deletePages(pt, it) }) { gallery = null }
+    }
     Column(Modifier.fillMaxSize()) {
         if (p == null) {
             Box(Modifier.padding(16.dp)) { Hint("Chưa có dự án - tạo ở tab 📦 Dự án.") }
@@ -349,6 +354,7 @@ private fun ProgressTab(vm: LongVM) {
                         }
                         Text(extra, fontSize = 12.sp, color = if (pt.error.isNotBlank()) Color(0xFFFF8A80) else Muted, maxLines = 2)
                     }
+                    if (p.kind == "manga") TextButton(onClick = { gallery = pt }) { Text("👁") }
                     if (!vm.busy) {
                         if (pt.state > 0) TextButton(onClick = { vm.redoPart(pt) }) { Text("↻") }
                         TextButton(onClick = { vm.removePart(pt) }) { Text("✖") }
