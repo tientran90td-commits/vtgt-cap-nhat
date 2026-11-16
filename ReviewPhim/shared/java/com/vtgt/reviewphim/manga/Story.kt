@@ -97,6 +97,7 @@ Mình gửi kèm $images ảnh, mỗi ảnh ghép tối đa $PER_SHEET trang tru
 
 Hãy ĐỌC KỸ từng trang (tranh + chữ trong khung thoại, truyện Nhật đọc từ phải sang trái) và viết lại diễn biến bằng tiếng Việt:
 ${if (numbered) "- Các khung tranh trong trang có SỐ TRÒN ĐỎ (1, 2, 3...). Mỗi trang đúng 1 dòng, tả theo từng khung, dạng: P12 | (1) ai làm gì... (2) chuyện gì xảy ra, lời thoại quan trọng dịch sang tiếng Việt trong ngoặc kép... (3) ...\n- Trang không có số khung thì tả cả trang." else "- Mỗi trang đúng 1 dòng, dạng: P12 | ai làm gì, chuyện gì xảy ra, lời thoại quan trọng (dịch sang tiếng Việt, để trong ngoặc kép)."}
+- Lời thoại ghi rõ AI NÓI: Tên: "câu thoại đã dịch" (xem đuôi bóng thoại chỉ vào ai; không chắc thì ghi ?: "..."). Lời dẫn trong khung vuông ghi (dẫn truyện) "...". Bỏ chữ hiệu ứng âm thanh (ầm, rầm, BOOM...), chữ nền, chữ không quan trọng.
 - Không bỏ trang nào trong P$first–P$last. Trang chỉ có tranh hành động thì tả hành động (đánh nhau, chiêu thức, rượt đuổi, biểu cảm...). Trang bìa / quảng cáo / lời tác giả ghi "P.. | (bỏ qua)".
 - Gọi nhân vật đúng tên trong truyện, thống nhất từ đầu tới cuối; chưa biết tên thì tả ngoại hình.
 - Chỉ viết những gì có trên trang, không đoán thêm.
