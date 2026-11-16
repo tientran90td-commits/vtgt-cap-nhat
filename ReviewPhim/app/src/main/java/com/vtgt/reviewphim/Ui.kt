@@ -77,7 +77,6 @@ import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import kotlinx.coroutines.launch
 
-private val Muted = Color(0xFF9A9AB0)
 
 @Composable
 fun AppScreen(vm: MainVM) {
@@ -102,48 +101,7 @@ fun AppScreen(vm: MainVM) {
         }
         BottomBar(vm)
     }
-    vm.ask?.let { ManualDialog(it, vm) }
-}
-
-@Composable
-private fun Section(title: String, content: @Composable () -> Unit) {
-    Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            content()
-        }
-    }
-}
-
-@Composable
-private fun <T> Choice(label: String, value: T, options: List<Pair<T, String>>, onPick: (T) -> Unit) {
-    var open by remember { mutableStateOf(false) }
-    Column {
-        Text(label, color = Muted, fontSize = 12.sp)
-        Box {
-            OutlinedButton(onClick = { open = true }, modifier = Modifier.fillMaxWidth()) {
-                Text(options.firstOrNull { it.first == value }?.second ?: "Chọn...", modifier = Modifier.weight(1f))
-                Text("▾")
-            }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
-                options.forEach { (v, t) ->
-                    DropdownMenuItem(text = { Text(t) }, onClick = { open = false; onPick(v) })
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun Hint(text: String) = Text(text, color = Muted, fontSize = 12.sp)
-
-@Composable
-private fun Toggle(text: String, value: Boolean, onChange: (Boolean) -> Unit) {
-    Row(verticalAlignment = Alignment.CenterVertically) {
-        Checkbox(value, onChange)
-        Text(text, fontSize = 14.sp)
-    }
+    vm.ask?.let { ManualDialog(it, vm::answerManual, vm::cancel) }
 }
 
 // ==================================================================== tab Làm video
@@ -512,82 +470,6 @@ private fun ScriptTab(vm: MainVM) {
 }
 
 // ==================================================================== dán tay qua DeepSeek web
-@Composable
-private fun ManualDialog(a: ManualAsk, vm: MainVM) {
-    val clip = LocalClipboardManager.current
-    val ctx = LocalContext.current
-    val gemini = a.target == "gemini"
-    val who = if (gemini) "Gemini" else "DeepSeek"
-    var reply by remember(a) { mutableStateOf("") }
-    var copied by remember(a) { mutableStateOf(false) }
-    fun looksLikeAnswer(t: String) = t != a.prompt && (t.contains("{") || t.contains("-->") || Regex("\\d+:\\d{2}").containsMatchIn(t))
-    // quay lại app sau khi chép câu trả lời: tự dán
-    val owner = androidx.compose.ui.platform.LocalLifecycleOwner.current
-    androidx.compose.runtime.DisposableEffect(owner, a) {
-        val obs = androidx.lifecycle.LifecycleEventObserver { _, ev ->
-            if (ev == androidx.lifecycle.Lifecycle.Event.ON_RESUME && reply.isBlank()) {
-                clip.getText()?.text?.let { if (looksLikeAnswer(it)) reply = it }
-            }
-        }
-        owner.lifecycle.addObserver(obs)
-        onDispose { owner.lifecycle.removeObserver(obs) }
-    }
-    fun openApp() {
-        val pkg = if (gemini) "com.google.android.apps.bard" else "com.deepseek.chat"
-        val web = if (gemini) "https://gemini.google.com/app" else "https://chat.deepseek.com"
-        val i = ctx.packageManager.getLaunchIntentForPackage(pkg)
-            ?: Intent(Intent.ACTION_VIEW, android.net.Uri.parse(web))
-        ctx.startActivity(i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-    }
-    Dialog(onDismissRequest = {}, properties = DialogProperties(usePlatformDefaultWidth = false)) {
-        Surface(Modifier.fillMaxWidth().padding(12.dp), shape = RoundedCornerShape(16.dp)) {
-            Column(Modifier.padding(16.dp).verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("🖐 Làm tay: ${a.step}", fontWeight = FontWeight.Bold, fontSize = 18.sp)
-                Text(if (gemini) "1. Bấm Chép yêu cầu.  2. Bấm 📤 Gửi cho Gemini (hoặc mở Gemini, đính kèm " +
-                    "\"${a.fileName}\" trong Download/ReviewPhim), dán yêu cầu, gửi.  3. Chép câu trả lời, quay lại đây - app tự dán, bấm Dùng."
-                else "1. Bấm Chép yêu cầu.  2. Mở DeepSeek, dán vào ô chat, gửi (nên dùng chung 1 cuộc trò chuyện cho các phần của " +
-                    "cùng video).  3. Bấm nút chép dưới câu trả lời, quay lại đây - app tự dán, bấm Dùng.", fontSize = 13.sp)
-                if (a.note.isNotBlank()) Hint(a.note)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Button(onClick = { clip.setText(AnnotatedString(a.prompt)); copied = true }, modifier = Modifier.weight(1f)) {
-                        Text(if (copied) "✅ Đã chép" else "📋 Chép yêu cầu")
-                    }
-                    OutlinedButton(onClick = { openApp() }, modifier = Modifier.weight(1f)) { Text("🌐 Mở $who") }
-                }
-                if (a.files.isNotEmpty()) {
-                    OutlinedButton(onClick = {
-                        clip.setText(AnnotatedString(a.prompt)); copied = true
-                        val send = (if (a.files.size == 1) Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, a.files[0])
-                        else Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(a.files)))
-                            .setType(a.mime).putExtra(Intent.EXTRA_TEXT, a.prompt).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                        val g = Intent(send).setPackage("com.google.android.apps.bard")
-                        ctx.startActivity((if (g.resolveActivity(ctx.packageManager) != null) g
-                        else Intent.createChooser(send, "Gửi cho Gemini")).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                    }, modifier = Modifier.fillMaxWidth()) {
-                        Text(if (a.mime.startsWith("image")) "📤 Gửi ${a.files.size} ảnh khung hình cho Gemini (kèm yêu cầu)"
-                        else "📤 Gửi file âm thanh cho Gemini (kèm yêu cầu)")
-                    }
-                }
-                Hint("Yêu cầu (${a.prompt.length} ký tự): " + a.prompt.take(240).replace("\n", " ") + "...")
-                OutlinedTextField(reply, { reply = it }, Modifier.fillMaxWidth().heightIn(min = 120.dp, max = 260.dp),
-                    label = { Text("Câu trả lời của $who") })
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { clip.getText()?.text?.let { reply = it } }, modifier = Modifier.weight(1f)) {
-                        Text("📋 Dán")
-                    }
-                    Button(onClick = { vm.answerManual(reply) }, enabled = looksLikeAnswer(reply) || reply.contains("|"),
-                        modifier = Modifier.weight(1f)) { Text("✅ Dùng") }
-                }
-                Row {
-                    TextButton(onClick = { vm.cancel() }) { Text("Hủy") }
-                    Spacer(Modifier.weight(1f))
-                    if (a.canApi) TextButton(onClick = { vm.answerManual(RETRY_API) }) { Text("⚡ Thử lại API") }
-                }
-            }
-        }
-    }
-}
-
 // ==================================================================== tab Cài đặt
 @Composable
 private fun SettingsTab(vm: MainVM) {

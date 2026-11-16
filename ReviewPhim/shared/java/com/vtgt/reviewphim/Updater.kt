@@ -26,7 +26,7 @@ class Updater(private val ctx: Context) {
             val code = Regex("versionCode=(\\d+)").find(body)?.groupValues?.get(1)?.toIntOrNull() ?: return@withContext null
             val assets = j.optJSONArray("assets") ?: return@withContext null
             val apk = (0 until assets.length()).map { assets.getJSONObject(it) }
-                .firstOrNull { it.optString("name") == "ReviewPhim.apk" } ?: return@withContext null
+                .firstOrNull { it.optString("name") == BuildConfig.UPDATE_ASSET } ?: return@withContext null
             val notes = body.lines().filter { !it.startsWith("versionCode=") }.joinToString("\n").trim()
             Release(code, j.optString("name"), apk.optString("browser_download_url"), notes)
         }

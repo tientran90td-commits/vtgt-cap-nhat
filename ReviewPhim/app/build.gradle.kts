@@ -19,6 +19,7 @@ android {
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         buildConfigField("String", "UPDATE_REPO", "\"tientran90td-commits/vtgt-cap-nhat\"")
         buildConfigField("String", "UPDATE_TAG", "\"reviewphim\"")
+        buildConfigField("String", "UPDATE_ASSET", "\"ReviewPhim.apk\"")
     }
 
     signingConfigs {
@@ -60,6 +61,14 @@ android {
         resources {
             excludes += setOf("META-INF/DEPENDENCIES", "META-INF/LICENSE*", "META-INF/NOTICE*")
         }
+    }
+
+    // code / tài nguyên dùng chung với app MangaRecap (thư mục ../shared)
+    sourceSets["main"].apply {
+        java.srcDir("../shared/java")
+        res.srcDir("../shared/res")
+        assets.srcDir("../shared/assets")
+        jniLibs.srcDir("../shared/jniLibs")
     }
 
     compileOptions {

@@ -20,10 +20,10 @@ class KeepAliveService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val nm = getSystemService(NotificationManager::class.java)
         nm.createNotificationChannel(NotificationChannel(CH, "Đang làm video", NotificationManager.IMPORTANCE_LOW))
-        val open = PendingIntent.getActivity(this, 0, Intent(this, MainActivity::class.java),
+        val open = PendingIntent.getActivity(this, 0, packageManager.getLaunchIntentForPackage(packageName) ?: Intent(),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
         val n = Notification.Builder(this, CH)
-            .setContentTitle("ReviewPhim AI đang làm việc")
+            .setContentTitle(getString(R.string.app_name) + " đang làm việc")
             .setContentText(intent?.getStringExtra("text") ?: "Đang làm video...")
             .setSmallIcon(R.drawable.ic_stat)
             .setContentIntent(open)

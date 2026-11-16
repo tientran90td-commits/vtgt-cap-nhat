@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- cuốn truyện mở + nút phát -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp" android:height="108dp"
+    android:viewportWidth="108" android:viewportHeight="108">
+    <path android:fillColor="#FFFFFFFF"
+        android:pathData="M26,38c8,-3 18,-3 27,2v34c-9,-5 -19,-5 -27,-2z M55,40c9,-5 19,-5 27,-2v34c-8,-3 -18,-3 -27,2z" />
+    <path android:fillColor="#FFE8553A" android:pathData="M63,49l11,7l-11,7z" />
+    <path android:fillColor="#FFFFD54F" android:pathData="M31,47h16v3h-16z M31,54h16v3h-16z M31,61h12v3h-12z" />
+</vector>

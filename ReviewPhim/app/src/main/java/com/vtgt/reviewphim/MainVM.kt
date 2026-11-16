@@ -32,16 +32,6 @@ import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 
-/**
- * Một bước bạn làm tay thay cho gọi API: chép yêu cầu -> dán sang AI (DeepSeek / Gemini) -> dán câu trả lời lại.
- * target: "deepseek" | "gemini"; file: file cần gửi kèm (âm thanh cho Gemini nghe).
- */
-data class ManualAsk(val step: String, val target: String, val prompt: String, val note: String = "",
-                     val files: List<Uri> = emptyList(), val fileName: String = "", val canApi: Boolean = false,
-                     val mime: String = "audio/mpeg")
-
-const val RETRY_API = "\u0000api"
-
 class MainVM(app: Application) : AndroidViewModel(app) {
     private val ctx get() = getApplication<Application>()
     val prefs = Prefs(app)

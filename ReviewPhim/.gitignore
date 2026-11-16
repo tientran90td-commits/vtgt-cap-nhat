@@ -4,5 +4,5 @@ local.properties
 *.iml
 .idea/
 .kotlin/
-app/src/main/jniLibs/
+shared/jniLibs/
 app/src/androidTest/assets/

@@ -1,4 +1,4 @@
-# ReviewPhim AI (Android)
+# ReviewPhim AI & MangaRecap AI (Android)
 
 App điện thoại làm **video review / tóm tắt phim** và **dịch phim nước ngoài sang tiếng Việt** (thuyết minh + Vietsub), tự làm hết trên máy.
 
@@ -14,7 +14,21 @@ App điện thoại làm **video review / tóm tắt phim** và **dịch phim n�
 | Giọng VoiceStudio | Tùy chọn: gọi [VoiceStudio](https://github.com/debpalash/VoiceStudio) (AGPL) chạy trên máy tính cùng wifi qua API `/v1/audio/speech` - giọng AI / giọng nhân bản; app không chứa code VoiceStudio, mất kết nối thì tự dùng giọng của máy |
 | Kết quả | Lưu vào Thư viện ảnh → Movies/ReviewPhim, có nút Xem / Chia sẻ. Tab *Kịch bản* để sửa chữ rồi xuất lại |
 
-Cài đặt: tải `ReviewPhim.apk` ở mục Releases (tag `reviewphim`) của repo. App có nút **Cập nhật** tự lấy bản mới.
+## MangaRecap AI (app thứ 2, thư mục `manga/`)
+
+App **tóm tắt truyện tranh (manga / manhwa / manhua) và light novel thành video** kể chuyện.
+
+| Bước | Cách làm |
+|---|---|
+| Truyện | Ảnh các trang, cả thư mục, file CBZ / ZIP / PDF; light novel: EPUB (lấy cả ảnh minh họa + bìa), TXT (UTF-8 / GB18030) hoặc dán chữ. Trang manhwa dài được tự cắt ở khoảng trắng giữa các khung tranh |
+| Đọc truyện | Truyện tranh: ghép 4 trang/ảnh có số trang, AI nhìn ảnh (Gemini / OpenRouter / Groq / OpenAI) tả diễn biến + dịch lời thoại từng trang; không có key thì 🖐 gửi ảnh cho app Gemini. Light novel: AI tóm tắt từng phần thành các ý (🖐 DeepSeek nếu không có key) |
+| Kịch bản | Hook + kể theo trình tự, mỗi đoạn neo vào đúng các trang / phần truyện; tên nhân vật đúng (bảng tên riêng, MyAnimeList) |
+| Video | Đúng trang tranh của từng đoạn kể: trang dài cuộn từ trên xuống, trang vừa khung phóng to chậm, nền mờ; light novel dùng ảnh minh họa gần nhất / bìa / khung tên truyện. Phụ đề karaoke, tiêu đề hook, nhạc nền, khung 9:16 hoặc 16:9 |
+| Giọng | Như ReviewPhim: giọng máy, VieNeu AI trên máy + nhân bản giọng, VoiceStudio |
+
+Code AI, giọng đọc, dựng video, trộn tiếng dùng chung với ReviewPhim ở thư mục `shared/`.
+
+Cài đặt: tải `ReviewPhim.apk` / `MangaRecap.apk` ở mục Releases (tag `reviewphim`) của repo. App có nút **Cập nhật** tự lấy bản mới.
 
 APK được GitHub Actions dựng (`.github/workflows/reviewphim-android.yml`): test trên JVM + test trên máy ảo Android (ffmpeg, dựng hình có phụ đề, trộn tiếng), rồi mới đăng Release.
 
