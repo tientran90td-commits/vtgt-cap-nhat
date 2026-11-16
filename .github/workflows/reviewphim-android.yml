@@ -127,6 +127,12 @@ jobs:
           pip download -q "sea-g2p==0.10.0" --no-deps --only-binary :all: -d whl
           unzip -o -j "$(ls whl/*.whl | head -1)" 'sea_g2p/sea_g2p.bin' -d .
           ls -la sea_g2p.bin
+      - name: Bỏ file app cũ đã gộp (MangaRecap / LongRecap) khỏi Release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for a in MangaRecap.apk LongRecap.apk; do gh release delete-asset reviewphim "$a" -y -R "${{ github.repository }}" || true; done
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: reviewphim
