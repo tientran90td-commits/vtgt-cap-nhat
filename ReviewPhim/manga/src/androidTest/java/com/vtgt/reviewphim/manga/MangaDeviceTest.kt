@@ -70,6 +70,49 @@ class MangaDeviceTest {
     }
 
     @Test
+    fun webtoonRestitchedAcrossFiles() = runBlocking {
+        // dải gốc 600 x 1800: khung 1 (40-1000), rãnh trắng, khung 2 (1060-1700) - bị cắt thành 2 ảnh 600x900 (cắt ngang khung 1)
+        val strip = webtoon(File(dir, "full.jpg"), 600, listOf(960, 640), 50)
+        val full = BitmapFactory.decodeFile(strip.path)
+        val cbz = File(dir, "wt.cbz")
+        ZipOutputStream(cbz.outputStream()).use { z ->
+            for (k in 0 until 2) {
+                val part = Bitmap.createBitmap(full, 0, k * 900, 600, minOf(900, full.height - k * 900))
+                val f = File(dir, "wt$k.jpg")
+                f.outputStream().use { part.compress(Bitmap.CompressFormat.JPEG, 92, it) }
+                z.putNextEntry(ZipEntry("${k + 1}.jpg"))
+                z.write(f.readBytes())
+                z.closeEntry()
+            }
+        }
+        val pages = Books.fromZip(cbz, File(dir, "wtout"), "webtoon") {}
+        assertTrue(Book("manga", "W", pages).webtoon)
+        assertEquals("nối lại rồi cắt ở rãnh giữa 2 khung: ${pages.map { it.h }}", 2, pages.size)
+        assertTrue("khúc 1 chứa trọn khung 1 (kết thúc ở rãnh 1010-1060): ${pages[0].h}", pages[0].h in 1012..1058)
+        assertEquals(full.height, pages.sumOf { it.h })
+    }
+
+    @Test
+    fun panelCropsOnDevice() {
+        val page = jpg(File(dir, "page.jpg"), 600, 840) { c ->
+            c.drawColor(Color.WHITE)
+            val p = Paint().apply { color = Color.DKGRAY }
+            c.drawRect(20f, 20f, 580f, 280f, p)
+            c.drawRect(20f, 300f, 290f, 580f, p)
+            c.drawRect(310f, 300f, 580f, 580f, p)
+            c.drawRect(20f, 600f, 580f, 820f, p)
+        }
+        val crops = Panels.crops(page, true, File(dir, "crops"), "t")
+        assertEquals(4, crops.size)
+        val sizes = crops.map { f -> BitmapFactory.Options().apply { inJustDecodeBounds = true }.also { BitmapFactory.decodeFile(f.path, it) } }
+        assertTrue("khung đầu rộng cả trang: ${sizes[0].outWidth}", sizes[0].outWidth in 540..600)
+        assertTrue("khung 2 là khung phải (manga): ${sizes[1].outWidth}", sizes[1].outWidth in 250..300)
+        // trang 1 khung: giữ nguyên trang
+        val one = jpg(File(dir, "one.jpg"), 600, 840) { it.drawColor(Color.rgb(90, 120, 150)) }
+        assertEquals(listOf(one), Panels.crops(one, true, File(dir, "crops"), "o"))
+    }
+
+    @Test
     fun cbzAndEpub() = runBlocking {
         // CBZ: thứ tự trang theo số (2 trước 10)
         val cbz = File(dir, "t.cbz")

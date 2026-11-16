@@ -105,4 +105,39 @@ class MangaTest {
         assertEquals(listOf("0.jpg", "3.jpg", "6.jpg"), sh.map { it.first.name })
         assertEquals(1, Story.share(fs.take(2), 1.0).size)
     }
+
+    @Test
+    fun panelsInReadingOrder() {
+        val w = 300
+        val h = 420
+        val g = IntArray(w * h) { 255 }
+        fun fill(l: Int, t: Int, r: Int, b: Int) { for (y in t until b) for (x in l until r) g[y * w + x] = 100 }
+        fill(10, 10, 290, 140)    // khung trên, cả hàng
+        fill(10, 150, 145, 290)   // hàng giữa: khung trái
+        fill(155, 150, 290, 290)  // hàng giữa: khung phải
+        fill(10, 300, 290, 410)   // khung dưới
+        val top = Box(10, 10, 290, 140)
+        val left = Box(10, 150, 145, 290)
+        val right = Box(155, 150, 290, 290)
+        val bottom = Box(10, 300, 290, 410)
+        assertEquals(listOf(top, right, left, bottom), Panels.detect(g, w, h, rtl = true))   // manga Nhật: phải trước
+        assertEquals(listOf(top, left, right, bottom), Panels.detect(g, w, h, rtl = false))
+        // tranh tràn trang, không có rãnh: cả trang là 1 khung
+        val art = IntArray(w * h) { (it * 37 % 200) }
+        assertEquals(1, Panels.detect(art, w, h, true).size)
+        // trang nền đen, khung sáng
+        val dark = IntArray(w * h) { 10 }
+        for (y in 20 until 200) for (x in 20 until 280) dark[y * w + x] = 220
+        for (y in 220 until 400) for (x in 20 until 280) dark[y * w + x] = 220
+        assertEquals(listOf(Box(20, 20, 280, 200), Box(20, 220, 280, 400)), Panels.detect(dark, w, h, true))
+    }
+
+    @Test
+    fun webtoonDetection() {
+        assertTrue(Books.looksWebtoon(List(5) { 720 to 1280 }))          // ảnh cắt sẵn cùng cỡ, dài hơn trang sách
+        assertTrue(Books.looksWebtoon(listOf(800 to 1100, 800 to 5000)))  // có dải dài
+        assertTrue(!Books.looksWebtoon(List(6) { 800 to 1150 }))         // trang manga
+        assertTrue(!Books.looksWebtoon(listOf(700 to 1300, 800 to 1300, 900 to 1300)))
+        assertTrue(!Books.looksWebtoon(emptyList()))
+    }
 }

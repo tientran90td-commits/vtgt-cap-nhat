@@ -21,7 +21,7 @@ import kotlin.math.min
 import kotlin.math.roundToInt
 
 /** Một trang truyện tranh đã chuẩn hóa (trang dài kiểu webtoon được cắt thành nhiều khúc). */
-data class Page(val file: File, val w: Int, val h: Int, val label: String)
+data class Page(val file: File, val w: Int, val h: Int, val label: String, val strip: Boolean = false)
 
 /** Ảnh minh họa trong light novel, nằm ở vị trí ký tự `pos` của văn bản. */
 data class Illus(val pos: Int, val file: File)
@@ -30,6 +30,8 @@ data class Illus(val pos: Int, val file: File)
 data class Book(val kind: String, val title: String, val pages: List<Page> = emptyList(), val text: String = "",
                 val illus: List<Illus> = emptyList(), val cover: File? = null) {
     val manga get() = kind == "manga"
+    /** Truyện cuộn dọc (manhwa / webtoon): các khúc đã cắt theo khoảng trắng, không tách khung nữa. */
+    val webtoon get() = pages.count { it.strip } * 2 > pages.size
 }
 
 object Books {
@@ -68,16 +70,16 @@ object Books {
 
     // ------------------------------------------------------------------ nhập
     /** Nhiều ảnh trang chọn từ thư viện / file. */
-    suspend fun fromImages(ctx: Context, uris: List<Uri>, dir: File, progress: (Float) -> Unit): List<Page> {
+    suspend fun fromImages(ctx: Context, uris: List<Uri>, dir: File, layout: String = "auto", progress: (Float) -> Unit): List<Page> {
         val named = uris.map { it to displayName(ctx, it) }.sortedWith { a, b -> natural.compare(a.second, b.second) }
-        return pagesFrom(named.size, dir, progress) { i, out ->
+        return pagesFrom(named.size, dir, layout, progress) { i, out ->
             ctx.contentResolver.openInputStream(named[i].first)?.use { s -> out.outputStream().use { s.copyTo(it) } }
             named[i].second
         }
     }
 
     /** Cả thư mục ảnh (chọn bằng trình chọn thư mục của Android). */
-    suspend fun fromTree(ctx: Context, tree: Uri, dir: File, progress: (Float) -> Unit): Pair<String, List<Page>> {
+    suspend fun fromTree(ctx: Context, tree: Uri, dir: File, layout: String = "auto", progress: (Float) -> Unit): Pair<String, List<Page>> {
         val r = ctx.contentResolver
         val root = DocumentsContract.buildChildDocumentsUriUsingTree(tree, DocumentsContract.getTreeDocumentId(tree))
         val items = mutableListOf<Pair<Uri, String>>()
@@ -91,18 +93,18 @@ object Books {
         if (items.isEmpty()) throw IllegalStateException("Thư mục không có ảnh nào.")
         items.sortWith { a, b -> natural.compare(a.second, b.second) }
         val title = DocumentsContract.getTreeDocumentId(tree).substringAfterLast('/').substringAfterLast(':')
-        return titleOf(title) to pagesFrom(items.size, dir, progress) { i, out ->
+        return titleOf(title) to pagesFrom(items.size, dir, layout, progress) { i, out ->
             r.openInputStream(items[i].first)?.use { s -> out.outputStream().use { s.copyTo(it) } }
             items[i].second
         }
     }
 
     /** CBZ / ZIP chứa ảnh trang. */
-    suspend fun fromZip(zip: File, dir: File, progress: (Float) -> Unit): List<Page> = ZipFile(zip).use { z ->
+    suspend fun fromZip(zip: File, dir: File, layout: String = "auto", progress: (Float) -> Unit): List<Page> = ZipFile(zip).use { z ->
         val entries = z.entries().toList().filter { !it.isDirectory && isImage(it.name) && !it.name.contains("__MACOSX") }
             .sortedWith { a, b -> natural.compare(a.name, b.name) }
         if (entries.isEmpty()) throw IllegalStateException("File nén không có ảnh nào.")
-        pagesFrom(entries.size, dir, progress) { i, out ->
+        pagesFrom(entries.size, dir, layout, progress) { i, out ->
             z.getInputStream(entries[i]).use { s -> out.outputStream().use { s.copyTo(it) } }
             entries[i].name.substringAfterLast('/')
         }
@@ -130,16 +132,20 @@ object Books {
         out
     }
 
-    private suspend fun pagesFrom(n: Int, dir: File, progress: (Float) -> Unit,
+    private suspend fun pagesFrom(n: Int, dir: File, layout: String, progress: (Float) -> Unit,
                                   fetch: (Int, File) -> String): List<Page> = withContext(Dispatchers.IO) {
         dir.mkdirs()
         val tmp = File(dir, "src.tmp")
         val out = mutableListOf<Page>()
+        val sizes = mutableListOf<Pair<Int, Int>>()
         for (i in 0 until n) {
             currentCoroutineContext().ensureActive()
             fetch(i, tmp)
             try {
+                val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                BitmapFactory.decodeFile(tmp.path, o)
                 out += sliceFile(tmp, dir, "Trang ${i + 1}", out.size)
+                sizes += o.outWidth to o.outHeight
             } catch (e: Exception) {
                 // ảnh hỏng / không đọc được: bỏ qua trang đó
             }
@@ -147,7 +153,75 @@ object Books {
         }
         tmp.delete()
         if (out.isEmpty()) throw IllegalStateException("Không đọc được ảnh trang nào.")
-        out
+        val webtoon = when (layout) {
+            "webtoon" -> true
+            "page" -> false
+            else -> looksWebtoon(sizes)
+        }
+        if (webtoon) restitch(out, File(dir, "strip")) else out
+    }
+
+    /**
+     * Ảnh kiểu webtoon (cuộn dọc): có ảnh rất dài, hoặc mọi ảnh cùng chiều rộng mà tỉ lệ không giống trang sách
+     * (trang manga / manhua ~1.3-1.6).
+     */
+    fun looksWebtoon(sizes: List<Pair<Int, Int>>): Boolean {
+        if (sizes.isEmpty()) return false
+        if (sizes.any { (w, h) -> h > w * 2.2 }) return true
+        if (sizes.size < 3) return false
+        val w0 = sizes[0].first
+        val sameW = sizes.all { abs(it.first - w0) <= max(2, w0 / 100) }
+        val ratios = sizes.map { (w, h) -> h.toDouble() / max(1, w) }.sorted()
+        val med = ratios[ratios.size / 2]
+        return sameW && (med >= 1.65 || med < 1.0)
+    }
+
+    /**
+     * Webtoon thường bị cắt thành nhiều ảnh cắt ngang khung tranh: nối các khúc liên tiếp lại rồi cắt lại đúng
+     * khoảng trắng giữa các khung (cách SmartStitch / StitchTool làm; code tự viết).
+     */
+    fun restitch(pages: List<Page>, dir: File): List<Page> {
+        dir.mkdirs()
+        val w = pages.first().w
+        val out = mutableListOf<Page>()
+        var carry: Bitmap? = null
+        fun emit(b: Bitmap) {
+            val f = File(dir, "k%05d.jpg".format(out.size))
+            f.outputStream().use { b.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+            out += Page(f, b.width, b.height, "Khúc ${out.size + 1}", strip = true)
+        }
+        for (p in pages) {
+            val src = BitmapFactory.decodeFile(p.file.path) ?: continue
+            val b = if (src.width == w) src else Bitmap.createScaledBitmap(src, w, max(1, (src.height.toDouble() * w / src.width).roundToInt()), true)
+                .also { src.recycle() }
+            val c0 = carry
+            val combined = if (c0 == null) b else {
+                val m = Bitmap.createBitmap(w, c0.height + b.height, Bitmap.Config.ARGB_8888)
+                val cv = android.graphics.Canvas(m)
+                cv.drawBitmap(c0, 0f, 0f, null)
+                cv.drawBitmap(b, 0f, c0.height.toFloat(), null)
+                c0.recycle()
+                b.recycle()
+                m
+            }
+            if (combined.height <= w * MAX_RATIO) {
+                carry = combined
+                continue
+            }
+            val row = IntArray(w)
+            val ys = cuts(w, combined.height) { y -> combined.getPixels(row, 0, w, 0, y, w, 1); rowBlank(row) }
+            for ((a, c) in ys.zipWithNext().dropLast(1)) {
+                val part = Bitmap.createBitmap(combined, 0, a, w, c - a)
+                emit(part)
+                part.recycle()
+            }
+            val last = ys[ys.size - 2]
+            carry = Bitmap.createBitmap(combined, 0, last, w, combined.height - last)
+            combined.recycle()
+        }
+        carry?.let { emit(it); it.recycle() }
+        pages.forEach { it.file.delete() }
+        return out
     }
 
     // ------------------------------------------------------------------ cắt trang dài (webtoon / manhwa)

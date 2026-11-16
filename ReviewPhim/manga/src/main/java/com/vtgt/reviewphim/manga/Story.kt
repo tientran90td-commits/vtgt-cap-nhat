@@ -66,7 +66,8 @@ object Story {
 
     // ------------------------------------------------------------------ yêu cầu gửi AI
     /** Nhờ AI nhìn các trang truyện tranh và tả diễn biến từng trang. */
-    fun readPages(title: String, part: Int, parts: Int, images: Int, first: Int, last: Int, prefs: Prefs): String = """
+    fun readPages(title: String, part: Int, parts: Int, images: Int, first: Int, last: Int, prefs: Prefs,
+                  prev: List<String> = emptyList()): String = """
 Mình gửi kèm $images ảnh, mỗi ảnh ghép tối đa $PER_SHEET trang truyện tranh của "$title"${if (parts > 1) " (phần $part/$parts)" else ""}. Góc trên bên trái mỗi trang có số trang màu vàng (P$first ... P$last). Đọc lần lượt theo số trang.
 
 Hãy ĐỌC KỸ từng trang (tranh + chữ trong khung thoại, truyện Nhật đọc từ phải sang trái) và viết lại diễn biến bằng tiếng Việt:
@@ -76,9 +77,14 @@ Hãy ĐỌC KỸ từng trang (tranh + chữ trong khung thoại, truyện Nhậ
 - Chỉ viết những gì có trên trang, không đoán thêm.
 ${Prompts.NAME_RULES}
 ${Prompts.glossary(prefs)}
-
+${memory(prev)}
 Chỉ trả lời các dòng "P.. | ...", không giải thích gì thêm.
 """.trim()
+
+    /** Mạch truyện của lần trước (để AI nối đúng diễn biến và gọi tên thống nhất giữa các lần gửi). */
+    private fun memory(prev: List<String>): String =
+        if (prev.isEmpty()) "" else "\nDIỄN BIẾN NGAY TRƯỚC ĐÓ (chỉ để nối mạch và giữ tên nhân vật, KHÔNG viết lại):\n" +
+            prev.takeLast(8).joinToString("\n") { "- " + it.take(220) } + "\n"
 
     private val PAGE_ROW = Regex("^[\\s*\\-•#>]*(?:P|Trang|Page|p)\\s*\\.?\\s*(\\d{1,4})[\\s*]*[|:\\-–.)]+\\s*(.+)$", RegexOption.IGNORE_CASE)
 
@@ -97,14 +103,14 @@ Chỉ trả lời các dòng "P.. | ...", không giải thích gì thêm.
     }
 
     /** Nhờ AI tóm tắt chi tiết 1 phần light novel thành các ý theo thứ tự. */
-    fun novelNotes(title: String, part: Int, parts: Int, text: String, prefs: Prefs): String = """
+    fun novelNotes(title: String, part: Int, parts: Int, text: String, prefs: Prefs, prev: List<String> = emptyList()): String = """
 Dưới đây là phần $part/$parts của light novel / tiểu thuyết "$title". Hãy tóm tắt CHI TIẾT phần này bằng tiếng Việt thành các ý theo đúng thứ tự diễn biến, để sau đó làm video kể lại truyện.
 - Mỗi ý 1 dòng, bắt đầu bằng "- ", 1–2 câu: ai làm gì, ở đâu, vì sao, kết quả; giữ các chi tiết quan trọng, lời thoại then chốt, cảnh hành động, bí mật được hé lộ, cảm xúc nhân vật.
 - Khoảng ${(text.length / 900).coerceIn(6, 30)} ý. Chỉ kể những gì có trong đoạn văn, không bịa, không bình luận.
 - Tên nhân vật / địa danh / chiêu thức thống nhất, đúng quy tắc tên riêng bên dưới.
 ${Prompts.NAME_RULES}
 ${Prompts.glossary(prefs)}
-
+${memory(prev)}
 Chỉ trả lời các dòng "- ...", không giải thích.
 
 VĂN BẢN:

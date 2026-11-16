@@ -26,6 +26,8 @@ App **tóm tắt truyện tranh (manga / manhwa / manhua) và light novel thành
 | Video | Đúng trang tranh của từng đoạn kể: trang dài cuộn từ trên xuống, trang vừa khung phóng to chậm, nền mờ; light novel dùng ảnh minh họa gần nhất / bìa / khung tên truyện. Phụ đề karaoke, tiêu đề hook, nhạc nền, khung 9:16 hoặc 16:9 |
 | Giọng | Như ReviewPhim: giọng máy, VieNeu AI trên máy + nhân bản giọng, VoiceStudio |
 
+Học cơ chế từ mã nguồn mở (ý tưởng, code tự viết): [manga-reader](https://github.com/pashpashpash/manga-reader) (MIT - neo lời kể vào đúng trang, chiếu khung tranh theo lời kể), [Kumiko](https://github.com/njean42/kumiko) (AGPL - tách khung theo rãnh trắng, thứ tự phải→trái), [SmartStitch](https://github.com/MechTechnology/SmartStitch) / [StitchTool](https://github.com/Aeonss/StitchTool) (nối ảnh webtoon rồi cắt lại ở khoảng trắng), BooookScore (tóm tắt sách dài theo từng phần có nhớ mạch phần trước).
+
 Code AI, giọng đọc, dựng video, trộn tiếng dùng chung với ReviewPhim ở thư mục `shared/`.
 
 Cài đặt: tải `ReviewPhim.apk` / `MangaRecap.apk` ở mục Releases (tag `reviewphim`) của repo. App có nút **Cập nhật** tự lấy bản mới.

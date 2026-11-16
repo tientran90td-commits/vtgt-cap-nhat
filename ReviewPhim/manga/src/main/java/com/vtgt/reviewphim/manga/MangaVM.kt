@@ -75,6 +75,9 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
     var bgmName by mutableStateOf(prefs.str("m_bgm_name"))
     var voice by mutableStateOf(prefs.str("voice"))
     var rate by mutableFloatStateOf(prefs.num("rate", 1.1f))
+    var layout by mutableStateOf(prefs.str("m_layout", "auto"))   // auto | page | webtoon
+    var rtl by mutableStateOf(prefs.bool("m_rtl", true))          // thứ tự khung: phải -> trái (manga Nhật)
+    var panelZoom by mutableStateOf(prefs.bool("m_panels", true)) // chiếu lần lượt từng khung tranh
 
     // ---- tiến trình
     val logs = mutableStateListOf<String>()
@@ -157,7 +160,7 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
             recapTitle = ""
             result = null
         }
-        if (b.manga) log("📚 ${b.title}: ${b.pages.size} trang/khúc tranh.")
+        if (b.manga) log("📚 ${b.title}: ${b.pages.size} ${if (b.webtoon) "khúc (truyện cuộn dọc, đã nối lại và cắt đúng khoảng trắng giữa các khung)" else "trang"}.")
         else log("📖 ${b.title}: ${b.text.length} ký tự, ${b.illus.size} ảnh minh họa${if (b.cover != null) ", có ảnh bìa" else ""}.")
     }
 
@@ -165,12 +168,12 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
 
     fun openImages(uris: List<Uri>) = launchTask("Mở ảnh truyện") {
         if (uris.isEmpty()) return@launchTask
-        val pages = Books.fromImages(ctx, uris, freshDir()) { prog(it, "Đọc ảnh ${(it * 100).toInt()}%") }
+        val pages = Books.fromImages(ctx, uris, freshDir(), layout) { prog(it, "Đọc ảnh ${(it * 100).toInt()}%") }
         setBook(Book("manga", Books.titleOf(Books.displayName(ctx, uris.first())).replace(Regex("\\s*\\d+$"), ""), pages))
     }
 
     fun openTree(uri: Uri) = launchTask("Mở thư mục truyện") {
-        val (t, pages) = Books.fromTree(ctx, uri, freshDir()) { prog(it, "Đọc ảnh ${(it * 100).toInt()}%") }
+        val (t, pages) = Books.fromTree(ctx, uri, freshDir(), layout) { prog(it, "Đọc ảnh ${(it * 100).toInt()}%") }
         setBook(Book("manga", t, pages))
     }
 
@@ -186,11 +189,11 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
         val dir = freshDir()
         val t = Books.titleOf(name)
         val b = when (ext) {
-            "cbz", "zip" -> Book("manga", t, Books.fromZip(src, dir) { prog(it, "Giải nén trang ${(it * 100).toInt()}%") })
+            "cbz", "zip" -> Book("manga", t, Books.fromZip(src, dir, layout) { prog(it, "Giải nén trang ${(it * 100).toInt()}%") })
             "pdf" -> Book("manga", t, Books.fromPdf(src, dir) { prog(it, "Đọc PDF ${(it * 100).toInt()}%") })
             "epub" -> Books.fromEpub(src, dir) { prog(it, "Đọc EPUB ${(it * 100).toInt()}%") }
             "txt", "md", "text" -> Book("novel", t, text = withContext(Dispatchers.IO) { Books.readText(src.readBytes()) }.trim())
-            else -> if (Books.isImage(name)) Book("manga", t, Books.fromImages(ctx, listOf(uri), dir) {})
+            else -> if (Books.isImage(name)) Book("manga", t, Books.fromImages(ctx, listOf(uri), dir, layout) {})
             else throw IllegalStateException("Chưa hỗ trợ file .$ext - dùng ảnh, CBZ/ZIP, PDF, EPUB hoặc TXT.")
         }
         src.delete()
@@ -366,7 +369,8 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
             val first = g.first().pages.first() + 1
             val last = g.last().pages.last() + 1
             val step = "Đọc tranh ${if (groups.size > 1) "phần ${k + 1}/${groups.size}" else ""}".trim()
-            val prompt = Story.readPages(title, k + 1, groups.size, g.size, first, last, prefs)
+            val prompt = Story.readPages(title, k + 1, groups.size, g.size, first, last, prefs,
+                notes.keys.sorted().takeLast(8).mapNotNull { notes[it] })
             var got = emptyMap<Int, String>()
             if (useApi && !apiDown) {
                 try {
@@ -445,7 +449,8 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
             var tries = 0
             while (notes.isEmpty() && tries < 3) {
                 tries++
-                val r = askAi("Tóm tắt phần ${k + 1}/${parts.size}", Story.novelNotes(title, k + 1, parts.size, body, prefs), json = false)
+                val r = askAi("Tóm tắt phần ${k + 1}/${parts.size}",
+                    Story.novelNotes(title, k + 1, parts.size, body, prefs, out.takeLast(6).map { it.text }), json = false)
                 notes = Story.parseNotes(r)
                 if (notes.isEmpty()) log("Không thấy ý nào dạng \"- ...\" trong câu trả lời - thử lại.")
             }
@@ -594,6 +599,10 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
         val slides = mutableListOf<Slide>()
         val cues = mutableListOf<Cue>()
         val made = HashMap<String, Pair<File, Boolean>>()
+        val panelDir = File(frames, "khung").apply { mkdirs() }
+        val panelsOf = HashMap<String, List<File>>()
+        val zoom = b.manga && !b.webtoon && panelZoom
+        var nPanels = 0
         val maxChars = if (vertical) 30 else 44
         val name = recapTitle.ifBlank { title }
         log("Đọc giọng ${segs.size} đoạn, dựng ${w}x$h...")
@@ -611,7 +620,20 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
                         Slides.titleCard(name, if (b.manga) "" else "Light novel", w, h, File(frames, "card.jpg")) to false
                     }.first)
                 }
-                for ((f, d) in Story.share(files, dur)) {
+                if (zoom) {  // chiếu lần lượt từng khung tranh của các trang (thứ tự đọc)
+                    files = files.flatMap { pg ->
+                        panelsOf.getOrPut(pg.path) {
+                            withContext(Dispatchers.Default) {
+                                try {
+                                    Panels.crops(pg, rtl, panelDir, "p${panelsOf.size}")
+                                } catch (e: Exception) {
+                                    listOf(pg)
+                                }
+                            }.also { if (it.size > 1) nPanels += it.size }
+                        }
+                    }
+                }
+                for ((f, d) in Story.share(files, dur, if (zoom) 1.6 else 2.2)) {
                     val (img, scroll) = made.getOrPut(f.path) {
                         withContext(Dispatchers.Default) {
                             if (f.parentFile == frames) f to false else Slides.frame(f, w, h, File(frames, "f${made.size}.jpg"))
@@ -626,7 +648,7 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
                 wr.silenceTo(t)
             }
         }
-        log("Ghép ${segs.size} đoạn lời kể với ${slides.size} cảnh (${made.size} ảnh).")
+        log("Ghép ${segs.size} đoạn lời kể với ${slides.size} cảnh (${made.size} ảnh${if (nPanels > 0) ", tách được $nPanels khung tranh" else ""}).")
         val aud = File(work, "audio.wav")
         val vid = File(work, "video_only.mp4")
         val out = File(work, "final.mp4")

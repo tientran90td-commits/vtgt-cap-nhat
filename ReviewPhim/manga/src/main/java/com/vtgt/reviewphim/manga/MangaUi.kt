@@ -123,6 +123,9 @@ private fun MakeTab(vm: MangaVM) {
                 }
                 OutlinedButton(onClick = { paste = true }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("📋 Dán chữ") }
             }
+            Choice("Kiểu truyện tranh", vm.layout, listOf("auto" to "Tự nhận",
+                "page" to "Theo trang (manga, manhua, comic)",
+                "webtoon" to "Cuộn dọc (manhwa, webtoon) - nối & cắt lại theo khung")) { vm.layout = it; vm.save("m_layout", it) }
             vm.book?.let { b ->
                 Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
                     vm.cover?.let {
@@ -163,6 +166,11 @@ private fun MakeTab(vm: MangaVM) {
             Choice("Chất lượng", vm.quality, listOf(540 to "540p (nhanh nhất)", 720 to "720p HD", 1080 to "1080p Full HD")) {
                 vm.quality = it; vm.save("m_quality", "$it")
             }
+            Toggle("Chiếu lần lượt từng khung tranh (truyện theo trang)", vm.panelZoom) {
+                vm.panelZoom = it; vm.prefs.setBool("m_panels", it)
+            }
+            if (vm.panelZoom) Choice("Thứ tự khung trong 1 hàng", vm.rtl, listOf(true to "Phải → trái (manga Nhật)",
+                false to "Trái → phải (manhua, manhwa, comic)")) { vm.rtl = it; vm.prefs.setBool("m_rtl", it) }
             Toggle("Phụ đề karaoke (chữ đổi màu theo giọng đọc)", vm.karaoke) { vm.karaoke = it; vm.prefs.setBool("karaoke", it) }
             Toggle("Tiêu đề lớn ở đầu video (hook)", vm.hookTitle) { vm.hookTitle = it; vm.prefs.setBool("hook_title", it) }
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
