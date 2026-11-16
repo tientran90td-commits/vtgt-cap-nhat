@@ -430,11 +430,13 @@ private fun SettingsTab(vm: LongVM) {
             Hint("Video dài cần AI hàng chục / hàng trăm lần (mỗi chương / tập): nên có key. Gemini miễn phí (đọc được cả tranh), " +
                 "DeepSeek rẻ cho dịch / kể lại. Truyện tiếng Việt đọc nguyên văn thì không cần AI. Key chỉ lưu trong máy.")
             Ai.PROVS.forEach { p ->
-                var k by remember { mutableStateOf(vm.prefs.key(p.id)) }
+                var k by remember { mutableStateOf(vm.prefs.str("key_${p.id}")) }
                 OutlinedTextField(k, { k = it.trim(); vm.prefs.set("key_${p.id}", k) }, Modifier.fillMaxWidth(), singleLine = true,
                     label = { Text("${p.name} key - ${p.note}") }, visualTransformation = PasswordVisualTransformation())
                 TextButton(onClick = { uri.openUri(p.keyUrl) }) { Text("Lấy key ${p.name} ↗") }
             }
+            Hint("Mỗi AI nhập được nhiều key, cách nhau dấu phẩy: key này quá tải / hết lượt thì app tự đổi sang key kế.")
+            com.vtgt.reviewphim.CustomAiSection(vm.prefs)
         }
         Section("Tên riêng") {
             var g by remember { mutableStateOf(vm.prefs.str("glossary")) }

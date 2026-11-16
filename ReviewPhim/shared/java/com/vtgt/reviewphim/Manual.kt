@@ -209,3 +209,45 @@ fun ManualDialog(a: ManualAsk, answer: (String?) -> Unit, cancel: () -> Unit) {
     }
 }
 
+/**
+ * Máy chủ AI riêng: LiteLLM (tự thử lại, xoay nhiều key, chuyển AI dự phòng khi quá tải), hoặc AI chạy trên máy tính
+ * nhà (Ollama / LM Studio). Có địa chỉ thì app dùng trước các AI khác.
+ */
+@Composable
+fun CustomAiSection(prefs: Prefs) {
+    val scope = rememberCoroutineScope()
+    var url by remember { mutableStateOf(prefs.str("custom_url")) }
+    var key by remember { mutableStateOf(prefs.str("key_custom")) }
+    var model by remember { mutableStateOf(prefs.str("custom_model")) }
+    var vmodel by remember { mutableStateOf(prefs.str("custom_vmodel")) }
+    var msg by remember { mutableStateOf("") }
+    var found by remember { mutableStateOf<List<String>>(emptyList()) }
+    Text("🖥 Máy chủ AI riêng (LiteLLM / Ollama / LM Studio)", fontWeight = FontWeight.SemiBold)
+    Hint("LiteLLM chạy trên máy tính / máy chủ: tự thử lại khi quá tải, xoay vòng nhiều key, tự chuyển AI dự phòng " +
+        "(Gemini → DeepSeek → Groq...). Hoặc AI miễn phí chạy trên máy tính nhà (Ollama, LM Studio). Có địa chỉ thì app dùng trước tiên. " +
+        "Hướng dẫn: thư mục ReviewPhim/litellm trên GitHub.")
+    OutlinedTextField(url, { url = it.trim(); prefs.set("custom_url", url) }, Modifier.fillMaxWidth(), singleLine = true,
+        label = { Text("Địa chỉ (vd 192.168.1.10:4000 - để trống = không dùng)") })
+    OutlinedTextField(key, { key = it.trim(); prefs.set("key_custom", key) }, Modifier.fillMaxWidth(), singleLine = true,
+        label = { Text("Key (master key LiteLLM; Ollama / LM Studio để trống)") }, visualTransformation = PasswordVisualTransformation())
+    OutlinedTextField(model, { model = it.trim(); prefs.set("custom_model", model) }, Modifier.fillMaxWidth(), singleLine = true,
+        label = { Text("Model viết / dịch (vd chinh, qwen2.5:14b)") })
+    OutlinedTextField(vmodel, { vmodel = it.trim(); prefs.set("custom_vmodel", vmodel) }, Modifier.fillMaxWidth(), singleLine = true,
+        label = { Text("Model nhìn ảnh (vd nhin-anh, gemma3:12b; \"-\" = máy chủ không nhìn được ảnh)") })
+    OutlinedButton(onClick = {
+        scope.launch {
+            msg = "Đang kết nối..."
+            msg = try {
+                found = Ai.testCustom(prefs)
+                "✅ Kết nối được - ${found.size} model: " + found.take(8).joinToString(", ")
+            } catch (e: Exception) {
+                found = emptyList()
+                "❌ ${e.message ?: e.javaClass.simpleName}"
+            }
+        }
+    }, enabled = url.isNotBlank()) { Text("🔌 Kiểm tra kết nối") }
+    if (msg.isNotEmpty()) Hint(msg)
+    if (found.isNotEmpty() && model.isBlank()) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        found.take(3).forEach { m -> TextButton(onClick = { model = m; prefs.set("custom_model", m) }) { Text(m.take(24)) } }
+    }
+}

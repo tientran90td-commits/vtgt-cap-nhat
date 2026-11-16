@@ -240,4 +240,13 @@ Dialogue: 0,0:00:10.00,0:00:12.00,Default,,0,0,0,,前方, 正是友哈巴赫
         assertEquals("google/gemma-3-27b-it:free", Ai.openRouterVision(listOf("google/gemma-3-27b-it:free", "x/y:free")))
         assertNull(Ai.openRouterVision(listOf("deepseek/deepseek-chat-v3.1:free")))
     }
+
+    @Test
+    fun customAiBase() {
+        assertEquals("http://192.168.1.10:4000/v1", Ai.normBase("192.168.1.10:4000"))
+        assertEquals("http://x:11434/v1", Ai.normBase("http://x:11434/"))
+        assertEquals("https://p.com/v1", Ai.normBase("https://p.com/v1"))
+        assertEquals("https://g.com/v1beta/openai", Ai.normBase("https://g.com/v1beta/openai"))
+        assertEquals("", Ai.normBase("  "))
+    }
 }

@@ -484,11 +484,13 @@ private fun SettingsTab(vm: MainVM) {
                 "auto" to "⚡ API tự động (lỗi thì tự chuyển sang làm tay)")) { ai = it; vm.prefs.set("ai", it) }
             Hint("Key chỉ lưu trong máy này. Thứ tự dùng: DeepSeek → Gemini → OpenRouter → Groq → OpenAI; AI nào lỗi/hết tiền thì tự sang AI kế.")
             Ai.PROVS.forEach { p ->
-                var k by remember { mutableStateOf(vm.prefs.key(p.id)) }
+                var k by remember { mutableStateOf(vm.prefs.str("key_${p.id}")) }
                 OutlinedTextField(k, { k = it.trim(); vm.prefs.set("key_${p.id}", k) }, Modifier.fillMaxWidth(), singleLine = true,
                     label = { Text("${p.name} key - ${p.note}") }, visualTransformation = PasswordVisualTransformation())
                 TextButton(onClick = { uri.openUri(p.keyUrl) }) { Text("Lấy key ${p.name} ↗") }
             }
+            Hint("Mỗi AI nhập được nhiều key, cách nhau dấu phẩy: key này quá tải / hết lượt thì app tự đổi sang key kế.")
+            com.vtgt.reviewphim.CustomAiSection(vm.prefs)
         }
         Section("Tên riêng & lời gốc") {
             var g by remember { mutableStateOf(vm.prefs.str("glossary")) }

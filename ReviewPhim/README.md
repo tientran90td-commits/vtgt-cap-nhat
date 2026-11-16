@@ -42,6 +42,8 @@ Code AI, giọng đọc, dựng video, trộn tiếng dùng chung ở thư mục
 
 Video dài làm theo **từng phần** (chương / tập): mỗi phần dựng xong lưu lại, dừng / tắt app vẫn **làm tiếp** từ phần dở; cuối cùng nối các phần (không mã hóa lại) thành 1 video, hoặc lưu từng phần riêng. AI nhớ nội dung phần trước để nối mạch, tên nhân vật thống nhất. Mức "Tiết kiệm" cho truyện audio ~0.16 GB / giờ (ảnh tĩnh 5 khung/giây). Kèm mục lục chương (dán vào mô tả YouTube) và phụ đề .srt của cả video.
 
+**Đỡ lỗi quá tải AI:** mỗi AI nhập được nhiều key (cách nhau dấu phẩy) - key quá tải / hết lượt thì tự đổi key; hoặc dùng **🖥 Máy chủ AI riêng**: [LiteLLM](litellm/) (tự thử lại, xoay key, chuyển AI dự phòng) hay AI chạy ở nhà bằng Ollama / LM Studio.
+
 Cài đặt: tải `ReviewPhim.apk` ở mục Releases (tag `reviewphim`) của repo. App có nút **Cập nhật** tự lấy bản mới.
 
 APK được GitHub Actions dựng (`.github/workflows/reviewphim-android.yml`): test trên JVM + test trên máy ảo Android (ffmpeg, dựng hình có phụ đề, trộn tiếng), rồi mới đăng Release.

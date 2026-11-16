@@ -33,6 +33,32 @@ object Ai {
             "https://platform.openai.com/api-keys", "trả phí"),
     )
 
+    /**
+     * Máy chủ AI riêng (chuẩn OpenAI): LiteLLM proxy (tự thử lại, xoay nhiều key, chuyển AI dự phòng),
+     * Ollama / LM Studio / llama.cpp trên máy tính nhà... Có địa chỉ thì dùng trước tiên.
+     */
+    val CUSTOM = Prov("custom", "Máy chủ AI riêng", "", listOf("auto"), "https://docs.litellm.ai/docs/simple_proxy",
+        "LiteLLM / Ollama / LM Studio")
+
+    /** "192.168.1.10:4000" -> "http://192.168.1.10:4000/v1". */
+    fun customBase(prefs: Prefs): String = normBase(prefs.str("custom_url"))
+
+    fun normBase(raw: String): String {
+        var u = raw.trim().trimEnd('/')
+        if (u.isEmpty()) return ""
+        if (!u.startsWith("http://") && !u.startsWith("https://")) u = "http://$u"
+        if (!Regex("/v\\d+(beta)?(/openai)?$").containsMatchIn(u) && !u.endsWith("/api")) u += "/v1"
+        return u
+    }
+
+    private fun base(p: Prov, prefs: Prefs) = if (p.id == "custom") customBase(prefs) else p.base
+
+    private fun keysOf(p: Prov, prefs: Prefs): List<String> =
+        if (p.id == "custom") prefs.keys("custom").ifEmpty { listOf(prefs.str("key_custom").trim().ifEmpty { "sk-none" }) } else prefs.keys(p.id)
+
+    /** Lượt key đang dùng của mỗi AI (xoay vòng). */
+    private val keyAt = mutableMapOf<String, Int>()
+
     val http: OkHttpClient = OkHttpClient.Builder()
         .connectTimeout(15, TimeUnit.SECONDS)
         .readTimeout(100, TimeUnit.SECONDS)
@@ -46,13 +72,14 @@ object Ai {
     private val resolved = mutableMapOf<String, String>()
     private val JSON_TYPE = "application/json".toMediaType()
 
-    fun chain(prefs: Prefs): List<Prov> = PROVS.filter { prefs.key(it.id).isNotBlank() }
+    fun chain(prefs: Prefs): List<Prov> =
+        (if (customBase(prefs).isNotEmpty()) listOf(CUSTOM) else emptyList()) + PROVS.filter { prefs.keys(it.id).isNotEmpty() }
 
     fun manual(prefs: Prefs): Boolean = prefs.str("ai", "auto") == "manual" || chain(prefs).isEmpty()
 
     /** Gửi 1 yêu cầu theo thứ tự các AI có key; AI hỏng / hết tiền / hết lượt -> sang AI kế tiếp. */
     /** AI nhìn được ảnh (DeepSeek không nhìn được ảnh). */
-    fun visionChain(prefs: Prefs): List<Prov> = chain(prefs).filter { it.id != "deepseek" }
+    fun visionChain(prefs: Prefs): List<Prov> = chain(prefs).filter { it.id != "deepseek" && (it.id != "custom" || prefs.str("custom_vmodel") != "-") }
 
     suspend fun chat(prefs: Prefs, system: String, user: String, log: (String) -> Unit, json: Boolean = true,
                      images: List<java.io.File> = emptyList()): String {
@@ -64,24 +91,44 @@ object Ai {
         for ((i, p) in provs.withIndex()) {
             if (System.currentTimeMillis() - t00 > BUDGET_MS) break
             if (i > 0) log("🔀 Chuyển sang ${p.name} (vì: ${last?.message?.take(140)})")
-            for (attempt in 0 until 2) {
+            val ks = keysOf(p, prefs)
+            val start = (keyAt[p.id] ?: 0) % ks.size
+            var tried = 0          // số key đã thử của AI này
+            var waited = false     // đã chờ thử lại 1 lần chưa
+            while (tried < ks.size && System.currentTimeMillis() - t00 <= BUDGET_MS) {
+                val ki = (start + tried) % ks.size
                 try {
-                    val model = if (images.isEmpty()) model(p, prefs) else visionModel(p, prefs)
+                    val model = if (images.isEmpty()) model(p, prefs, ks[ki]) else visionModel(p, prefs, ks[ki])
                     val t0 = System.currentTimeMillis()
-                    val out = call(p, model, prefs.key(p.id), system, user, json, images)
-                    log("AI ${p.name} ($model) trả lời sau ${(System.currentTimeMillis() - t0) / 1000}s")
+                    val out = call(p, model, ks[ki], system, user, json, images, base(p, prefs))
+                    keyAt[p.id] = ki
+                    log("AI ${p.name}${if (ks.size > 1) " (key ${ki + 1}/${ks.size})" else ""} ($model) trả lời sau ${(System.currentTimeMillis() - t0) / 1000}s")
                     return out
                 } catch (e: CancellationException) {
                     throw e
                 } catch (e: RetryLater) {
                     last = e
-                    if (attempt == 1 || System.currentTimeMillis() - t00 > BUDGET_MS) break
+                    if (tried + 1 < ks.size) {               // còn key khác: đổi key ngay, khỏi chờ
+                        log("${e.message} → đổi sang key ${(ki + 1) % ks.size + 1}/${ks.size}")
+                        keyAt[p.id] = (ki + 1) % ks.size
+                        tried++
+                        continue
+                    }
+                    if (waited) break
+                    waited = true
                     val w = minOf(e.waitSec, 6)
                     log("${e.message} - thử lại sau ${w}s")
                     delay(w * 1000L)
+                    tried = 0
+                } catch (e: KeyError) {                      // key hết tiền / hết lượt / sai: sang key kế
+                    last = e
+                    if (tried + 1 < ks.size) log("${e.message} → đổi sang key ${(ki + 1) % ks.size + 1}/${ks.size}")
+                    keyAt[p.id] = (ki + 1) % ks.size
+                    tried++
                 } catch (e: IOException) {
-                    last = AiError("${p.name}: ${if (e is java.io.InterruptedIOException) "chờ quá lâu không trả lời" else "lỗi mạng"}")
-                    if (attempt == 1 || System.currentTimeMillis() - t00 > BUDGET_MS) break
+                    last = AiError("${p.name}: ${if (e is java.io.InterruptedIOException) "chờ quá lâu không trả lời" else "lỗi mạng / không kết nối được"}")
+                    if (waited || p.id == "custom") break
+                    waited = true
                     delay(3000L)
                 } catch (e: Exception) {
                     last = e
@@ -94,8 +141,11 @@ object Ai {
 
     private class RetryLater(msg: String, val waitSec: Int) : Exception(msg)
 
+    /** Lỗi do key (hết tiền, hết lượt, sai key): đổi key khác của cùng AI. */
+    private class KeyError(msg: String) : Exception(msg)
+
     private suspend fun call(p: Prov, model: String, key: String, system: String, user: String, json: Boolean,
-                             images: List<java.io.File> = emptyList()): String =
+                             images: List<java.io.File>, base: String): String =
         withContext(Dispatchers.IO) {
             val content: Any = if (images.isEmpty()) user else JSONArray().apply {
                 put(JSONObject().put("type", "text").put("text", user))
@@ -110,10 +160,10 @@ object Ai {
                     .put(JSONObject().put("role", "user").put("content", content)))
             if (json) body.put("response_format", JSONObject().put("type", "json_object"))
             if (model.startsWith("openai/gpt-oss")) body.put("reasoning_effort", "low")
-            var (code, text) = post("${p.base}/chat/completions", key, body)
+            var (code, text) = post("$base/chat/completions", key, body)
             if (code == 400 && json && text.contains("response_format")) {
                 body.remove("response_format")
-                val r = post("${p.base}/chat/completions", key, body)
+                val r = post("$base/chat/completions", key, body)
                 code = r.first
                 text = r.second
             }
@@ -136,9 +186,9 @@ object Ai {
         val low = text.lowercase()
         when {
             code == 402 || "insufficient_quota" in low || "insufficient balance" in low ->
-                throw AiError("${p.name}: tài khoản API hết tiền / hết hạn mức")
-            code == 401 || code == 403 -> throw AiError("${p.name}: key sai hoặc không có quyền (HTTP $code)")
-            code == 429 && "perday" in low -> throw AiError("${p.name}: hết lượt miễn phí hôm nay")
+                throw KeyError("${p.name}: tài khoản API hết tiền / hết hạn mức")
+            code == 401 || code == 403 -> throw KeyError("${p.name}: key sai hoặc không có quyền (HTTP $code)")
+            code == 429 && ("perday" in low || "per day" in low) -> throw KeyError("${p.name}: hết lượt miễn phí hôm nay")
             code == 429 || code >= 500 -> {
                 val wait = Regex("retry[^0-9]{0,12}(\\d+)", RegexOption.IGNORE_CASE).find(text)?.groupValues?.get(1)
                     ?.toIntOrNull()?.coerceIn(3, 60) ?: 8
@@ -153,12 +203,13 @@ object Ai {
     }
 
     /** Model: tự chọn model mới, hợp việc dịch (Gemini Flash, GPT mini, DeepSeek miễn phí trên OpenRouter). */
-    private suspend fun model(p: Prov, prefs: Prefs): String {
+    private suspend fun model(p: Prov, prefs: Prefs, key: String): String {
+        if (p.id == "custom") prefs.str("custom_model").trim().takeIf { it.isNotEmpty() }?.let { return it }
         resolved[p.id]?.let { return it }
         val first = p.models.first()
         if (first != "auto") return first.also { resolved[p.id] = it }
         val ids = try {
-            listModels(p, prefs.key(p.id))
+            listModels(base(p, prefs), key)
         } catch (e: Exception) {
             emptyList()
         }
@@ -170,6 +221,7 @@ object Ai {
                 listOf("audio", "realtime", "search", "transcribe", "tts", "nano").none { b -> b in it } &&
                 !Regex("-\\d{4}-\\d{2}-\\d{2}$").containsMatchIn(it) }.maxByOrNull { version(it) }
             "openrouter" -> openRouterFree(ids)
+            "custom" -> ids.firstOrNull() ?: throw AiError("Máy chủ AI riêng: chưa có model nào - nhập tên model ở Cài đặt.")
             else -> null
         } ?: p.models.getOrNull(1) ?: "deepseek/deepseek-chat"
         resolved[p.id] = pick
@@ -177,14 +229,22 @@ object Ai {
     }
 
     /** Model nhìn được ảnh: Gemini Flash, GPT mini, Llama 4 trên Groq, model miễn phí có thị giác trên OpenRouter. */
-    private suspend fun visionModel(p: Prov, prefs: Prefs): String = when (p.id) {
+    private suspend fun visionModel(p: Prov, prefs: Prefs, key: String): String = when (p.id) {
         "groq" -> "meta-llama/llama-4-scout-17b-16e-instruct"
         "openrouter" -> resolved["openrouter-vision"] ?: (openRouterVision(try {
-            listModels(p, prefs.key(p.id))
+            listModels(base(p, prefs), key)
         } catch (e: Exception) {
             emptyList()
         }) ?: "google/gemma-3-27b-it:free").also { resolved["openrouter-vision"] = it }
-        else -> model(p, prefs)
+        "custom" -> prefs.str("custom_vmodel").trim().takeIf { it.isNotEmpty() } ?: model(p, prefs, key)
+        else -> model(p, prefs, key)
+    }
+
+    /** Kiểm tra máy chủ AI riêng: danh sách model. */
+    suspend fun testCustom(prefs: Prefs): List<String> {
+        val b = customBase(prefs)
+        if (b.isEmpty()) throw AiError("Chưa nhập địa chỉ.")
+        return listModels(b, keysOf(CUSTOM, prefs).first())
     }
 
     fun openRouterVision(ids: List<String>): String? {
@@ -210,8 +270,8 @@ object Ai {
         return null
     }
 
-    private suspend fun listModels(p: Prov, key: String): List<String> = withContext(Dispatchers.IO) {
-        val req = Request.Builder().url("${p.base}/models").header("Authorization", "Bearer $key").build()
+    private suspend fun listModels(base: String, key: String): List<String> = withContext(Dispatchers.IO) {
+        val req = Request.Builder().url("$base/models").header("Authorization", "Bearer $key").build()
         http.newCall(req).execute().use { r ->
             val arr = JSONObject(r.body?.string() ?: "{}").optJSONArray("data") ?: JSONArray()
             (0 until arr.length()).map { arr.getJSONObject(it).optString("id") }.filter { it.isNotEmpty() }

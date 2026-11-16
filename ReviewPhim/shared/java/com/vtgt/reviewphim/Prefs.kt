@@ -12,5 +12,9 @@ class Prefs(ctx: Context) {
     fun setNum(k: String, v: Float) = p.edit().putFloat(k, v).apply()
     fun bool(k: String, d: Boolean): Boolean = p.getBoolean(k, d)
     fun setBool(k: String, v: Boolean) = p.edit().putBoolean(k, v).apply()
-    fun key(id: String): String = str("key_$id").trim()
+    /** Key đầu tiên của 1 AI (ô key có thể chứa nhiều key, cách nhau dấu phẩy / xuống dòng). */
+    fun key(id: String): String = keys(id).firstOrNull() ?: ""
+
+    /** Mọi key của 1 AI: key này quá tải / hết lượt thì app tự đổi sang key kế. */
+    fun keys(id: String): List<String> = str("key_$id").split(',', ';', '\n', ' ', '\t').map { it.trim() }.filter { it.length >= 8 }
 }
