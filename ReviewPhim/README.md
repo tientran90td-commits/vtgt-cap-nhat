@@ -20,7 +20,7 @@ App **tóm tắt truyện tranh (manga / manhwa / manhua) và light novel thành
 
 | Bước | Cách làm |
 |---|---|
-| Truyện | Ảnh các trang, cả thư mục, file CBZ / ZIP / PDF; light novel: EPUB (lấy cả ảnh minh họa + bìa), TXT (UTF-8 / GB18030) hoặc dán chữ. Trang manhwa dài được tự cắt ở khoảng trắng giữa các khung tranh |
+| Truyện | **Dán link chương**: app tự lấy ảnh trang (truyện tranh) hoặc văn bản chương (truyện chữ), tự đi theo nút "Chương sau" nhiều chương; trang cần JavaScript / đăng nhập thì mở 🌐 trình duyệt trong app rồi bấm Lấy ảnh / Lấy chữ. Hoặc ảnh các trang, cả thư mục, file CBZ / ZIP / PDF; light novel: EPUB (lấy cả ảnh minh họa + bìa), TXT (UTF-8 / GB18030) hoặc dán chữ. Trang manhwa dài được tự cắt ở khoảng trắng giữa các khung tranh |
 | Đọc truyện | Truyện tranh: ghép 4 trang/ảnh có số trang, AI nhìn ảnh (Gemini / OpenRouter / Groq / OpenAI) tả diễn biến + dịch lời thoại từng trang; không có key thì 🖐 gửi ảnh cho app Gemini. Light novel: AI tóm tắt từng phần thành các ý (🖐 DeepSeek nếu không có key) |
 | Kịch bản | Hook + kể theo trình tự, mỗi đoạn neo vào đúng các trang / phần truyện; tên nhân vật đúng (bảng tên riêng, MyAnimeList) |
 | Video | Đúng trang tranh của từng đoạn kể: trang dài cuộn từ trên xuống, trang vừa khung phóng to chậm, nền mờ; light novel dùng ảnh minh họa gần nhất / bìa / khung tên truyện. Phụ đề karaoke, tiêu đề hook, nhạc nền, khung 9:16 hoặc 16:9 |

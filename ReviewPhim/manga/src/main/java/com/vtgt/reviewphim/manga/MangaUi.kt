@@ -109,10 +109,12 @@ private fun MakeTab(vm: MangaVM) {
     val pickIllus = rememberLauncherForActivityResult(ActivityResultContracts.GetMultipleContents()) { if (it.isNotEmpty()) vm.addIllus(it) }
     val pickBgm = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { it?.let { u -> vm.setBgm(u) } }
     var paste by remember { mutableStateOf(false) }
+    var linkBox by remember { mutableStateOf(false) }
+    var browser by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 6.dp)) {
         Section("1. Truyện") {
-            Hint("Truyện tranh (manga / manhwa / manhua): chọn ảnh các trang, cả thư mục, hoặc file CBZ / ZIP / PDF. " +
-                "Light novel / tiểu thuyết: file EPUB / TXT hoặc dán chữ. Trang manhwa dài được tự cắt theo khung tranh.")
+            Hint("Truyện tranh (manga / manhwa / manhua): dán link chương, chọn ảnh các trang, cả thư mục, hoặc file CBZ / ZIP / PDF. " +
+                "Light novel / tiểu thuyết: dán link chương, file EPUB / TXT hoặc dán chữ. Trang manhwa dài được tự nối / cắt theo khung tranh.")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { pickImages.launch("image/*") }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("🖼 Ảnh trang") }
                 Button(onClick = { pickTree.launch(null) }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("📁 Thư mục") }
@@ -122,6 +124,10 @@ private fun MakeTab(vm: MangaVM) {
                     Text("📦 CBZ/PDF/EPUB/TXT")
                 }
                 OutlinedButton(onClick = { paste = true }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("📋 Dán chữ") }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Button(onClick = { linkBox = true }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("🔗 Lấy từ link") }
+                OutlinedButton(onClick = { browser = "" }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("🌐 Trình duyệt") }
             }
             Choice("Kiểu truyện tranh", vm.layout, listOf("auto" to "Tự nhận",
                 "page" to "Theo trang (manga, manhua, comic)",
@@ -195,6 +201,8 @@ private fun MakeTab(vm: MangaVM) {
         Spacer(Modifier.height(12.dp))
     }
     if (paste) PasteDialog(vm) { paste = false }
+    if (linkBox) LinkDialog(vm, { linkBox = false }) { u -> browser = u }
+    browser?.let { BrowserDialog(vm, it) { browser = null } }
 }
 
 @Composable

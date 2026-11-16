@@ -140,4 +140,35 @@ class MangaTest {
         assertTrue(!Books.looksWebtoon(listOf(700 to 1300, 800 to 1300, 900 to 1300)))
         assertTrue(!Books.looksWebtoon(emptyList()))
     }
+
+    @Test
+    fun webPages() {
+        val base = "https://x.com/truyen/c1/"
+        val html = """<html><head><script>var x=1</script></head><body><header><img src="/logo.png"></header>
+            <div class="reading"><img src="data:image/gif;base64,AAA" data-src="https://cdn.x.com/c1/001.jpg">
+            <img data-original="//cdn.x.com/c1/002.jpg" src="/loading.gif"><img src="003.webp" class="page"></div>
+            <img src="/static/icon-fb.png"></body></html>"""
+        assertEquals(listOf("https://cdn.x.com/c1/001.jpg", "https://cdn.x.com/c1/002.jpg", "https://x.com/truyen/c1/003.webp"),
+            Web.images(html, base))
+        // danh sách ảnh nằm trong script (JSON)
+        val js = "<html><body><div id=r></div><script>var pages=[\"https:\\/\\/img.y.com\\/a\\/1.jpg\",\"https:\\/\\/img.y.com\\/a\\/2.jpg?t=1\"]</script></body></html>"
+        assertEquals(listOf("https://img.y.com/a/1.jpg", "https://img.y.com/a/2.jpg?t=1"), Web.images(js, base))
+
+        val chap = """<html><head><title>Vũ Động Càn Khôn - Chương 1</title></head><body>
+            <div class="main-content"><div class="menu"><a href="/">Trang chủ</a></div>
+            <h1>Chương 1: Viên đá</h1>
+            <div id="chapter-c" class="chapter-c"><p>Lâm Động mở mắt.</p>Hắn nhìn quanh.<br>Trời đã sáng.<div class="ads">QC</div>${"<p>Lâm Động vận chuyển nguyên lực, cảm nhận viên đá đang phát sáng.</p>".repeat(10)}<p>Chương sau</p></div>
+            <a href="/truyen/c0/">‹ Chương trước</a> <a class="btn" href="/truyen/c2/">Chương sau ›</a>
+            <div class="comments"><p>hay quá</p></div></div></body></html>"""
+        val t = Web.text(chap)
+        assertTrue(t, t.startsWith("Lâm Động mở mắt.\nHắn nhìn quanh.\nTrời đã sáng."))
+        assertTrue(t, !t.contains("Chương sau") && !t.contains("hay quá") && !t.contains("Trang chủ"))
+        assertEquals("Chương 1: Viên đá", Web.title(chap))
+        assertEquals("https://x.com/truyen/c2/", Web.next(chap, base))
+        assertEquals("https://x.com/c/9", Web.next("<link rel=\"next\" href=\"/c/9\">", base))
+        assertEquals(null, Web.next("<a href='/c/0'>Chương trước</a>", base))
+        assertTrue(Web.decode("<meta charset=\"gbk\"><p>林动</p>".toByteArray(charset("GBK")), null).contains("林动"))
+        assertTrue(Web.isImageUrl("https://a.b/1.JPG?x=1") && !Web.isImageUrl("https://a.b/chap-1"))
+        assertEquals("https://a.b/x/y.jpg", Web.absolute("https://a.b/x/z.html", "y.jpg"))
+    }
 }

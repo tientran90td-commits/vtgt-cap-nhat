@@ -208,6 +208,83 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
         setBook(Book("novel", name.ifBlank { "Truyện" }, text = text.trim()))
     }
 
+    // ================================================================ lấy truyện từ link
+    /**
+     * Link trang đọc truyện (tự đi theo "Chương sau" tới [chapters] chương), nhiều link chương / link ảnh (mỗi dòng 1 link).
+     * [want]: auto | manga | novel.
+     */
+    fun openLink(input: String, chapters: Int, want: String) = launchTask("Lấy truyện từ link", keepAlive = true) {
+        val links = input.lines().map { it.trim() }.filter { it.startsWith("http://") || it.startsWith("https://") }
+        if (links.isEmpty()) throw IllegalStateException("Dán link (bắt đầu bằng http) vào ô Link.")
+        if (want != "novel" && links.all(Web::isImageUrl)) {  // danh sách link ảnh trực tiếp
+            val pages = Books.fromUrls(links.map { it to null }, freshDir(), layout) { prog(it, "Tải ảnh ${(it * 100).toInt()}%") }
+            setBook(Book("manga", "Truyện", pages))
+            return@launchTask
+        }
+        val list = links.size > 1          // nhiều link chương: lấy đúng các link đó, không đi theo "Chương sau"
+        val total = if (list) links.size else chapters
+        var url: String? = links[0]
+        var kind: String? = want.takeIf { it != "auto" }
+        val imgs = mutableListOf<Pair<String, String?>>()
+        val text = StringBuilder()
+        var title = ""
+        val seen = HashSet<String>()
+        var n = 0
+        while (url != null && n < total && seen.add(url)) {
+            prog(0.4f * n / total, "Đọc chương ${n + 1}/$total")
+            val p = try {
+                Web.page(url)
+            } catch (e: CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                if (n == 0) throw IllegalStateException("Không mở được link: ${e.message?.take(120)} → thử 🌐 Mở trong trình duyệt của app.")
+                log("⚠ Dừng ở chương ${n + 1}: ${e.message?.take(100)}")
+                break
+            }
+            if (n == 0) title = p.title
+            if (kind == null) kind = when {
+                p.images.size >= 5 -> "manga"
+                p.text.length >= 800 -> "novel"
+                else -> null
+            }
+            when (kind) {
+                "manga" -> imgs += p.images.map { it to p.url }
+                "novel" -> if (p.text.isNotBlank()) text.append(p.title).append("\n\n").append(p.text).append("\n\n")
+                else -> break
+            }
+            log("📄 ${p.title.take(70)}: " + if (kind == "manga") "${p.images.size} ảnh" else "${p.text.length} ký tự")
+            n++
+            url = if (list) links.getOrNull(n) else p.next
+        }
+        if (n < total && !list && url == null && n > 0) log("Hết link \"Chương sau\" sau $n chương.")
+        val name = title.replace(Regex("(?i)\\s*[-–|:]?\\s*(chapter|chap|chương|ch\\.|第)\\s*\\d+.*$"), "").trim().ifBlank { "Truyện" }
+        when {
+            kind == "manga" && imgs.isNotEmpty() -> {
+                log("Tải ${imgs.size} ảnh trang...")
+                val pages = Books.fromUrls(imgs, freshDir(), layout) { prog(0.4f + 0.6f * it, "Tải ảnh ${(it * 100).toInt()}%") }
+                setBook(Book("manga", name, pages))
+            }
+            kind == "novel" && text.isNotBlank() -> {
+                freshDir()
+                setBook(Book("novel", name, text = text.toString().trim()))
+            }
+            else -> throw IllegalStateException("Không thấy ảnh truyện hay chữ trong trang (trang hiện nội dung bằng JavaScript) " +
+                "→ bấm 🌐 Mở trong trình duyệt của app, cuộn hết chương rồi bấm Lấy ảnh / Lấy chữ.")
+        }
+    }
+
+    /** Nội dung gom từ trình duyệt trong app (ảnh đã hiện trên trang / chữ của các chương). */
+    fun fromBrowser(images: List<Pair<String, String?>>, text: String, name: String) = launchTask("Lấy truyện từ trình duyệt", keepAlive = true) {
+        val t = name.replace(Regex("(?i)\\s*[-–|:]?\\s*(chapter|chap|chương|ch\\.|第)\\s*\\d+.*$"), "").trim().ifBlank { "Truyện" }
+        if (images.size >= 3 && (text.length < 800 || images.size >= 8)) {
+            val pages = Books.fromUrls(images, freshDir(), layout) { prog(it, "Tải ảnh ${(it * 100).toInt()}%") }
+            setBook(Book("manga", t, pages))
+        } else if (text.isNotBlank()) {
+            freshDir()
+            setBook(Book("novel", t, text = text.trim()))
+        } else throw IllegalStateException("Chưa lấy được ảnh / chữ nào.")
+    }
+
     /** Light novel: thêm ảnh bìa / ảnh minh họa (rải đều theo truyện). */
     fun addIllus(uris: List<Uri>) = launchTask("Thêm ảnh minh họa") {
         val b = book ?: throw IllegalStateException("Mở truyện chữ trước.")

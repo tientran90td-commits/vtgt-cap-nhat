@@ -132,7 +132,14 @@ object Books {
         out
     }
 
-    private suspend fun pagesFrom(n: Int, dir: File, layout: String, progress: (Float) -> Unit,
+    /** Ảnh trang tải từ link (trang đọc truyện / link ảnh trực tiếp). Bỏ ảnh nhỏ (icon, nút). */
+    suspend fun fromUrls(urls: List<Pair<String, String?>>, dir: File, layout: String, progress: (Float) -> Unit): List<Page> =
+        pagesFrom(urls.size, dir, layout, progress, minSide = 300) { i, out ->
+            kotlinx.coroutines.runBlocking { Web.download(urls[i].first, urls[i].second, out) }
+            urls[i].first.substringAfterLast('/')
+        }
+
+    private suspend fun pagesFrom(n: Int, dir: File, layout: String, progress: (Float) -> Unit, minSide: Int = 0,
                                   fetch: (Int, File) -> String): List<Page> = withContext(Dispatchers.IO) {
         dir.mkdirs()
         val tmp = File(dir, "src.tmp")
@@ -140,11 +147,12 @@ object Books {
         val sizes = mutableListOf<Pair<Int, Int>>()
         for (i in 0 until n) {
             currentCoroutineContext().ensureActive()
-            fetch(i, tmp)
             try {
+                fetch(i, tmp)
                 val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
                 BitmapFactory.decodeFile(tmp.path, o)
-                out += sliceFile(tmp, dir, "Trang ${i + 1}", out.size)
+                if (o.outWidth < minSide || o.outHeight < minSide * 2 / 3) throw IllegalArgumentException("ảnh nhỏ")
+                out += sliceFile(tmp, dir, "Trang ${sizes.size + 1}", out.size)
                 sizes += o.outWidth to o.outHeight
             } catch (e: Exception) {
                 // ảnh hỏng / không đọc được: bỏ qua trang đó
@@ -356,7 +364,7 @@ object Books {
         var s = html.replace(Regex("(?is)<(script|style|head)[^>]*>.*?</\\1>"), " ")
         s = s.replace(Regex("(?is)<img[^>]*?\\ssrc\\s*=\\s*[\"']([^\"']+)[\"'][^>]*>"), "\n\u0001$1\u0001\n")
         s = s.replace(Regex("(?is)<image[^>]*?href\\s*=\\s*[\"']([^\"']+)[\"'][^>]*>"), "\n\u0001$1\u0001\n")
-        s = s.replace(Regex("(?i)<br\\s*/?>|</(p|div|h[1-6]|li|tr|blockquote)>"), "\n")
+        s = s.replace(Regex("(?i)<br\\s*/?>|</?(p|div|h[1-6]|li|tr|blockquote|section|article)\\b[^>]*>"), "\n")
         s = s.replace(Regex("(?s)<[^>]+>"), "")
         s = s.replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"")
             .replace("&#39;", "'").replace("&apos;", "'").replace("&amp;", "&")
