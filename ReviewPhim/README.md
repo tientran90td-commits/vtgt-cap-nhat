@@ -1,4 +1,6 @@
-# ReviewPhim AI · MangaRecap AI · LongRecap AI (Android)
+# ReviewPhim AI (Android)
+
+**1 app, 3 chế độ** (chọn ở đầu màn hình): 🎬 **Phim** (review / tóm tắt / dịch phim) · 📚 **Truyện** (tóm tắt truyện tranh, light novel - trước là MangaRecap) · ⏱ **Video dài** (tới 10 tiếng - trước là LongRecap). Dùng chung cài đặt, key AI, giọng đọc (VieNeu chỉ tải 1 lần).
 
 App điện thoại làm **video review / tóm tắt phim** và **dịch phim nước ngoài sang tiếng Việt** (thuyết minh + Vietsub), tự làm hết trên máy.
 
@@ -14,7 +16,7 @@ App điện thoại làm **video review / tóm tắt phim** và **dịch phim n�
 | Giọng VoiceStudio | Tùy chọn: gọi [VoiceStudio](https://github.com/debpalash/VoiceStudio) (AGPL) chạy trên máy tính cùng wifi qua API `/v1/audio/speech` - giọng AI / giọng nhân bản; app không chứa code VoiceStudio, mất kết nối thì tự dùng giọng của máy |
 | Kết quả | Lưu vào Thư viện ảnh → Movies/ReviewPhim, có nút Xem / Chia sẻ. Tab *Kịch bản* để sửa chữ rồi xuất lại |
 
-## MangaRecap AI (app thứ 2, thư mục `manga/`)
+## 📚 Chế độ Truyện (code: `app/.../manga/`)
 
 App **tóm tắt truyện tranh (manga / manhwa / manhua) và light novel thành video** kể chuyện.
 
@@ -28,9 +30,9 @@ App **tóm tắt truyện tranh (manga / manhwa / manhua) và light novel thành
 
 Học cơ chế từ mã nguồn mở (ý tưởng, code tự viết): [manga-reader](https://github.com/pashpashpash/manga-reader) (MIT - neo lời kể vào đúng trang / khung, chiếu khung tranh theo lời kể, gửi kèm trang nhân vật làm mẫu → app tự lập bảng nhân vật ảnh + tên), [Kumiko](https://github.com/njean42/kumiko) (AGPL - tách khung theo rãnh trắng, thứ tự phải→trái), [SmartStitch](https://github.com/MechTechnology/SmartStitch) / [StitchTool](https://github.com/Aeonss/StitchTool) (nối ảnh webtoon rồi cắt lại ở khoảng trắng), [Magi](https://github.com/ragavsachdeva/magi) (chỉ cho nghiên cứu - học ý tưởng: bảng nhân vật, gán lời thoại cho người nói, bỏ chữ hiệu ứng), BooookScore (tóm tắt sách dài theo từng phần có nhớ mạch phần trước).
 
-Code AI, giọng đọc, dựng video, trộn tiếng dùng chung với ReviewPhim ở thư mục `shared/`.
+Code AI, giọng đọc, dựng video, trộn tiếng dùng chung ở thư mục `shared/` và `shared-video/`.
 
-## LongRecap AI (app thứ 3, thư mục `longvid/`) - video dài tới 10 tiếng
+## ⏱ Chế độ Video dài - tới 10 tiếng (code: `app/.../longvid/`)
 
 | Loại | Cách làm |
 |---|---|
@@ -40,7 +42,7 @@ Code AI, giọng đọc, dựng video, trộn tiếng dùng chung với ReviewPh
 
 Video dài làm theo **từng phần** (chương / tập): mỗi phần dựng xong lưu lại, dừng / tắt app vẫn **làm tiếp** từ phần dở; cuối cùng nối các phần (không mã hóa lại) thành 1 video, hoặc lưu từng phần riêng. AI nhớ nội dung phần trước để nối mạch, tên nhân vật thống nhất. Mức "Tiết kiệm" cho truyện audio ~0.16 GB / giờ (ảnh tĩnh 5 khung/giây). Kèm mục lục chương (dán vào mô tả YouTube) và phụ đề .srt của cả video.
 
-Cài đặt: tải `ReviewPhim.apk` / `MangaRecap.apk` / `LongRecap.apk` ở mục Releases (tag `reviewphim`) của repo. App có nút **Cập nhật** tự lấy bản mới.
+Cài đặt: tải `ReviewPhim.apk` ở mục Releases (tag `reviewphim`) của repo. App có nút **Cập nhật** tự lấy bản mới.
 
 APK được GitHub Actions dựng (`.github/workflows/reviewphim-android.yml`): test trên JVM + test trên máy ảo Android (ffmpeg, dựng hình có phụ đề, trộn tiếng), rồi mới đăng Release.
 

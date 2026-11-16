@@ -13,4 +13,4 @@ dependencyResolutionManagement {
     }
 }
 rootProject.name = "ReviewPhim"
-include(":app", ":manga", ":longvid")
+include(":app")

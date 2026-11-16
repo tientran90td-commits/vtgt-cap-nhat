@@ -79,16 +79,18 @@ import kotlinx.coroutines.launch
 
 
 @Composable
-fun AppScreen(vm: MainVM) {
+fun AppScreen(vm: MainVM, embedded: Boolean = false) {
     var tab by remember { mutableIntStateOf(0) }
     val tabs = listOf("🎬 Làm video", "✏️ Kịch bản", "⚙️ Cài đặt")
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding()) {
-        Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text("ReviewPhim AI", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-            Spacer(Modifier.width(8.dp))
-            Text("v${BuildConfig.VERSION_NAME}", color = Muted, fontSize = 12.sp)
+        if (!embedded) {
+            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
+                Text("ReviewPhim AI", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
+                Spacer(Modifier.width(8.dp))
+                Text("v${BuildConfig.VERSION_NAME}", color = Muted, fontSize = 12.sp)
+            }
+            UpdateBanner(vm)
         }
-        UpdateBanner(vm)
         TabRow(selectedTabIndex = tab) {
             tabs.forEachIndexed { i, t -> Tab(selected = tab == i, onClick = { tab = i }, text = { Text(t) }) }
         }
@@ -573,7 +575,7 @@ private fun SettingsTab(vm: MainVM) {
 }
 
 @Composable
-private fun UpdateBanner(vm: MainVM) {
+fun UpdateBanner(vm: MainVM) {
     val scope = rememberCoroutineScope()
     LaunchedEffect(Unit) { vm.update = runCatching { vm.updater.check() }.getOrNull() }
     val r = vm.update
