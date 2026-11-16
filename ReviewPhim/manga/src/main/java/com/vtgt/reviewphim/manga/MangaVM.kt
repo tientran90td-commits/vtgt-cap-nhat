@@ -443,19 +443,23 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
             Story.sheets(b.pages, dir, if (numbered) { i -> try { Panels.boxes(b.pages[i].file, rtl) } catch (e: Exception) { emptyList() } } else null)
         }
         val useApi = !Ai.manual(prefs) && Ai.visionChain(prefs).isNotEmpty()
-        val groups = sheets.chunked(if (useApi) 3 else 10)
+        val groups = sheets.chunked(if (useApi) 3 else 9)   // làm tay: Gemini nhận tối đa 10 ảnh (1 ảnh bảng nhân vật)
         val notes = HashMap<Int, String>()
+        val roster = Roster(File(bookDir, "roster"))
         log("👁 AI đọc ${b.pages.size} trang (${sheets.size} ảnh ghép, ${groups.size} lần gửi).")
         for ((k, g) in groups.withIndex()) {
             val first = g.first().pages.first() + 1
             val last = g.last().pages.last() + 1
             val step = "Đọc tranh ${if (groups.size > 1) "phần ${k + 1}/${groups.size}" else ""}".trim()
             val prompt = Story.readPages(title, k + 1, groups.size, g.size, first, last, prefs,
-                notes.keys.sorted().takeLast(8).mapNotNull { notes[it] }, numbered)
+                notes.keys.sorted().takeLast(8).mapNotNull { notes[it] }, numbered, roster.names(), roster.sheet != null)
+            val files = roster.files() + g.map { it.file }
             var got = emptyMap<Int, String>()
+            var raw = ""
             if (useApi && !apiDown) {
                 try {
-                    got = Story.parsePages(callApi(step, prompt, false, g.map { it.file }), first, last)
+                    raw = callApi(step, prompt, false, files)
+                    got = Story.parsePages(raw, first, last)
                     if (got.isEmpty()) log("⚠ AI không đọc được trang nào ở phần ${k + 1} → 🖐 gửi cho Gemini.")
                 } catch (e: SkipApi) {
                     apiDown = true
@@ -467,8 +471,14 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
                     log("⚠ AI đọc tranh lỗi (${e.message?.take(120)}) → 🖐 gửi ảnh cho Gemini.")
                 }
             }
-            if (got.isEmpty()) got = readManual(g, step, prompt, first, last)
+            if (got.isEmpty()) {
+                raw = readManual(files, step, prompt, first, last)
+                got = Story.parsePages(raw, first, last)
+            }
             notes.putAll(got)
+            // nhân vật mới AI chỉ ra -> thêm vào bảng nhân vật gửi kèm các lần đọc sau
+            val nv = withContext(Dispatchers.Default) { roster.add(Roster.parse(raw), rtl) { pg -> b.pages.getOrNull(pg - 1)?.file } }
+            if (nv > 0) log("🧑 Bảng nhân vật: ${roster.names().joinToString(", ")}")
             prog(0.05f + 0.3f * (k + 1) / groups.size, "Đọc tranh ${k + 1}/${groups.size}")
             log("👁 P$first–P$last: đọc được ${got.size} trang.")
         }
@@ -480,9 +490,9 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
     }
 
     /** 🖐 Lưu ảnh vào Download/MangaRecap, gửi cho Gemini cùng yêu cầu, dán câu trả lời lại. */
-    private suspend fun readManual(g: List<PageSheet>, step: String, prompt: String, first: Int, last: Int): Map<Int, String> {
+    private suspend fun readManual(g: List<File>, step: String, prompt: String, first: Int, last: Int): String {
         val base = title.take(40).replace(Regex("[\\\\/:*?\"<>|]"), " ").trim()
-        val uris = g.map { s -> saveToDownloads(s.file, "$base ${s.file.name}", "image/jpeg") }
+        val uris = g.map { f -> saveToDownloads(f, "$base ${f.name}", "image/jpeg") }
         try {
             while (true) {
                 val r = askManual(ManualAsk(step, "gemini", prompt,
@@ -491,8 +501,8 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
                 if (r == RETRY_API) {
                     try {
                         apiDown = false
-                        val got = Story.parsePages(callApi(step, prompt, false, g.map { it.file }), first, last)
-                        if (got.isNotEmpty()) return got
+                        val raw = callApi(step, prompt, false, g)
+                        if (Story.parsePages(raw, first, last).isNotEmpty()) return raw
                     } catch (e: CancellationException) {
                         throw e
                     } catch (e: Exception) {
@@ -501,8 +511,7 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
                     }
                     continue
                 }
-                val got = Story.parsePages(r, first, last)
-                if (got.isNotEmpty()) return got
+                if (Story.parsePages(r, first, last).isNotEmpty()) return r
                 log("Không thấy dòng nào dạng \"P12 | ...\" - dán lại câu trả lời của Gemini.")
             }
         } finally {

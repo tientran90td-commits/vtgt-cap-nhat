@@ -944,18 +944,24 @@ class LongVM(app: Application) : AndroidViewModel(app) {
             Story.sheets(pages, File(d, "doc").apply { deleteRecursively() },
                 if (numbered) { k -> try { Panels.boxes(pages[k].file, rtl) } catch (e: Exception) { emptyList() } } else null)
         }
-        val groups = sheets.chunked(if (!Ai.manual(prefs) && Ai.visionChain(prefs).isNotEmpty()) 3 else 10)
+        val groups = sheets.chunked(if (!Ai.manual(prefs) && Ai.visionChain(prefs).isNotEmpty()) 3 else 9)
         val notes = HashMap<Int, String>()
+        val roster = com.vtgt.reviewphim.manga.Roster(File(p.dir, "roster"))   // bảng nhân vật dùng cho cả bộ truyện
         for ((k, g) in groups.withIndex()) {
             sub(0.3f * k / groups.size, "AI đọc tranh ${k + 1}/${groups.size}")
             val first = g.first().pages.first() + 1
             val last = g.last().pages.last() + 1
             val prev = notes.keys.sorted().takeLast(8).mapNotNull { notes[it] }.ifEmpty { listOf(p.memory.takeLast(600)).filter { it.isNotBlank() } }
-            val prompt = Story.readPages("${p.title} - ${part.name}", k + 1, groups.size, g.size, first, last, prefs, prev, numbered)
-            val got = askVision("Đọc tranh ${part.name} (${k + 1}/${groups.size})", prompt, g.map { it.file },
-                "Gửi kèm ${g.size} ảnh trang (P$first–P$last) cho Gemini - nút 📤 gửi cả ảnh lẫn yêu cầu.",
-                { Story.parsePages(it, first, last) }, { it.isNotEmpty() }) ?: emptyMap()
+            val prompt = Story.readPages("${p.title} - ${part.name}", k + 1, groups.size, g.size, first, last, prefs, prev, numbered,
+                roster.names(), roster.sheet != null)
+            val files = roster.files() + g.map { it.file }
+            val (got, refs) = askVision("Đọc tranh ${part.name} (${k + 1}/${groups.size})", prompt, files,
+                "Gửi kèm ${files.size} ảnh (P$first–P$last${if (roster.sheet != null) " + bảng nhân vật" else ""}) cho Gemini - nút 📤 gửi cả ảnh lẫn yêu cầu.",
+                { Story.parsePages(it, first, last) to com.vtgt.reviewphim.manga.Roster.parse(it) }, { it.first.isNotEmpty() })
+                ?: (emptyMap<Int, String>() to emptyList())
             notes.putAll(got)
+            val nv = withContext(Dispatchers.Default) { roster.add(refs, rtl) { pg -> pages.getOrNull(pg - 1)?.file } }
+            if (nv > 0) log("🧑 Bảng nhân vật: ${roster.names().joinToString(", ")}")
         }
         File(d, "doc").deleteRecursively()
         val items = pages.indices.mapNotNull { k -> notes[k + 1]?.let { Item(it, page = k, label = pages[k].label) } }

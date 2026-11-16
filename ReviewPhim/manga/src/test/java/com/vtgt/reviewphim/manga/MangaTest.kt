@@ -185,4 +185,12 @@ class MangaTest {
         assertEquals(listOf(Sync.Beat("Không có ghi chú gì cả", 3, -1)), Sync.beats("Không có ghi chú gì cả", 3, 4, 6))
         assertEquals("A, B.", Sync.clean("A [#2.1], B [ #3 ] ."))
     }
+
+    @Test
+    fun rosterParse() {
+        val r = Roster.parse("P1 | Jin-Woo vào hầm\nNV | Sung Jin-Woo | P3.2\n- NV: **Cha Hae-In** | P5\nNV | | P2\nNV | Thần tượng | Trang 7")
+        assertEquals(listOf(CastRef("Sung Jin-Woo", 3, 2), CastRef("Cha Hae-In", 5, 0), CastRef("Thần tượng", 7, 0)), r)
+        // dòng NV không lẫn vào diễn biến trang
+        assertEquals(setOf(1), Story.parsePages("P1 | a b c\nNV | X | P1.1", 1, 3).keys)
+    }
 }

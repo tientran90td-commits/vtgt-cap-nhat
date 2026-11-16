@@ -91,8 +91,9 @@ object Story {
     // ------------------------------------------------------------------ yêu cầu gửi AI
     /** Nhờ AI nhìn các trang truyện tranh và tả diễn biến từng trang. */
     fun readPages(title: String, part: Int, parts: Int, images: Int, first: Int, last: Int, prefs: Prefs,
-                  prev: List<String> = emptyList(), numbered: Boolean = false): String = """
-Mình gửi kèm $images ảnh, mỗi ảnh ghép tối đa $PER_SHEET trang truyện tranh của "$title"${if (parts > 1) " (phần $part/$parts)" else ""}. Góc trên bên trái mỗi trang có số trang màu vàng (P$first ... P$last). Đọc lần lượt theo số trang.
+                  prev: List<String> = emptyList(), numbered: Boolean = false, cast: List<String> = emptyList(),
+                  castSheet: Boolean = false): String = """
+Mình gửi kèm $images ảnh, mỗi ảnh ghép tối đa $PER_SHEET trang truyện tranh của "$title"${if (parts > 1) " (phần $part/$parts)" else ""}. Góc trên bên trái mỗi trang có số trang màu vàng (P$first ... P$last). Đọc lần lượt theo số trang.${if (castSheet) "\nẢNH ĐẦU TIÊN là BẢNG NHÂN VẬT đã gặp (ảnh mặt + tên: ${cast.joinToString(", ")}) - dùng để nhận đúng ai là ai và gọi đúng tên đó; các ảnh sau mới là trang truyện." else ""}
 
 Hãy ĐỌC KỸ từng trang (tranh + chữ trong khung thoại, truyện Nhật đọc từ phải sang trái) và viết lại diễn biến bằng tiếng Việt:
 ${if (numbered) "- Các khung tranh trong trang có SỐ TRÒN ĐỎ (1, 2, 3...). Mỗi trang đúng 1 dòng, tả theo từng khung, dạng: P12 | (1) ai làm gì... (2) chuyện gì xảy ra, lời thoại quan trọng dịch sang tiếng Việt trong ngoặc kép... (3) ...\n- Trang không có số khung thì tả cả trang." else "- Mỗi trang đúng 1 dòng, dạng: P12 | ai làm gì, chuyện gì xảy ra, lời thoại quan trọng (dịch sang tiếng Việt, để trong ngoặc kép)."}
@@ -101,9 +102,15 @@ ${if (numbered) "- Các khung tranh trong trang có SỐ TRÒN ĐỎ (1, 2, 3...
 - Chỉ viết những gì có trên trang, không đoán thêm.
 ${Prompts.NAME_RULES}
 ${Prompts.glossary(prefs)}
-${memory(prev)}
-Chỉ trả lời các dòng "P.. | ...", không giải thích gì thêm.
+${memory(prev)}${castAsk(cast)}
+Chỉ trả lời các dòng "P.. | ..."${if (cast.size < Roster.MAX) " (và các dòng NV)" else ""}, không giải thích gì thêm.
 """.trim()
+
+    /** Nhờ AI chỉ khung thấy rõ mặt nhân vật chính mới -> app cắt làm ảnh mẫu cho bảng nhân vật. */
+    private fun castAsk(cast: List<String>): String = if (cast.size >= Roster.MAX) "" else
+        "\nCuối câu trả lời thêm tối đa 3 dòng dạng: NV | Tên nhân vật | P12.2 - nhân vật CHÍNH thấy rõ mặt trong các trang này " +
+            "(P12.2 = trang 12 khung 2, hoặc P12 nếu trang không có số khung), chọn khung thấy mặt rõ nhất" +
+            (if (cast.isNotEmpty()) ", CHỈ nhân vật chưa có trong bảng: ${cast.joinToString(", ")}" else "") + ".\n"
 
     /** Mạch truyện của lần trước (để AI nối đúng diễn biến và gọi tên thống nhất giữa các lần gửi). */
     private fun memory(prev: List<String>): String =

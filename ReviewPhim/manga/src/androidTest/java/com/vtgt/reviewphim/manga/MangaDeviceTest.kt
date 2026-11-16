@@ -140,6 +140,16 @@ class MangaDeviceTest {
         assertEquals(t, slides.sumOf { it.dur }, 1e-6)
         assertEquals(t, com.vtgt.reviewphim.Wav.duration(narr), 0.05)
         assertTrue(cues.none { it.text.contains("[#") })
+        // bảng nhân vật: cắt khung AI chỉ ra, lưu lại, lần sau không thêm trùng
+        val rdir = File(dir, "roster").apply { deleteRecursively() }
+        val ro = Roster(rdir)
+        assertEquals(1, ro.add(listOf(CastRef("Jin-Woo", 1, 4), CastRef("jin woo", 1, 1)), true) { if (it == 1) page else null })
+        assertTrue(ro.sheet!!.length() > 1000)
+        val again = Roster(rdir)
+        assertEquals(listOf("Jin-Woo"), again.names())
+        assertEquals(0, again.add(listOf(CastRef("JIN-WOO", 1, 2)), true) { page })
+        val nvBmp = BitmapFactory.decodeFile(again.entries[0].second.path)
+        assertTrue("ảnh mẫu là khung 4 (rộng cả trang, thấp): ${nvBmp.width}x${nvBmp.height}", nvBmp.width > nvBmp.height)
         // khi AI đọc tranh: số khung tròn đỏ được vẽ lên ảnh ghép
         val sh = Story.sheets(book.pages, File(dir, "numsheet")) { Panels.boxes(page, true) }
         val bmp = BitmapFactory.decodeFile(sh[0].file.path)
