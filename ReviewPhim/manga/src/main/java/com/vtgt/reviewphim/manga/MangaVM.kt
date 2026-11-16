@@ -217,7 +217,9 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
         val links = input.lines().map { it.trim() }.filter { it.startsWith("http://") || it.startsWith("https://") }
         if (links.isEmpty()) throw IllegalStateException("Dán link (bắt đầu bằng http) vào ô Link.")
         if (want != "novel" && links.all(Web::isImageUrl)) {  // danh sách link ảnh trực tiếp
-            val pages = Books.fromUrls(links.map { it to null }, freshDir(), layout) { prog(it, "Tải ảnh ${(it * 100).toInt()}%") }
+            val pages = Books.fromUrls(links.map { it to null }, freshDir(), layout, dropped = { log("🚫 Bỏ $it ảnh quảng cáo / ảnh lỗi.") }) {
+                prog(it, "Tải ảnh ${(it * 100).toInt()}%")
+            }
             setBook(Book("manga", "Truyện", pages))
             return@launchTask
         }
@@ -261,7 +263,9 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
         when {
             kind == "manga" && imgs.isNotEmpty() -> {
                 log("Tải ${imgs.size} ảnh trang...")
-                val pages = Books.fromUrls(imgs, freshDir(), layout) { prog(0.4f + 0.6f * it, "Tải ảnh ${(it * 100).toInt()}%") }
+                val pages = Books.fromUrls(imgs, freshDir(), layout, dropped = { log("🚫 Bỏ $it ảnh quảng cáo / ảnh lặp / ảnh lỗi.") }) {
+                    prog(0.4f + 0.6f * it, "Tải ảnh ${(it * 100).toInt()}%")
+                }
                 setBook(Book("manga", name, pages))
             }
             kind == "novel" && text.isNotBlank() -> {
@@ -277,7 +281,9 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
     fun fromBrowser(images: List<Pair<String, String?>>, text: String, name: String) = launchTask("Lấy truyện từ trình duyệt", keepAlive = true) {
         val t = name.replace(Regex("(?i)\\s*[-–|:]?\\s*(chapter|chap|chương|ch\\.|第)\\s*\\d+.*$"), "").trim().ifBlank { "Truyện" }
         if (images.size >= 3 && (text.length < 800 || images.size >= 8)) {
-            val pages = Books.fromUrls(images, freshDir(), layout) { prog(it, "Tải ảnh ${(it * 100).toInt()}%") }
+            val keepHosts = Web.mainHosts(images.map { it.first }).toSet()   // bỏ ảnh từ máy chủ quảng cáo / máy chủ lạ
+            val pages = Books.fromUrls(images.filter { it.first in keepHosts }, freshDir(), layout,
+                dropped = { log("🚫 Bỏ $it ảnh quảng cáo / ảnh lặp / ảnh lỗi.") }) { prog(it, "Tải ảnh ${(it * 100).toInt()}%") }
             setBook(Book("manga", t, pages))
         } else if (text.isNotBlank()) {
             freshDir()

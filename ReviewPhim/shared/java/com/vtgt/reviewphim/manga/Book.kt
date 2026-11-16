@@ -135,11 +135,58 @@ object Books {
     }
 
     /** Ảnh trang tải từ link (trang đọc truyện / link ảnh trực tiếp). Bỏ ảnh nhỏ (icon, nút). */
-    suspend fun fromUrls(urls: List<Pair<String, String?>>, dir: File, layout: String, progress: (Float) -> Unit): List<Page> =
-        pagesFrom(urls.size, dir, layout, progress, minSide = 300) { i, out ->
-            kotlinx.coroutines.runBlocking { Web.download(urls[i].first, urls[i].second, out) }
-            urls[i].first.substringAfterLast('/')
+    /**
+     * Ảnh tải về: ảnh lỗi / nhỏ, banner dài ngang, ảnh lệch cỡ hẳn so với các trang khác, ảnh lặp lại (cùng nội dung
+     * ở nhiều chỗ / chương trước - quảng cáo chèn mỗi chương) bị bỏ. Trả về chỉ số ảnh giữ lại.
+     * [seen]: mã ảnh của các chương trước.
+     */
+    fun adFilter(imgs: List<Triple<Int, Int, String>>, seen: Set<String> = emptySet()): List<Int> {
+        val dup = imgs.groupingBy { it.third }.eachCount()
+        val ok = imgs.indices.filter { i ->
+            val (w, h, md5) = imgs[i]
+            w >= 300 && h >= 200 && w.toDouble() / h < 2.2 && md5 !in seen && !(imgs.size >= 6 && (dup[md5] ?: 0) >= 2)
         }
+        if (ok.size < 3) return ok
+        val ws = ok.map { imgs[it].first }.sorted()
+        val med = ws[ws.size / 2]
+        return ok.filter { imgs[it].first >= med * 0.6 && imgs[it].first <= med * 2.6 }
+    }
+
+    suspend fun fromUrls(urls: List<Pair<String, String?>>, dir: File, layout: String, seen: MutableSet<String>? = null,
+                         dropped: (Int) -> Unit = {}, progress: (Float) -> Unit): List<Page> {
+        val dl = File(dir, "dl").apply { deleteRecursively(); mkdirs() }
+        val files = mutableListOf<File>()
+        val info = mutableListOf<Triple<Int, Int, String>>()
+        withContext(Dispatchers.IO) {
+            val md = java.security.MessageDigest.getInstance("MD5")
+            for ((i, u) in urls.withIndex()) {
+                currentCoroutineContext().ensureActive()
+                val f = File(dl, "%05d".format(i))
+                try {
+                    Web.download(u.first, u.second, f)
+                    val o = BitmapFactory.Options().apply { inJustDecodeBounds = true }
+                    BitmapFactory.decodeFile(f.path, o)
+                    if (o.outWidth > 0) {
+                        files += f
+                        info += Triple(o.outWidth, o.outHeight, md.digest(f.readBytes()).joinToString("") { "%02x".format(it) })
+                    }
+                } catch (e: kotlinx.coroutines.CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    // ảnh lỗi: bỏ qua
+                }
+                progress(0.7f * (i + 1) / urls.size)
+            }
+        }
+        val keep = adFilter(info, seen ?: emptySet())
+        seen?.addAll(info.map { it.third })
+        if (urls.size - keep.size > 0) dropped(urls.size - keep.size)
+        if (keep.isEmpty()) throw IllegalStateException("Không tải được ảnh trang nào (hoặc toàn ảnh quảng cáo / ảnh nhỏ).")
+        return pagesFrom(keep.size, dir, layout, { progress(0.7f + 0.3f * it) }) { i, out ->
+            files[keep[i]].copyTo(out, true)
+            urls[keep[i]].first.substringAfterLast('/')
+        }.also { dl.deleteRecursively() }
+    }
 
     private suspend fun pagesFrom(n: Int, dir: File, layout: String, progress: (Float) -> Unit, minSide: Int = 0,
                                   fetch: (Int, File) -> String): List<Page> = withContext(Dispatchers.IO) {

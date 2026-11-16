@@ -76,7 +76,14 @@ fun LinkDialog(vm: MangaVM, close: () -> Unit, openBrowser: (String) -> Unit) {
 
 // JS chạy trong trang: danh sách ảnh nội dung (đã tải, đủ lớn) theo thứ tự; chữ của khối nhiều chữ nhất
 private const val JS_IMAGES = """(function(){var out=[];var seen={};
+var AD=/(^|[^a-z0-9])(ads?|adv|advert|advertisement|adsbygoogle|banner|sponsor|sponsored|qc|quang-?cao|popup)([^a-z0-9]|$)/i;
+function isAd(i){for(var e=i;e&&e!==document.body;e=e.parentElement){
+ var c=(typeof e.className==='string'?e.className:'')+' '+(e.id||'');if(AD.test(c)&&!/no-?ads?|ads?-?free/i.test(c))return true;
+ if(e.tagName==='A'&&e.href){try{var h=new URL(e.href).hostname.split('.').slice(-2).join('.');
+  if(h&&h!==location.hostname.split('.').slice(-2).join('.'))return true;}catch(x){}}}
+ return false;}
 document.querySelectorAll('img').forEach(function(i){
+ if(isAd(i))return;
  var s=i.currentSrc||i.src||'';var d=i.getAttribute('data-src')||i.getAttribute('data-original')||i.getAttribute('data-lazy-src')||'';
  if((!s||s.indexOf('data:')===0)&&d)s=d;
  if(!s||s.indexOf('data:')===0||seen[s])return;
@@ -148,7 +155,7 @@ fun BrowserDialog(vm: MangaVM, start: String, close: () -> Unit) {
                                         if (images.none { it.first == s }) { images += s to page; add++ }
                                     }
                                     if (title.isBlank()) title = o.optString("title")
-                                    msg = "🖼 +$add ảnh (tổng ${images.size}). Sang chương sau rồi bấm Lấy ảnh tiếp, hoặc bấm ✅ Dùng."
+                                    msg = "🖼 +$add ảnh (tổng ${images.size}, đã bỏ ảnh trong khung quảng cáo). Sang chương sau rồi bấm Lấy ảnh tiếp, hoặc bấm ✅ Dùng."
                                 } catch (e: Exception) {
                                     msg = "Không lấy được ảnh: ${e.message}"
                                 }

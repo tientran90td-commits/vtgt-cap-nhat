@@ -193,4 +193,34 @@ class MangaTest {
         // dòng NV không lẫn vào diễn biến trang
         assertEquals(setOf(1), Story.parsePages("P1 | a b c\nNV | X | P1.1", 1, 3).keys)
     }
+
+    @Test
+    fun adsFiltered() {
+        val base = "https://truyen.com/manga/c1"
+        val pages = (1..6).joinToString("") { "<img src=\"https://cdn.truyen.com/c1/%03d.jpg\">".format(it) }
+        val html = """<html><body>
+            <div class="ads-top"><img src="https://img.ads.net/b.gif"><div><img src="https://cdn.truyen.com/c1/inner-ad.jpg"></div></div>
+            <div class="no-ads reader">$pages</div>
+            <a href="https://casino.xyz/khuyen-mai"><img src="https://cdn.truyen.com/c1/casino.jpg"></a>
+            <a href="/manga/c2"><img src="https://cdn.truyen.com/c1/next-btn.jpg"></a>
+            <div id="qc"><img src="https://cdn.truyen.com/c1/qc.jpg"></div>
+            <img src="https://other.net/promo.jpg">
+            </body></html>"""
+        val got = Web.images(html, base)
+        assertEquals((1..6).map { "https://cdn.truyen.com/c1/%03d.jpg".format(it) } + "https://cdn.truyen.com/c1/next-btn.jpg", got)
+        assertEquals("abc.com", Web.domain("https://img.cdn.abc.com/x.jpg"))
+        assertEquals("abc.com.vn", Web.domain("https://x.abc.com.vn/a"))
+        // máy chủ ảnh: giữ cdn1 / cdn2 cùng tên miền, bỏ ảnh lẻ từ tên miền khác + mạng quảng cáo
+        val urls = (1..3).map { "https://cdn1.truyen.com/$it.jpg" } + (4..6).map { "https://cdn2.truyen.com/$it.jpg" } +
+            "https://x.com/promo.jpg" + "https://tpc.googlesyndication.com/a.jpg"
+        assertEquals(urls.take(6), Web.mainHosts(urls))
+        // sau khi tải: bỏ banner ngang, ảnh nhỏ lệch cỡ, ảnh đã gặp ở chương trước, ảnh lặp
+        val imgs = listOf(Triple(800, 1200, "a"), Triple(800, 1150, "b"), Triple(728, 90, "ad1"), Triple(300, 250, "ad2"),
+            Triple(800, 1200, "c"), Triple(800, 1180, "d"), Triple(800, 1200, "e"), Triple(600, 200, "f"))
+        assertEquals(listOf(0, 1, 4, 5), Books.adFilter(imgs, setOf("e")))
+        val rep = (1..6).map { Triple(800, 1200, "p$it") } + Triple(800, 1200, "z") + Triple(800, 1200, "z")
+        assertEquals((0..5).toList(), Books.adFilter(rep))
+        // trang manhwa cuộn dọc (dài) vẫn giữ
+        assertEquals(listOf(0, 1, 2), Books.adFilter(listOf(Triple(720, 5000, "x"), Triple(720, 4000, "y"), Triple(720, 3000, "w"))))
+    }
 }

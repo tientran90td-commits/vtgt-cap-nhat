@@ -401,6 +401,7 @@ class LongVM(app: Application) : AndroidViewModel(app) {
     /** Link chương truyện tranh: lấy [n] chương liên tiếp (mỗi chương 1 phần). */
     fun importMangaLink(url: String, n: Int) = launchTask("Lấy truyện tranh từ link", keepAlive = true) {
         val p = need("manga")
+        val imgSeen = HashSet<String>()   // ảnh đã gặp ở chương trước: quảng cáo chèn mỗi chương bị bỏ
         val layout = prefs.str("m_layout", "auto")
         var u: String? = url.trim()
         val seen = HashSet<String>()
@@ -420,7 +421,8 @@ class LongVM(app: Application) : AndroidViewModel(app) {
                 if (k == 0) throw IllegalStateException("Không thấy ảnh truyện trong trang (trang tải ảnh bằng JavaScript?). Thử tải về CBZ / ảnh rồi thêm file.")
                 break
             }
-            val pages = Books.fromUrls(page.images.map { it to page.url }, File(ctx.cacheDir, "nhap_pages").apply { deleteRecursively() }, layout) {
+            val pages = Books.fromUrls(page.images.map { it to page.url }, File(ctx.cacheDir, "nhap_pages").apply { deleteRecursively() }, layout,
+                imgSeen, dropped = { log("🚫 Chương ${k + 1}: bỏ $it ảnh quảng cáo / ảnh lặp / ảnh lỗi.") }) {
                 prog((k + it) / n, "Chương ${k + 1}/$n: tải ảnh ${(it * 100).toInt()}%")
             }
             if (k == 0 && (p.title.isBlank() || p.title == "Video dài")) p.title = page.title.replace(Regex("(?i)\\s*[-–|:]?\\s*(chương|chapter|chap|ch\\.)\\s*\\d+.*$"), "").trim()

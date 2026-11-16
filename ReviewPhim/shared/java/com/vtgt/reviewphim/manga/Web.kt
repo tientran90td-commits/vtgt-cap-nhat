@@ -55,8 +55,75 @@ object Web {
     }
 
     /** Ảnh nội dung trong trang theo thứ tự xuất hiện (bỏ logo, icon, quảng cáo). */
+    /** Khối quảng cáo: thẻ có id / class là ads, banner, qc, quangcao, sponsor, popup... */
+    private val AD_BOX = Regex("(?i)<(div|section|aside|ins|span|p|center|figure|li|ul|a)\\b[^>]*\\b(?:id|class)\\s*=\\s*[\"'][^\"']*" +
+        "(?<![a-z0-9])(?:ads?|adv|advert|advertisement|adsbygoogle|banner|sponsor(?:ed)?|qc|quang-?cao|popup|ad-?slot|ad-?box|ad-?container|ad-?wrap)" +
+        "(?![a-z0-9])[^\"']*[\"'][^>]*>")
+    private val AD_HOST = Regex("(?i)(doubleclick|googlesyndication|googleadservices|adservice|adsystem|adnxs|exoclick|popads|propeller|" +
+        "juicyads|adsterra|taboola|outbrain|mgid|criteo|amazon-adsystem|adform|admicro|eclick|/ads?/|/banners?/|/qc/|quangcao)")
+
+    /** Vị trí ngay sau thẻ đóng của khối bắt đầu tại [start] (đếm thẻ lồng cùng tên). */
+    fun blockEnd(html: String, start: Int, tag: String): Int {
+        val re = Regex("(?i)<$tag\\b|</$tag\\s*>")
+        var depth = 0
+        for (m in re.findAll(html, start)) {
+            if (m.value.startsWith("</")) {
+                depth--
+                if (depth == 0) return m.range.last + 1
+            } else depth++
+        }
+        return html.indexOf('>', start).let { if (it < 0) html.length else it + 1 }
+    }
+
+    /** Tên miền chính ("img.cdn.abc.com" -> "abc.com", "x.abc.com.vn" -> "abc.com.vn"). */
+    fun domain(url: String): String {
+        val h = (try { URI(url).host ?: "" } catch (e: Exception) { "" }).lowercase().removePrefix("www.")
+        val p = h.split('.')
+        if (p.size <= 2) return h
+        val sld = p[p.size - 2]
+        return if (p.last().length == 2 && sld in setOf("com", "net", "org", "gov", "edu", "co", "ac", "info", "biz")) p.takeLast(3).joinToString(".")
+        else p.takeLast(2).joinToString(".")
+    }
+
+    /** Bỏ khối quảng cáo + ảnh bọc trong link dẫn sang trang khác (kiểu banner quảng cáo). */
+    fun stripAds(html: String, base: String): String {
+        var s = html
+        var from = 0
+        var guard = 0
+        while (guard++ < 300) {
+            val m = AD_BOX.find(s, from) ?: break
+            if (Regex("(?i)(no-?ads?|ads?-?free|without-?ads?)").containsMatchIn(m.value)) {  // "không quảng cáo" - giữ
+                from = m.range.last + 1
+                continue
+            }
+            s = s.substring(0, m.range.first) + " " + s.substring(blockEnd(s, m.range.first, m.groupValues[1]))
+            from = m.range.first
+        }
+        val home = domain(base)
+        s = Regex("(?is)<a\\b[^>]*href\\s*=\\s*[\"'](https?://[^\"']+)[\"'][^>]*>(.*?)</a>").replace(s) { m ->
+            if (m.groupValues[2].contains("<img", true) && domain(m.groupValues[1]) != home) " " else m.value
+        }
+        return s
+    }
+
+    /**
+     * Ảnh truyện thường cùng 1 máy chủ ảnh: ảnh từ tên miền lạ chỉ có vài cái (quảng cáo) thì bỏ.
+     * Giữ tên miền có ≥ 30% số ảnh của tên miền nhiều ảnh nhất.
+     */
+    fun mainHosts(urls: List<String>): List<String> {
+        val ok = urls.filter { !AD_HOST.containsMatchIn(it) }
+        if (ok.size < 5) return ok
+        val count = ok.groupingBy { domain(it) }.eachCount()
+        val top = count.values.max()
+        return ok.filter { (count[domain(it)] ?: 0) >= maxOf(2.0, top * 0.3) }
+    }
+
     fun images(html: String, base: String): List<String> {
-        val body = html.replace(Regex("(?is)<(script|style|noscript|header|footer|nav)[^>]*>.*?</\\1>"), " ")
+        val raw = html.replace(Regex("(?is)<(script|style|noscript|header|footer|nav)[^>]*>.*?</\\1>"), " ")
+        val clean = stripAds(raw, base)
+        // phòng khi khung nội dung bị nhận nhầm là quảng cáo: bỏ lọc khối nếu mất gần hết ảnh
+        val n = { x: String -> Regex("(?i)<img\\b").findAll(x).count() }
+        val body = if (n(clean) < 3 && n(raw) >= 5) raw else clean
         val out = LinkedHashSet<String>()
         for (m in Regex("(?is)<img\\b([^>]*)>").findAll(body)) {
             val a = m.groupValues[1]
@@ -76,7 +143,7 @@ object Web {
                 if (!JUNK.containsMatchIn(u)) out += u
             }
         }
-        return out.toList()
+        return mainHosts(out.toList())
     }
 
     /** Tiêu đề chương: <h1>, không thì <title>. */
