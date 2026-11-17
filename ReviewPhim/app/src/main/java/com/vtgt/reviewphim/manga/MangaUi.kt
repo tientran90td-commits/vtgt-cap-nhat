@@ -106,14 +106,14 @@ private fun MakeTab(vm: MangaVM) {
     var browser by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 6.dp)) {
         Section("Truyện", 1, vm.book != null) {
-            Hint("Manga / manhwa / manhua hoặc light novel / tiểu thuyết: chọn 1 cách đưa truyện vào.")
+            Hint("Manga / manhwa / manhua hoặc light novel: chọn 1 cách đưa truyện vào. File truyện: CBZ, ZIP, PDF, EPUB, TXT.")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 com.vtgt.reviewphim.Tile("🔗", "Link", !vm.busy, Modifier.weight(1f), primary = true) { linkBox = true }
                 com.vtgt.reviewphim.Tile("🖼", "Ảnh trang", !vm.busy, Modifier.weight(1f)) { pickImages.launch("image/*") }
                 com.vtgt.reviewphim.Tile("📁", "Thư mục", !vm.busy, Modifier.weight(1f)) { pickTree.launch(null) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                com.vtgt.reviewphim.Tile("📦", "CBZ·PDF·EPUB", !vm.busy, Modifier.weight(1f)) { pickFile.launch(arrayOf("*/*")) }
+                com.vtgt.reviewphim.Tile("📦", "File truyện", !vm.busy, Modifier.weight(1f)) { pickFile.launch(arrayOf("*/*")) }
                 com.vtgt.reviewphim.Tile("📋", "Dán chữ", !vm.busy, Modifier.weight(1f)) { paste = true }
                 com.vtgt.reviewphim.Tile("🌐", "Trình duyệt", !vm.busy, Modifier.weight(1f)) { browser = "" }
             }
