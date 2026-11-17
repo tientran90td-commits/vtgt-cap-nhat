@@ -20,29 +20,19 @@ import androidx.media3.exoplayer.upstream.DefaultBandwidthMeter
  */
 @OptIn(UnstableApi::class)
 object PlaybackBandwidth {
-    private const val INITIAL_BITRATE_BPS = 2_500_000L
+    // TTube: open the first video at a low rung (~240-360p) so the first frame
+    // arrives fast, then climb as real throughput is measured. Later videos in the
+    // same session start from the speed already measured.
+    private const val INITIAL_BITRATE_BPS = 500_000L
 
     @Volatile
     private var meter: DefaultBandwidthMeter? = null
 
-    private const val PREFS = "playback_bandwidth"
-    private const val KEY_LAST_BPS = "last_bps"
-    private var startBps = INITIAL_BITRATE_BPS
-
     fun init(context: Context) {
-        // TTube: start from the speed measured last time (bounded), so a fast connection
-        // opens videos in high quality right away instead of climbing up from 2.5 Mbps.
-        val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_LAST_BPS, 0L)
-        if (saved > 0L) startBps = (saved * 8 / 10).coerceIn(1_000_000L, 25_000_000L)
         get(context.applicationContext)
     }
 
-    /** Remember the current estimate for the next app start. */
-    fun save(context: Context) {
-        val bps = meter?.bitrateEstimate ?: return
-        if (bps <= 0L) return
-        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putLong(KEY_LAST_BPS, bps).apply()
-    }
+
 
     fun get(): BandwidthMeter = get(YTXTubeApplication.appContext)
 
@@ -51,7 +41,7 @@ object PlaybackBandwidth {
         synchronized(this) {
             meter?.let { return it }
             val built = DefaultBandwidthMeter.Builder(context)
-                .setInitialBitrateEstimate(startBps)
+                .setInitialBitrateEstimate(INITIAL_BITRATE_BPS)
                 .setResetOnNetworkTypeChange(true)
                 .build()
             meter = built
@@ -59,9 +49,12 @@ object PlaybackBandwidth {
         }
     }
 
-    /** Current downstream estimate in kbps, including the initial estimate before any sample. */
+    /** Current measured downstream estimate in kbps, or 0 before the first real sample. */
     fun measuredKbps(): Int {
         val bps = meter?.bitrateEstimate ?: 0L
+        // The low start value is only for the adaptive player; fixed-quality picks (Shorts,
+        // non-adaptive fallbacks) treat "nothing measured yet" as unknown, not as slow.
+        if (bps == INITIAL_BITRATE_BPS) return 0
         return (bps / 1000L).toInt().coerceAtLeast(0)
     }
 }

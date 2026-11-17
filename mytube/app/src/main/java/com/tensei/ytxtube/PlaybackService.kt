@@ -71,11 +71,14 @@ class PlaybackService : MediaSessionService() {
             .setTrackSelector(
                 DefaultTrackSelector(
                     this,
+                    // TTube: start low and climb fast. Step up once 1.5 s is buffered, and
+                    // keep only 6 s of already-buffered low quality when a better rung is
+                    // affordable (was 25 s), so the blurry opening lasts a few seconds.
                     AdaptiveTrackSelection.Factory(
- 2_000,
- 25_000,
- 25_000,
- 0.75f,
+                        1_500,
+                        25_000,
+                        6_000,
+                        0.75f,
                     ),
                 ).apply {
 

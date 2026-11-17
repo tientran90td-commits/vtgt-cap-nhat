@@ -165,7 +165,6 @@ class MainActivity : ComponentActivity() {
     override fun onStop() {
         super.onStop()
         shortsPlayerHolder?.pause()
-        PlaybackBandwidth.save(this)
     }
 
     override fun onUserLeaveHint() {
