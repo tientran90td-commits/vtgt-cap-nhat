@@ -9,7 +9,7 @@ Dựa trên mã nguồn [Koustubh12345/YTXTube](https://github.com/Koustubh12345
 | | YTXTube gốc | MyTube |
 |---|---|---|
 | Tên app | YTXTube | MyTube |
-| Biểu tượng | nút play đỏ | chữ **T** trắng + nút play vàng trên nền xanh tím (`docs/mytube-icon.svg`) |
+| Biểu tượng | nút play đỏ | chữ **T** trắng + nút play vàng trên nền đỏ (`docs/mytube-icon.svg`) |
 | Package ID | `com.tensei.ytxtube` | `com.personal.mytube` (cài song song được với bản gốc) |
 | Khóa ký APK | khóa của tác giả | khóa riêng `app/mytube.keystore` |
 | Kiểm tra cập nhật | release của tác giả | release `mytube-v*` trong repo này |
