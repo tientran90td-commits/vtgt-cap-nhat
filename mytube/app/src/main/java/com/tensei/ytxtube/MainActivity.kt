@@ -293,7 +293,18 @@ fun YtxTubeApp() {
 
     LaunchedEffect(Unit) {
         kotlinx.coroutines.delay(1_400)
-        updateState.check()
+        updateState.checkIfStale()
+    }
+    val updateLifecycleOwner = androidx.lifecycle.compose.LocalLifecycleOwner.current
+    androidx.compose.runtime.DisposableEffect(updateLifecycleOwner) {
+        val observer = androidx.lifecycle.LifecycleEventObserver { _, event ->
+            // The first check runs from the LaunchedEffect above; later resumes re-check.
+            if (event == androidx.lifecycle.Lifecycle.Event.ON_RESUME && updateState.hasCheckedOnce) {
+                updateState.checkIfStale()
+            }
+        }
+        updateLifecycleOwner.lifecycle.addObserver(observer)
+        onDispose { updateLifecycleOwner.lifecycle.removeObserver(observer) }
     }
     LaunchedEffect(updateState.message) {
         updateState.message?.let { message ->

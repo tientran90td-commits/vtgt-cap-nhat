@@ -118,9 +118,20 @@ class UpdateState(private val scope: CoroutineScope) {
         YTXTubeApplication.appContext.getSharedPreferences("mytube_updates", Context.MODE_PRIVATE)
     }
 
+    private var lastCheckAt = 0L
+    val hasCheckedOnce: Boolean get() = lastCheckAt != 0L
+
+    /** Re-check when the app comes back to the foreground, at most every 10 minutes. */
+    fun checkIfStale() {
+        if (visible || downloading) return
+        if (System.currentTimeMillis() - lastCheckAt < 10 * 60_000L) return
+        check()
+    }
+
     fun check(manual: Boolean = false) {
         if (checking) return
         checking = true
+        lastCheckAt = System.currentTimeMillis()
         scope.launch {
             val latest = withContext(Dispatchers.IO) { runCatching { fetchLatest() }.getOrNull() }
             checking = false
