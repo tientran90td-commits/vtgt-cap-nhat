@@ -103,6 +103,7 @@ jobs:
             adb logcat -c || true
             gradle --no-daemon --continue connectedDebugAndroidTest -PvCode=${{ github.run_number }} || (adb logcat -d -s VieNeuTest:I TestRunner:* AndroidRuntime:E | tail -200; exit 1)
             adb logcat -d -s VieNeuTest:I TestRunner:* | tail -60
+            mkdir -p app/build/reports/androidTests/shots && adb pull /sdcard/Download/ReviewPhim-shots app/build/reports/androidTests/shots || true
       - uses: actions/upload-artifact@v4
         if: always()
         with:
