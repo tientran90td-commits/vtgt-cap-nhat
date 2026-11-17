@@ -119,11 +119,19 @@ jobs:
         with:
           name: reviewphim-build
           path: out
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: reviewphim-device-test
+          path: dt
       - name: Chuẩn bị file
         run: |
           find out -name "*.apk"
           cp "$(find out -name 'app-arm64-v8a-release.apk' | head -1)" ReviewPhim.apk
           ls -la ReviewPhim.apk
+          # ảnh chụp giao diện từ test trên máy ảo (xem trước trên trang Release)
+          for f in $(find dt -name "*.png" 2>/dev/null); do cp "$f" "giao-dien-$(basename "$f")"; done
+          ls -la giao-dien-*.png || true
           # từ điển âm vị tiếng Việt cho giọng VieNeu (app tải về khi bật giọng AI)
           pip download -q "sea-g2p==0.10.0" --no-deps --only-binary :all: -d whl
           unzip -o -j "$(ls whl/*.whl | head -1)" 'sea_g2p/sea_g2p.bin' -d .
@@ -147,3 +155,4 @@ jobs:
           files: |
             ReviewPhim.apk
             sea_g2p.bin
+            giao-dien-*.png
