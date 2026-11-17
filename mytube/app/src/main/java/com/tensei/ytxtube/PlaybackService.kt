@@ -96,7 +96,10 @@ class PlaybackService : MediaSessionService() {
                     // buffer. The old 15 s/50 s/1 s policy is what made every open sit on
                     // a spinner before the first frame.
                     .setAllocator(androidx.media3.exoplayer.upstream.DefaultAllocator(true, 64 * 1024))
-                    .setBufferDurationsMs(2_500, 30_000, 250, 750)
+                    // TTube: still starts after 0.25 s, but keeps loading until 50 s are
+                    // buffered and resumes below 15 s (was 2.5 s), so a slow patch of network
+                    // drains the runway instead of stalling playback.
+                    .setBufferDurationsMs(15_000, 50_000, 250, 1_000)
                     .setBackBuffer(10_000, false)
                     .setPrioritizeTimeOverSizeThresholds(true)
                     .build(),

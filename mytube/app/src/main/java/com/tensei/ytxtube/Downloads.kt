@@ -142,6 +142,8 @@ object Downloads {
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
     private val jobs = ConcurrentHashMap<String, kotlinx.coroutines.Job>()
     private val pumpLock = Any()
+    private const val PARALLEL_CHUNK = 4L * 1024 * 1024
+    private const val PARALLEL_WORKERS = 4
     private val lastPersist = ConcurrentHashMap<String, Long>()
     private val lastReport = ConcurrentHashMap<String, Long>()
 
@@ -598,6 +600,15 @@ object Downloads {
         var downloaded = if (file.exists()) file.length() else 0L
         if (remote.total > 0 && downloaded >= remote.total) return downloaded
 
+        // TTube: big files go through several range requests at once. YouTube's media
+        // servers throttle one long connection, so parallel 4 MB chunks are much faster.
+        if (remote.ranges && remote.total - downloaded > PARALLEL_CHUNK * 2) {
+            runCatching { return parallelTransfer(url, file, remote, downloaded, onProgress) }
+                .onFailure { if (it is CancellationException) throw it }
+                .onFailure { Log.w(TAG, "Parallel download failed, falling back to a single connection", it) }
+            downloaded = if (file.exists()) file.length() else 0L
+        }
+
         var attempts = 0
         val maxAttempts = 5
         val buffer = ByteArray(128 * 1024)
@@ -660,6 +671,73 @@ object Downloads {
             throw IOException("Incomplete download: received $downloaded of ${remote.total} bytes")
         }
         return downloaded
+    }
+
+    /**
+     * Downloads [start, total) as consecutive batches of [PARALLEL_WORKERS] chunks fetched at
+     * the same time. Each batch is written in order before the next starts, so the file is
+     * always a complete prefix and an interrupted download can resume from its length.
+     */
+    private suspend fun parallelTransfer(
+        url: String,
+        file: File,
+        remote: Remote,
+        start: Long,
+        onProgress: (Long) -> Unit,
+    ): Long = withContext(Dispatchers.IO) {
+        var done = start
+        RandomAccessFile(file, "rw").use { raf ->
+            raf.setLength(done)
+            while (done < remote.total) {
+                val batchStart = done
+                val ranges = (0 until PARALLEL_WORKERS).mapNotNull { i ->
+                    val from = batchStart + i * PARALLEL_CHUNK
+                    if (from >= remote.total) null else from to minOf(from + PARALLEL_CHUNK, remote.total) - 1
+                }
+                val parts = coroutineScope {
+                    ranges.map { (from, to) -> async { fetchChunk(url, from, to, onProgress) } }.map { it.await() }
+                }
+                raf.seek(batchStart)
+                parts.forEach { raf.write(it) }
+                done = batchStart + parts.sumOf { it.size.toLong() }
+            }
+        }
+        done
+    }
+
+    /** One byte range of a stream, retried a few times; progress is reported as bytes arrive. */
+    private suspend fun fetchChunk(url: String, from: Long, to: Long, onProgress: (Long) -> Unit): ByteArray {
+        val size = (to - from + 1).toInt()
+        var attempt = 0
+        while (true) {
+            val out = ByteArray(size)
+            var got = 0
+            try {
+                val request = Request.Builder()
+                    .url(withRange(url, from, to))
+                    .header("User-Agent", Net.USER_AGENT)
+                    .header("Referer", "https://www.youtube.com/")
+                    .build()
+                Net.client.newCall(request).execute().use { response ->
+                    if (!response.isSuccessful) throw HttpStatusException(response.code)
+                    val source = response.body?.source() ?: throw IOException("Empty response body")
+                    while (got < size) {
+                        val n = source.read(out, got, size - got)
+                        if (n <= 0) break
+                        got += n
+                        onProgress(n.toLong())
+                    }
+                }
+                if (got == size) return out
+                throw IOException("Short chunk: $got of $size bytes")
+            } catch (e: CancellationException) {
+                throw e
+            } catch (t: Throwable) {
+                onProgress(-got.toLong())
+                if (++attempt >= 4) throw t
+                kotlinx.coroutines.delay(600L * attempt)
+            }
+        }
     }
 
     private fun withRange(url: String, start: Long, end: Long): String {

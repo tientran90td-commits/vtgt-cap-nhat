@@ -25,8 +25,23 @@ object PlaybackBandwidth {
     @Volatile
     private var meter: DefaultBandwidthMeter? = null
 
+    private const val PREFS = "playback_bandwidth"
+    private const val KEY_LAST_BPS = "last_bps"
+    private var startBps = INITIAL_BITRATE_BPS
+
     fun init(context: Context) {
+        // TTube: start from the speed measured last time (bounded), so a fast connection
+        // opens videos in high quality right away instead of climbing up from 2.5 Mbps.
+        val saved = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getLong(KEY_LAST_BPS, 0L)
+        if (saved > 0L) startBps = (saved * 8 / 10).coerceIn(1_000_000L, 25_000_000L)
         get(context.applicationContext)
+    }
+
+    /** Remember the current estimate for the next app start. */
+    fun save(context: Context) {
+        val bps = meter?.bitrateEstimate ?: return
+        if (bps <= 0L) return
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().putLong(KEY_LAST_BPS, bps).apply()
     }
 
     fun get(): BandwidthMeter = get(YTXTubeApplication.appContext)
@@ -36,7 +51,7 @@ object PlaybackBandwidth {
         synchronized(this) {
             meter?.let { return it }
             val built = DefaultBandwidthMeter.Builder(context)
-                .setInitialBitrateEstimate(INITIAL_BITRATE_BPS)
+                .setInitialBitrateEstimate(startBps)
                 .setResetOnNetworkTypeChange(true)
                 .build()
             meter = built
