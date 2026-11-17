@@ -219,10 +219,11 @@ class UpdateState(private val scope: CoroutineScope) {
     }
 
     // MyTube: updates come from the owner's own GitHub releases whose tag starts
-    // with "mytube-v" (the repo also hosts releases for other projects).
+    // with "mytube-v" (the repo also hosts releases for other projects). GitHub does not
+    // list them strictly by date, so read a full page and pick the highest version.
     private fun fetchLatest(): UpdateInfo? {
         val request = Request.Builder()
-            .url("https://api.github.com/repos/$UPDATE_REPO/releases?per_page=50")
+            .url("https://api.github.com/repos/$UPDATE_REPO/releases?per_page=100")
             .header("Accept", "application/vnd.github+json")
             .header("User-Agent", "TTube/${BuildConfig.VERSION_NAME}")
             .build()
