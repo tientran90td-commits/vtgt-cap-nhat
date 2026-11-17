@@ -142,7 +142,14 @@ class MainActivity : ComponentActivity() {
         ) {
             notificationPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
         }
-        setContent { YtxTubeTheme { YtxTubeApp() } }
+        setContent {
+            YtxTubeTheme {
+                androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()) {
+                    YtxTubeApp()
+                    LaunchSplash()
+                }
+            }
+        }
     }
 
     override fun onResume() {
