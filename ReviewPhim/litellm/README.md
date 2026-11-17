@@ -12,7 +12,21 @@ Không làm AI hết quá tải: nếu mọi AI cùng lỗi thì app vẫn chuy�
 
 > Không có máy tính bật sẵn? App cũng tự xoay nhiều key: ở Cài đặt nhập nhiều key cho 1 AI, cách nhau dấu phẩy.
 
-## Chạy trên máy tính Windows
+## Cách nhanh nhất: AI máy nhà, bấm đúp là xong (miễn phí, không giới hạn)
+
+1. Tải thư mục `ReviewPhim/litellm` về máy tính Windows (GitHub → Code → Download ZIP, giải nén).
+2. Bấm đúp **`CAI_AI_MAY_NHA.bat`** (nên chuột phải → *Run as administrator* để tự mở tường lửa). File tự:
+   - cài **Ollama** + tải mô hình nhìn được ảnh **gemma3** (máy ≥ 24 GB RAM: `gemma3:12b`, ít hơn: `gemma3:4b`),
+   - hỏi key Gemini (không bắt buộc - có thì viết / dịch hay hơn, hết lượt tự chuyển sang AI máy nhà),
+   - cài **LiteLLM**, tạo `config-may-nha.yaml` và mã key riêng, mở cổng 4000,
+   - ghi `thong_tin_ket_noi.txt`: địa chỉ, key, tên model để nhập vào app.
+3. Trên điện thoại: ⚙️ Cài đặt → **🖥 Máy chủ AI riêng** → nhập theo `thong_tin_ket_noi.txt` → 🔌 Kiểm tra kết nối.
+4. Những lần sau: bấm đúp **`CHAY_AI_MAY_NHA.bat`** trước khi làm video (máy tính bật, cùng wifi).
+
+App tự gửi ảnh + câu hỏi, tự nhận câu trả lời - không còn bước 🖐 làm tay, không lo hết lượt.
+Máy không có card đồ họa mạnh thì AI máy nhà chạy chậm (vài chục giây / lần) - để máy chạy qua đêm cho video dài.
+
+## Chạy trên máy tính Windows (tự cấu hình)
 
 1. Cài Python 3.10+ ([python.org](https://www.python.org/downloads/), tích *Add python.exe to PATH*).
 2. Tải thư mục này về, mở `config.yaml` bằng Notepad, thay `KEY_GEMINI_1`, `KEY_DEEPSEEK`... bằng key của bạn,
