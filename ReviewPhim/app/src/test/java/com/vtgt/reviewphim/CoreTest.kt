@@ -260,4 +260,13 @@ Dialogue: 0,0:00:10.00,0:00:12.00,Default,,0,0,0,,前方, 正是友哈巴赫
         assertTrue(Ai.backoff(0, 20, r) in 20000L..20999L)     // AI bảo chờ 20 giây (Retry-After)
         assertTrue(Ai.backoff(0, 300, r) in 30000L..30999L)    // nhưng không quá 30 giây
     }
+
+    @Test
+    fun nudgeAndTokens() {
+        val n = Prompts.nudge("YÊU CẦU", "AI không trả về JSON: Xin chào")
+        assertTrue(n.startsWith("YÊU CẦU") && n.contains("SAI ĐỊNH DẠNG") && n.contains("AI không trả về JSON"))
+        assertEquals("950", Ai.fmtTok(950))
+        assertEquals("12k", Ai.fmtTok(12_345))
+        assertEquals("3.5M", Ai.fmtTok(3_456_789))
+    }
 }

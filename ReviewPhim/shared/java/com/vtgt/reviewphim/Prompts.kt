@@ -165,6 +165,14 @@ Trả lời CHỈ bằng phụ đề định dạng SRT chuẩn, mốc thời gi
         return got.filter { (i, v) -> i in idx && !FOREIGN.containsMatchIn(v) }
     }
 
+    /**
+     * Gửi lại sau khi AI trả lời sai định dạng: nói rõ sai gì để AI sửa (cách "correction nudge" của BatchLLM),
+     * thay vì gửi lại y nguyên.
+     */
+    fun nudge(prompt: String, error: String?): String = prompt + "\n\nLƯU Ý: lần trước bạn trả lời SAI ĐỊNH DẠNG (" +
+        (error ?: "không đọc được").take(160) + "). Lần này CHỈ trả lời đúng 1 khối JSON hợp lệ theo đúng mẫu ở trên " +
+        "(có \"segments\" với \"from\", \"to\", \"text\"), không thêm chữ nào trước hoặc sau JSON, không dùng ```."
+
     fun parseRecap(text: String, duration: Double, lines: List<Line> = emptyList()): Pair<String, List<Seg>> {
         val d = extractJson(text)
         val arr = d.optJSONArray("segments") ?: throw IllegalArgumentException("Thiếu danh sách đoạn (segments)")

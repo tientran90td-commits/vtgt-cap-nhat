@@ -450,6 +450,8 @@ fun SettingsScreen(vm: MainVM) {
             }
             Hint("Mỗi AI nhập được nhiều key, cách nhau dấu phẩy: key này quá tải / hết lượt thì app tự đổi sang key kế.")
             com.vtgt.reviewphim.CustomAiSection(vm.prefs)
+            Text("📊 Đã dùng AI", fontWeight = FontWeight.SemiBold)
+            Hint(Ai.usageText(vm.prefs))
         }
         Section("Tên riêng & lời gốc") {
             var g by remember { mutableStateOf(vm.prefs.str("glossary")) }

@@ -591,9 +591,10 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
         if (target < targetSec) log("Truyện ngắn → video khoảng ${target / 60} phút ${target % 60} giây.")
         val prompt = Story.script(title, b.manga, items, target, style, prefs)
         var last: Exception? = null
+        var req = prompt
         repeat(2) {
             try {
-                val reply = askAi("Viết kịch bản", prompt, json = true)
+                val reply = askAi("Viết kịch bản", req, json = true)
                 val (t, s) = Prompts.parseRecap(reply, items.size.toDouble(), Story.asLines(items))
                 val n = synchronized(prefs) { Prompts.learnNames(prefs, Prompts.parseNames(reply)) }
                 if (n > 0) log("🧠 Nhớ thêm $n tên riêng.")
@@ -607,6 +608,7 @@ class MangaVM(app: Application) : AndroidViewModel(app) {
                 throw e
             } catch (e: Exception) {
                 last = e
+                req = Prompts.nudge(prompt, e.message)
                 log("Kịch bản lỗi (${e.message?.take(100)}) - thử lại...")
             }
         }

@@ -59,6 +59,7 @@ import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
@@ -657,45 +658,77 @@ class LongVM(app: Application) : AndroidViewModel(app) {
         checkVoices()
         val t0 = System.currentTimeMillis()
         var made = 0
-        for ((i, part) in p.parts.withIndex()) {
-            if (part.state >= 2) continue
-            val base = i.toFloat() / p.parts.size
-            fun sub(x: Float, s: String) = prog(base + x / p.parts.size, "Phần ${i + 1}/${p.parts.size} · ${part.name.take(40)}: $s")
-            try {
-                if (part.state == 0) {
-                    when (p.kind) {
-                        "novel" -> prepNovel(p, i, part, ::sub)
-                        "manga" -> prepManga(p, i, part, ::sub)
-                        else -> prepFilm(p, i, part, ::sub)
+        // AI chuẩn bị trước các phần sau trong lúc đọc giọng / dựng phần hiện tại (chạy song song như BatchLLM),
+        // tối đa 2 phần trước; làm tay thì lần lượt từng phần cho đỡ rối
+        val ahead = if (Ai.manual(prefs)) 0 else 2
+        val ready = p.parts.map { pt -> CompletableDeferred<Unit>().also { if (pt.state >= 1) it.complete(Unit) } }
+        val renderAt = kotlinx.coroutines.flow.MutableStateFlow(0)
+        suspend fun prepare(i: Int, part: Part, sub: (Float, String) -> Unit) {
+            when (p.kind) {
+                "novel" -> prepNovel(p, i, part, sub)
+                "manga" -> prepManga(p, i, part, sub)
+                else -> prepFilm(p, i, part, sub)
+            }
+        }
+        kotlinx.coroutines.coroutineScope {
+            val prepJob = launch {
+                for ((i, part) in p.parts.withIndex()) {
+                    if (part.state >= 1) continue
+                    renderAt.first { i - it <= ahead }
+                    val tag = "Phần ${i + 1}/${p.parts.size} · ${part.name.take(40)}"
+                    val sub = { x: Float, st: String ->
+                        if (renderAt.value == i) prog((i + x) / p.parts.size, "$tag: $st")
                     }
-                    part.state = 1
+                    try {
+                        if (renderAt.value != i) log("🤖 AI chuẩn bị trước $tag (song song với phần đang dựng)")
+                        prepare(i, part, sub)
+                        part.state = 1
+                        part.error = ""
+                        p.save()
+                        touch()
+                        ready[i].complete(Unit)
+                    } catch (e: CancellationException) {
+                        throw e
+                    } catch (e: Exception) {
+                        ready[i].completeExceptionally(e)
+                        return@launch
+                    }
+                }
+            }
+            for ((i, part) in p.parts.withIndex()) {
+                renderAt.value = i
+                if (part.state >= 2) continue
+                val base = i.toFloat() / p.parts.size
+                fun sub(x: Float, st: String) = prog(base + x / p.parts.size, "Phần ${i + 1}/${p.parts.size} · ${part.name.take(40)}: $st")
+                try {
+                    if (!ready[i].isCompleted) sub(0.02f, "AI đang chuẩn bị...")
+                    ready[i].await()
+                    when (p.kind) {
+                        "novel" -> renderNovel(p, part, pr, ::sub)
+                        "manga" -> renderManga(p, part, pr, ::sub)
+                        else -> renderFilm(p, i, part, pr, ::sub)
+                    }
+                    part.dur = withContext(Dispatchers.IO) { Media.probe(File(p.partDir(part), "part.mp4")).duration }
+                    part.state = 2
                     part.error = ""
                     p.save()
                     touch()
+                    made++
+                    val per = (System.currentTimeMillis() - t0) / 1000.0 / made
+                    val rest = p.parts.count { it.state < 2 }
+                    withContext(Dispatchers.Main) { eta = if (rest > 0) "Còn $rest phần · khoảng ${Text.stamp(per * rest)}" else "" }
+                    log("✅ ${part.name}: ${Text.stamp(part.dur)} (xong ${p.doneParts}/${p.parts.size}, video đã có ${Text.stamp(p.totalDur)})")
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    prepJob.cancel()
+                    part.error = e.message?.take(300) ?: e.javaClass.simpleName
+                    p.save()
+                    touch()
+                    throw IllegalStateException("${part.name}: ${part.error}")
                 }
-                when (p.kind) {
-                    "novel" -> renderNovel(p, part, pr, ::sub)
-                    "manga" -> renderManga(p, part, pr, ::sub)
-                    else -> renderFilm(p, i, part, pr, ::sub)
-                }
-                part.dur = withContext(Dispatchers.IO) { Media.probe(File(p.partDir(part), "part.mp4")).duration }
-                part.state = 2
-                part.error = ""
-                p.save()
-                touch()
-                made++
-                val per = (System.currentTimeMillis() - t0) / 1000.0 / made
-                val rest = p.parts.count { it.state < 2 }
-                withContext(Dispatchers.Main) { eta = if (rest > 0) "Còn $rest phần · khoảng ${Text.stamp(per * rest)}" else "" }
-                log("✅ ${part.name}: ${Text.stamp(part.dur)} (xong ${p.doneParts}/${p.parts.size}, video đã có ${Text.stamp(p.totalDur)})")
-            } catch (e: CancellationException) {
-                throw e
-            } catch (e: Exception) {
-                part.error = e.message?.take(300) ?: e.javaClass.simpleName
-                p.save()
-                touch()
-                throw IllegalStateException("${part.name}: ${part.error}")
             }
+            renderAt.value = p.parts.size
         }
         withContext(Dispatchers.Main) { eta = "" }
         exportAll(p)
@@ -995,9 +1028,10 @@ class LongVM(app: Application) : AndroidViewModel(app) {
 
     private suspend fun scriptFrom(prompt: String, duration: Double, lines: List<Line>): List<Seg> {
         var last: Exception? = null
+        var req = prompt
         repeat(2) {
             try {
-                val reply = askAi("Viết kịch bản", prompt, json = true)
+                val reply = askAi("Viết kịch bản", req, json = true)
                 val (_, s) = Prompts.parseRecap(reply, duration, lines)
                 synchronized(prefs) { Prompts.learnNames(prefs, Prompts.parseNames(reply)) }
                 return s
@@ -1005,6 +1039,7 @@ class LongVM(app: Application) : AndroidViewModel(app) {
                 throw e
             } catch (e: Exception) {
                 last = e
+                req = Prompts.nudge(prompt, e.message)
                 log("Kịch bản lỗi (${e.message?.take(100)}) - thử lại...")
             }
         }

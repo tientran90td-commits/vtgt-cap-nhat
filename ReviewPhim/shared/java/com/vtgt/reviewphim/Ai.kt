@@ -100,8 +100,9 @@ object Ai {
                 try {
                     val model = if (images.isEmpty()) model(p, prefs, ks[ki]) else visionModel(p, prefs, ks[ki])
                     val t0 = System.currentTimeMillis()
-                    val out = call(p, model, ks[ki], system, user, json, images, base(p, prefs))
+                    val (out, used) = call(p, model, ks[ki], system, user, json, images, base(p, prefs))
                     keyAt[p.id] = ki
+                    record(prefs, p.id, used.first, used.second)
                     log("AI ${p.name}${if (ks.size > 1) " (key ${ki + 1}/${ks.size})" else ""} ($model) trả lời sau ${(System.currentTimeMillis() - t0) / 1000}s")
                     return out
                 } catch (e: CancellationException) {
@@ -142,6 +143,35 @@ object Ai {
 
     private class RetryLater(msg: String, val waitSec: Int) : Exception(msg)
 
+    /** Thống kê dùng AI trong ngày (số lần gọi, token gửi / nhận) theo từng AI - cách BatchLLM theo dõi chi phí. */
+    @Synchronized
+    private fun record(prefs: Prefs, id: String, tin: Long, tout: Long) {
+        val day = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date())
+        if (prefs.str("use_day") != day) {
+            (PROVS + CUSTOM).forEach { prefs.set("use_${it.id}", "") }
+            prefs.set("use_day", day)
+        }
+        val v = prefs.str("use_$id").split(';').mapNotNull { it.toLongOrNull() }.let { if (it.size == 3) it else listOf(0L, 0L, 0L) }
+        prefs.set("use_$id", "${v[0] + 1};${v[1] + tin};${v[2] + tout}")
+    }
+
+    /** "Hôm nay: Gemini 120 lần · 350k token..." */
+    fun usageText(prefs: Prefs): String {
+        val day = java.text.SimpleDateFormat("yyyyMMdd", java.util.Locale.US).format(java.util.Date())
+        if (prefs.str("use_day") != day) return "Hôm nay chưa gọi AI nào."
+        val rows = (listOf(CUSTOM) + PROVS).mapNotNull { p ->
+            val v = prefs.str("use_${p.id}").split(';').mapNotNull { it.toLongOrNull() }
+            if (v.size != 3 || v[0] == 0L) null else "${p.name}: ${v[0]} lần · ${fmtTok(v[1] + v[2])} token (gửi ${fmtTok(v[1])}, nhận ${fmtTok(v[2])})"
+        }
+        return if (rows.isEmpty()) "Hôm nay chưa gọi AI nào." else "Hôm nay:\n" + rows.joinToString("\n")
+    }
+
+    fun fmtTok(n: Long): String = when {
+        n >= 1_000_000 -> "%.1fM".format(java.util.Locale.US, n / 1e6)
+        n >= 1_000 -> "${n / 1000}k"
+        else -> "$n"
+    }
+
     /**
      * Thời gian chờ trước lần thử lại thứ [n] (0..): tăng dần 2 → 4 → 8 giây + ngẫu nhiên tới 1 giây (cách tenacity
      * "wait_exponential + jitter"); AI báo phải chờ bao lâu ([asked] giây, header Retry-After) thì chờ đủ (tối đa 30 giây).
@@ -156,7 +186,7 @@ object Ai {
     private class KeyError(msg: String) : Exception(msg)
 
     private suspend fun call(p: Prov, model: String, key: String, system: String, user: String, json: Boolean,
-                             images: List<java.io.File>, base: String): String =
+                             images: List<java.io.File>, base: String): Pair<String, Pair<Long, Long>> =
         withContext(Dispatchers.IO) {
             val content: Any = if (images.isEmpty()) user else JSONArray().apply {
                 put(JSONObject().put("type", "text").put("text", user))
@@ -180,8 +210,14 @@ object Ai {
                 after = r.third
             }
             check(p, code, text, after)
-            val msg = JSONObject(text).getJSONArray("choices").getJSONObject(0).getJSONObject("message")
-            msg.optString("content", "")
+            val o = JSONObject(text)
+            val msg = o.getJSONArray("choices").getJSONObject(0).getJSONObject("message")
+            val content = msg.optString("content", "")
+            // token đã dùng (AI báo trong "usage"; không có thì ước tính ~4 ký tự / token)
+            val u = o.optJSONObject("usage")
+            val tin = u?.optLong("prompt_tokens", -1)?.takeIf { it >= 0 } ?: ((system.length + user.length) / 4L + images.size * 1000L)
+            val tout = u?.optLong("completion_tokens", -1)?.takeIf { it >= 0 } ?: (content.length / 4L)
+            content to (tin to tout)
         }
 
     /** (mã HTTP, nội dung, số giây AI yêu cầu chờ - header Retry-After). */

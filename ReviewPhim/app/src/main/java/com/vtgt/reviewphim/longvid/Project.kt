@@ -50,6 +50,7 @@ class Project(val dir: File) {
         return Part("%05d".format(n), name, weight).also { parts += it; partDir(it) }
     }
 
+    @Synchronized
     fun save() {
         dir.mkdirs()
         val o = JSONObject().put("kind", kind).put("title", title).put("mode", mode).put("targetMin", targetMin)

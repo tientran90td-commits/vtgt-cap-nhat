@@ -555,9 +555,10 @@ class MainVM(app: Application) : AndroidViewModel(app) {
         val prompt = Prompts.recap(title, i.duration, tl, min(targetSec, (i.duration * 0.9).toInt().coerceAtLeast(30)),
             style, prefs)
         var last: Exception? = null
+        var req = prompt
         repeat(2) {
             try {
-                val reply = askAi("Viết kịch bản review", prompt)
+                val reply = askAi("Viết kịch bản review", req)
                 val (t, s) = Prompts.parseRecap(reply, i.duration, tl)
                 rememberNames(reply)
                 withContext(Dispatchers.Main) {
@@ -570,6 +571,7 @@ class MainVM(app: Application) : AndroidViewModel(app) {
                 throw e
             } catch (e: Exception) {
                 last = e
+                req = Prompts.nudge(prompt, e.message)
                 log("Kịch bản lỗi (${e.message?.take(100)}) - thử lại...")
             }
         }
