@@ -1,0 +1,21 @@
+# Giao diện
+PySide6>=6.6
+# Kết nối AI
+requests>=2.31
+anthropic>=2.8
+# Nhận dạng lời thoại offline (Whisper)
+faster-whisper>=1.1
+# Dò chuyển cảnh
+scenedetect>=0.6.4
+opencv-python-headless>=4.8,<5  # 5.x bỏ bộ dò mặt Haar dùng cho khung dọc bám mặt
+# Giọng đọc miễn phí
+edge-tts>=7.0
+gTTS>=2.5
+pyttsx3>=2.98
+# Tải phim từ link
+yt-dlp>=2025.1.1
+# Đọc số thành chữ cho các ngôn ngữ khác tiếng Việt
+num2words>=0.5.13
+# FFmpeg dự phòng nếu máy chưa cài
+imageio-ffmpeg>=0.5
+Pillow>=10  # ảnh thumbnail

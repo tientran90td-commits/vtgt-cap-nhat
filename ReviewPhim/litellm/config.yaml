@@ -1,0 +1,44 @@
+# LiteLLM - trạm trung chuyển AI cho app ReviewPhim AI.
+# App gọi model "chinh" (viết / dịch) và "nhin-anh" (đọc tranh, xem hình). LiteLLM tự:
+#   - xoay vòng nhiều key (mỗi dòng cùng model_name = 1 key / 1 AI),
+#   - thử lại khi quá tải (429 / 503), tạm bỏ key / AI đang lỗi vài chục giây,
+#   - chuyển sang nhóm dự phòng khi nhóm chính lỗi hết.
+# Thay các key "..." bằng key của bạn (hoặc đặt biến môi trường rồi dùng os.environ/TEN_BIEN). Thêm / bớt dòng tùy ý.
+
+model_list:
+  # ---- nhóm chính: Gemini (miễn phí) - nhiều key thì nhiều lượt hơn
+  - model_name: chinh
+    litellm_params: {model: gemini/gemini-2.5-flash, api_key: "KEY_GEMINI_1"}
+  - model_name: chinh
+    litellm_params: {model: gemini/gemini-2.5-flash, api_key: "KEY_GEMINI_2"}
+
+  # ---- dự phòng: DeepSeek (rẻ), Groq (miễn phí, nhanh)
+  - model_name: du-phong
+    litellm_params: {model: deepseek/deepseek-chat, api_key: "KEY_DEEPSEEK"}
+  - model_name: du-phong
+    litellm_params: {model: groq/llama-3.3-70b-versatile, api_key: "KEY_GROQ"}
+
+  # ---- nhìn ảnh (đọc truyện tranh, xem hình phim)
+  - model_name: nhin-anh
+    litellm_params: {model: gemini/gemini-2.5-flash, api_key: "KEY_GEMINI_1"}
+  - model_name: nhin-anh
+    litellm_params: {model: gemini/gemini-2.5-flash, api_key: "KEY_GEMINI_2"}
+  - model_name: nhin-anh-du-phong
+    litellm_params: {model: groq/meta-llama/llama-4-scout-17b-16e-instruct, api_key: "KEY_GROQ"}
+
+  # ---- (tùy chọn) AI chạy trên chính máy tính này bằng Ollama - miễn phí, không giới hạn
+  # - model_name: du-phong
+  #   litellm_params: {model: ollama_chat/qwen2.5:14b, api_base: "http://localhost:11434"}
+
+litellm_settings:
+  num_retries: 2            # thử lại mỗi lần lỗi
+  request_timeout: 120      # giây
+  allowed_fails: 2          # lỗi 2 lần thì tạm bỏ key / AI đó
+  cooldown_time: 60         # ... trong 60 giây
+  fallbacks:
+    - chinh: [du-phong]
+    - nhin-anh: [nhin-anh-du-phong]
+  drop_params: true         # AI không hỗ trợ tham số nào thì bỏ tham số đó, không báo lỗi
+
+general_settings:
+  master_key: "sk-reviewphim-doi-ma-nay"   # đổi thành mã riêng của bạn; nhập mã này vào ô Key trong app

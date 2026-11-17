@@ -1,0 +1,158 @@
+# Dựng app Android "ReviewPhim AI" (thư mục ReviewPhim/), chạy test trên máy ảo Android,
+# rồi đăng file APK lên Release "reviewphim" của repo để tải về điện thoại / cập nhật trong app.
+name: ReviewPhim Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: ['claude/movie-summary-app-0q90dq']
+    paths: ['ReviewPhim/**', '.github/workflows/reviewphim-android.yml']
+
+permissions:
+  contents: write
+
+concurrency:
+  group: reviewphim-android
+  cancel-in-progress: true
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ReviewPhim
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ReviewPhim/native/seag2p-jni
+      - name: Dựng thư viện âm vị tiếng Việt (sea-g2p, Rust) cho Android
+        working-directory: ReviewPhim/native/seag2p-jni
+        run: |
+          rustup target add aarch64-linux-android x86_64-linux-android
+          cargo install cargo-ndk --locked
+          export ANDROID_NDK_HOME="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          cargo ndk -t arm64-v8a -t x86_64 -P 29 -o ../../shared/jniLibs build --release
+          rm -f ../../shared/jniLibs/*/libsea_g2p_rs-*.so   # thư viện phụ thuộc đã liên kết tĩnh vào libseag2p_jni
+          for f in ../../shared/jniLibs/*/*.so; do ls -la "$f"; readelf -d "$f" | grep NEEDED; done
+      - name: Unit test + build APK
+        run: gradle --no-daemon --stacktrace testDebugUnitTest assembleRelease -PvCode=${{ github.run_number }}
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reviewphim-build
+          path: |
+            ReviewPhim/app/build/outputs/apk/release/*.apk
+            ReviewPhim/app/build/reports/tests/
+          if-no-files-found: ignore
+
+  device-test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 75
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.11.1'
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: ReviewPhim/native/seag2p-jni
+      - name: Dựng thư viện âm vị tiếng Việt (sea-g2p, Rust) cho Android
+        working-directory: ReviewPhim/native/seag2p-jni
+        run: |
+          rustup target add aarch64-linux-android x86_64-linux-android
+          cargo install cargo-ndk --locked
+          export ANDROID_NDK_HOME="${ANDROID_NDK_LATEST_HOME:-$ANDROID_NDK_HOME}"
+          cargo ndk -t arm64-v8a -t x86_64 -P 29 -o ../../shared/jniLibs build --release
+          rm -f ../../shared/jniLibs/*/libsea_g2p_rs-*.so   # thư viện phụ thuộc đã liên kết tĩnh vào libseag2p_jni
+          for f in ../../shared/jniLibs/*/*.so; do ls -la "$f"; readelf -d "$f" | grep NEEDED; done
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Dữ liệu chuẩn VieNeu (bản Python) để so trên máy ảo
+        run: |
+          pip install -q "vieneu==3.8.4" "sea-g2p==0.10.0"
+          python ReviewPhim/scripts/vieneu_ref.py ReviewPhim/app/src/androidTest/assets "$RUNNER_TEMP/vieneu"
+          ls -la ReviewPhim/app/src/androidTest/assets
+      - name: Enable KVM
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Test trên máy ảo Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 34
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          emulator-options: -no-window -gpu swiftshader_indirect -noaudio -no-boot-anim -camera-back none
+          working-directory: ReviewPhim
+          script: |
+            adb logcat -c || true
+            gradle --no-daemon --continue connectedDebugAndroidTest -PvCode=${{ github.run_number }} || (adb logcat -d -s VieNeuTest:I TestRunner:* AndroidRuntime:E | tail -200; exit 1)
+            adb logcat -d -s VieNeuTest:I TestRunner:* | tail -60
+            mkdir -p app/build/reports/androidTests/shots && adb pull /sdcard/Download/ReviewPhim-shots app/build/reports/androidTests/shots || true
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: reviewphim-device-test
+          path: ReviewPhim/app/build/reports/androidTests/
+          if-no-files-found: ignore
+
+  release:
+    needs: [build, device-test]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: reviewphim-build
+          path: out
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: reviewphim-device-test
+          path: dt
+      - name: Chuẩn bị file
+        run: |
+          find out -name "*.apk"
+          cp "$(find out -name 'app-arm64-v8a-release.apk' | head -1)" ReviewPhim.apk
+          ls -la ReviewPhim.apk
+          # ảnh chụp giao diện từ test trên máy ảo (xem trước trên trang Release)
+          for f in $(find dt -name "*.png" 2>/dev/null); do cp "$f" "giao-dien-$(basename "$f")"; done
+          ls -la giao-dien-*.png || true
+          # từ điển âm vị tiếng Việt cho giọng VieNeu (app tải về khi bật giọng AI)
+          pip download -q "sea-g2p==0.10.0" --no-deps --only-binary :all: -d whl
+          unzip -o -j "$(ls whl/*.whl | head -1)" 'sea_g2p/sea_g2p.bin' -d .
+          ls -la sea_g2p.bin
+      - name: Bỏ file app cũ đã gộp (MangaRecap / LongRecap) khỏi Release
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          for a in MangaRecap.apk LongRecap.apk; do gh release delete-asset reviewphim "$a" -y -R "${{ github.repository }}" || true; done
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: reviewphim
+          name: ReviewPhim AI 1.0.${{ github.run_number }}
+          make_latest: false
+          body: |
+            versionCode=${{ github.run_number }}
+            App Android ReviewPhim AI - 3 chế độ trong 1 app: 🎬 review / tóm tắt / dịch phim · 📚 tóm tắt truyện tranh, light novel · ⏱ video dài tới 10 tiếng.
+            Tải ReviewPhim.apk về điện thoại rồi mở để cài (cho phép cài từ nguồn này nếu Android hỏi).
+            sea_g2p.bin: từ điển âm vị cho giọng VieNeu (app tự tải, không cần tải tay).
+          files: |
+            ReviewPhim.apk
+            sea_g2p.bin
+            giao-dien-*.png

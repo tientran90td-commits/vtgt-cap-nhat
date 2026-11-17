@@ -1,0 +1,23 @@
+# Giao diện (bản gọn, có trình xem video)
+PySide6-Essentials>=6.6
+# Mạng, FFmpeg đi kèm
+requests>=2.31
+imageio-ffmpeg>=0.5
+numpy>=1.26
+# Nghe lời gốc: Whisper chạy trên máy (bản card đồ họa app tự tải khi cần)
+faster-whisper>=1.1
+# Giọng thuyết minh: Edge (miễn phí, cần mạng) + Piper (trên máy, nhẹ - dự phòng khi mất mạng)
+edge-tts>=7.0
+piper-tts>=1.2
+gTTS>=2.5
+# Chạy model AI (tách nhạc, đọc chữ, giọng VieNeu). Windows: install.bat đổi sang bản DirectML để chạy bằng card
+onnxruntime>=1.20
+# Đọc phụ đề cứng trên hình (OCR mọi ngôn ngữ: model PaddleOCR chạy trên onnxruntime)
+rapidocr>=3.0
+# Giọng Việt AI chạy trên máy: Ngọc Huyền, Hải Đăng... (bản v3 Turbo không cần PyTorch)
+vieneu>=3.8
+# Tải video từ link, ảnh bìa
+yt-dlp>=2025.1.1
+Pillow>=10.1
+# AI dịch online (Claude); Gemini / OpenAI / Groq... gọi trực tiếp
+anthropic>=2.8

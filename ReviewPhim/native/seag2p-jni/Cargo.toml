@@ -1,0 +1,21 @@
+# Cầu nối JNI cho sea-g2p (Apache-2.0, github.com/pnnbao97/sea-g2p): chữ tiếng Việt -> âm vị cho VieNeu-TTS.
+# Dựng cho Android bằng cargo-ndk trong GitHub Actions (xem .github/workflows/reviewphim-android.yml).
+[package]
+name = "seag2p_jni"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+jni = "0.21"
+sea-g2p-rs = { git = "https://github.com/pnnbao97/sea-g2p", rev = "e825173f235d08ea19315b2b279fb11153b44cea", default-features = false, features = ["capi"] }
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+strip = true
+panic = "unwind"

@@ -1,0 +1,200 @@
+# 🎥 Movie Recap AI: tóm tắt phim dài thành video ngắn
+
+Ứng dụng máy tính (Windows/macOS/Linux), giao diện tiếng Việt. App biến một bộ phim 1–3 tiếng thành video
+**review/tóm tắt** 1–15 phút: có **giọng thuyết minh AI**, **phụ đề**, **nhạc nền**, xuất khung **ngang (YouTube)**
+hoặc **dọc (TikTok/Reels/Shorts)**.
+
+```
+Phim dài ──► 🔍 Nhận diện phim ──► ① Nhận dạng lời thoại ──► ② Dò cảnh ──► ③ AI viết kịch bản + chọn cảnh
+        (Whisper / phụ đề có sẵn)      (PySceneDetect)       (Gemini, Claude, GPT, Groq, Ollama…)
+                                                                        │
+     Video ngắn ◄── ⑤ Dựng video (FFmpeg) ◄── ④ Lồng tiếng (12 công cụ, phát âm chuẩn)
+     + phụ đề .srt     cắt cảnh, ghép giọng, phụ đề, nhạc nền, logo, khung 16:9 / 9:16 / 1:1
+```
+
+## ✨ Tính năng
+
+| Nhóm | Chi tiết |
+|---|---|
+| **Nguồn phim** | Kéo thả file (MP4, MKV, AVI, MOV, WEBM…) hoặc dán link YouTube/Facebook/TikTok/Bilibili… (yt-dlp, tự tải kèm phụ đề) |
+| **Nhận dạng thoại** | Whisper offline (faster-whisper, CPU/GPU), Groq Whisper API, OpenAI Whisper API, file phụ đề .srt/.vtt/.ass, phụ đề nhúng trong MKV/MP4 |
+| **AI viết kịch bản** | Google Gemini, Anthropic Claude, OpenAI, Groq, DeepSeek, OpenRouter, xAI Grok, Mistral, Qwen, **Ollama/LM Studio (offline)**, mọi API dạng OpenAI-compatible, hoặc chế độ **không dùng AI** |
+| **Kiểu video** | Thuyết minh AI · Cắt highlight giữ thoại gốc · Kết hợp (thuyết minh + câu thoại đắt giá) |
+| **Phong cách** | Review TikTok kịch tính, tóm tắt nghiêm túc, hài hước, cảm xúc, kinh dị, phân tích ý nghĩa, thiếu nhi + yêu cầu riêng |
+| **Giọng đọc** | ⭐ VieNeu-TTS (giọng Việt AI offline), Edge TTS (400+ giọng miễn phí, có Hoài My/Nam Minh), gTTS, OpenAI TTS (có chỉnh cảm xúc), ElevenLabs, Gemini TTS (30 giọng), Google Cloud TTS, Azure (500+ giọng, nhiều phong cách), FPT.AI (giọng Việt Bắc/Trung/Nam), **Piper offline**, giọng Windows (SAPI), **XTTS-v2 / viXTTS nhân bản giọng** |
+| **Tinh chỉnh giọng** | Tốc độ, cao độ (nửa cung), âm lượng, cảm xúc/phong cách, nghe thử ngay |
+| **🎭 Cách đọc** | Tự nhiên, hài hước, hoạt ngôn, nghiêm túc/tin tức, kịch tính, kinh dị, buồn, sôi nổi, ấm áp, gay gắt, thiếu nhi hoặc tự mô tả · AI gán cách đọc **riêng cho từng đoạn** theo cảm xúc cảnh (sửa được trong bảng kịch bản) · OpenAI/Gemini/Azure/ElevenLabs đọc theo cảm xúc thật, các công cụ khác được chỉnh nhịp & cao độ cho hợp |
+| **🔍 Nhận diện phim** | AI nhận ra phim từ tên file + 7 khung hình + lời thoại (tên phim, năm, nhân vật, nội dung) · đối chiếu **TMDB** (tùy chọn) để lấy tên nhân vật chuẩn · gợi ý tên riêng cho Whisper nghe đúng · **AI xem hình ảnh** các cảnh để chọn clip chính xác · bạn sửa/bổ sung được |
+| **🎯 Khớp hình theo câu** | Mỗi câu thuyết minh chiếu đúng khoảnh khắc nó kể. AI gán mốc phim cho từng câu, app chia giọng đọc theo khoảng lặng thật giữa các câu, **không lặp lại cảnh đã chiếu**, tự lấy cảnh mới gần đó |
+| **🛡️ Nguồn từ web phim** | Tự dò **quảng cáo / chữ chèn cứng** (lớp đứng yên trong khi hình phim thay đổi) và tránh các đoạn đó; tự phát hiện **logo/watermark cố định** và che mờ; ô *Bỏ qua đoạn* cho intro, cảnh không muốn dùng |
+| **⚡ Nhận dạng thoại bằng card AMD** | Engine *Whisper bằng card đồ họa* dùng [whisper.cpp](https://github.com/ggml-org/whisper.cpp) bản Vulkan: chạy trên card AMD/Intel/NVIDIA (vd RX 5700 XT), nhanh hơn CPU nhiều lần · lỗi thì tự quay về faster-whisper |
+| **🎯 Khung dọc bám nhân vật** | Lấp khung *Bám theo khuôn mặt*: phim ngang → video dọc 9:16, khung cắt tự dò khuôn mặt (không có mặt thì bám vùng có chuyển động) và lia mượt theo nhân vật |
+| **🖼 Thumbnail tự động** | Chấm điểm khung hình trong các cảnh được dùng (độ nét, khuôn mặt, tương phản, màu), chèn tiêu đề chữ to: ảnh 1280×720, ảnh dọc 1080×1920 + 2 phương án phụ |
+| **🎛️ Một mục thiết lập video** | Bước 4 *Thiết lập & xuất video*: mọi thiết lập của video thành phẩm trên một trang (mục lục bên trái để nhảy nhanh) - mẫu có sẵn, **mẫu của tôi** (lưu/áp dụng/xóa), khôi phục mặc định, thời lượng, khung hình, làm sạch hình gốc, phụ đề, logo, âm thanh, chọn cảnh, sau khi xuất |
+| **🧹 Thư mục xuất gọn** | Mặc định thư mục xuất CHỈ còn video thành phẩm; phụ đề .srt, kịch bản, thumbnail, tiêu đề được cất riêng và mở nhanh bằng nút 📣 |
+| **📣 Tiêu đề, mô tả, chương** | AI viết 3 tiêu đề, chữ cho thumbnail, mô tả, hashtag, tag và **mốc chương YouTube** đúng thời điểm trong video → file `.youtube.txt`, nút *Sao chép tất cả* |
+| **💬 Phụ đề gốc in cứng** | Tự phát hiện Vietsub/phụ đề in sẵn trong hình rồi: **làm mờ** dải phụ đề · **phủ dải tối** · **cắt bỏ** phần dưới · **né** (đưa phụ đề của app lên trên) · hoặc **🧠 xóa sạch bằng AI** qua [video-subtitle-remover](https://github.com/YaoFANGUK/video-subtitle-remover) (chỉ xử lý các cảnh được dùng trong recap, có bản cho card AMD) |
+| **🎙️ 1 giọng đồng nhất** | Mặc định cả video giữ đúng 1 giọng: cảm xúc từng đoạn chỉ nhích nhẹ tốc độ, không đổi cao độ/phong cách giọng · tắt tiếng phim gốc khi đang thuyết minh (không lẫn giọng nhân vật) |
+| **🔄 Cập nhật trong app** | Nút **Cập nhật** ở góc trái dưới: tự kiểm tra bản mới, tải & cài đè (giữ nguyên cài đặt, API key, giọng đã tải), sao lưu bản cũ và **khôi phục** được nếu cần |
+| **📚 Nhiều tập → 1 video** | Kéo thả nhiều tập hoặc cả thư mục: **1 video recap tóm tắt cả bộ** (AI kể theo thứ tự tập, hiện chữ "Tập N" khi chuyển tập, mốc chương YouTube theo tập) hoặc **nối thành 1 video dài**. **Tự dò OP/ED** bằng vân tay âm thanh (nhạc lặp lại giữa các tập, đúng cả khi có cảnh mở màn trước OP), sắp tập theo số trong tên file |
+| **🏁 Nhiều phương án** | AI viết 2–3 kịch bản (mở đầu gắt hơn / kể rõ ràng hơn), tự chấm điểm cuốn hút + độ chính xác + độ dài, rồi chọn bản hay nhất · **góc nhìn người kể** (toàn tri / qua mắt nhân vật / thám tử / reviewer) · **học phong cách từ video recap mẫu** (nhịp đọc, độ dài cảnh, giọng văn) |
+| **✅ Kiểm tra thành phẩm** | Sau khi xuất: phát hiện màn hình đen, cảnh đứng hình lâu (dễ bị coi là trình chiếu ảnh), âm lượng, độ dài so với mục tiêu · **cân bằng âm lượng** -16 LUFS · chuyển cảnh mờ dần nhẹ · khung hình/giây giống phim gốc |
+| **🚀 Turbo** | 1 nút dùng thiết lập mạnh nhất của máy để làm video nhanh nhất: nhận dạng thoại nhanh nhất có thể (Groq API / GPU NVIDIA / card AMD qua whisper.cpp Vulkan), mã hóa bằng GPU, **dựng nhiều đoạn song song**, **đọc giọng nhiều luồng**, quét quảng cáo nhanh, bỏ các bước phụ tốn thời gian · giữ nguyên giọng & kiểu video · nút *Bỏ Turbo* khôi phục thiết lập cũ |
+| **⚡ Mở là dùng ngay** | Màn hình khởi động · mở app là tự chạy nền: cài phần còn thiếu, tải model nhận dạng thoại, nạp sẵn model giọng đọc vào RAM, chọn model AI mới nhất, dò GPU (AMD AMF / NVIDIA / Intel) - không khóa giao diện, tiến độ hiện ở góc dưới · bật/tắt ở mục Cài đặt |
+| **🧩 Tự cài đặt** | Tự kiểm tra & tải những gì còn thiếu: thư viện, FFmpeg bản đầy đủ, model Whisper, model VieNeu, giọng Piper tiếng Việt · nút **🩺 Chẩn đoán giọng đọc** & **🔔 Thử loa** · file log để gửi khi gặp lỗi |
+| **🗣️ Phát âm chuẩn** | ⭐ **VieNeu-TTS**: AI giọng Việt offline, 25 giọng 3 miền, nhân bản giọng từ mẫu 3–8 giây · tự đọc đúng số, số thập phân, %, tiền tệ, ngày tháng, giờ, khoảng, tỷ số, đơn vị, số La Mã, chữ viết tắt · **từ điển phát âm** do bạn định nghĩa · **AI soát phát âm** (viết lại câu cho dễ đọc, phiên âm tên nước ngoài) · phụ đề vẫn giữ chữ gốc |
+| **Biên tập** | Bảng kịch bản sửa trực tiếp: lời thuyết minh, mốc thời gian, thêm/xóa/đổi thứ tự, xem trước cảnh, nghe thử từng đoạn, lưu/mở kịch bản JSON |
+| **Dựng video** | 16:9 / 9:16 / 1:1 / 4:5, nền mờ hoặc cắt cúp, 720p–4K, phụ đề tùy chỉnh (font, màu, viền, vị trí), tiêu đề mở đầu, logo, nhạc nền, giảm tiếng phim khi thuyết minh, GPU NVENC/QuickSync/AMF |
+| **Tốc độ** | Lưu tạm mọi bước: sửa 1 đoạn rồi xuất lại thì chỉ dựng lại đoạn đó |
+
+## 🚀 Cài đặt (Windows)
+
+1. Cài **Python 3.10–3.12** từ <https://www.python.org/downloads/>. Khi cài nhớ tick ✅ *Add python.exe to PATH*.
+2. Tải thư mục `MovieRecapAI` về máy, bấm đúp **`install.bat`**. Script tự tạo môi trường, cài thư viện, Piper và FFmpeg (qua winget).
+3. Bấm đúp **`run.bat`** để mở app. Lần đầu mở, app sẽ hỏi để **tự tải những thứ còn thiếu** (hoặc vào mục **🧩 Thành phần & sửa lỗi**, bấm *Cài tất cả còn thiếu*).
+4. Không nghe được giọng đọc: vào **🧩 Thành phần & sửa lỗi**, bấm **🔔 Thử loa** rồi **🩺 Chẩn đoán giọng đọc**. App tự sửa những lỗi thường gặp. File log nằm ở `%APPDATA%\MovieRecapAI\logs\app.log`.
+
+> Linux/macOS: `./run.sh` (cần `ffmpeg` có sẵn: `sudo apt install ffmpeg` / `brew install ffmpeg`).
+>
+> Muốn đóng gói thành file `.exe` gửi người khác: chạy `build_exe.bat`, kết quả nằm ở `dist\MovieRecapAI\`.
+
+## 💻 Gợi ý theo cấu hình máy
+
+| Máy | Nhận dạng thoại | Giọng đọc | Xuất video |
+|---|---|---|---|
+| **Card AMD (vd RX 5700 XT) / Intel, CPU 12 luồng (vd i5-12400F), RAM 16GB** | Whisper *Tự chọn* (large-v3-turbo chạy CPU, phim 2 tiếng mất khoảng 40-70 phút) hoặc **Groq Whisper API** (miễn phí, vài phút) | VieNeu-TTS v3turbo (CPU) hoặc Edge TTS | Bộ mã hóa *Tự động* → **AMD AMF** |
+| Card NVIDIA | Whisper large-v3-turbo trên GPU (rất nhanh) | VieNeu-TTS / XTTS dùng GPU | NVENC |
+| Máy yếu / laptop cũ | Groq Whisper API hoặc model `small` | Edge TTS hoặc VieNeu v3nano | CPU |
+
+Card AMD không dùng được CUDA, nên Whisper và VieNeu sẽ chạy bằng CPU (vẫn ổn với CPU 12 luồng). XTTS và Ollama không nên dùng trên card AMD.
+
+## 🔑 Nhập API (mục *API & Cài đặt* trong app)
+
+Không cần nhập hết, chỉ cần dịch vụ bạn dùng. Bấm **Kiểm tra** cạnh mỗi ô để thử kết nối.
+
+| Dịch vụ | Dùng cho | Lấy key | Ghi chú |
+|---|---|---|---|
+| **Google Gemini** ⭐ | Viết kịch bản, Gemini TTS | <https://aistudio.google.com/apikey> | **Có gói miễn phí**, ngữ cảnh 1 triệu token, rất hợp phim dài |
+| Anthropic Claude | Viết kịch bản | <https://console.anthropic.com/settings/keys> | Mặc định `claude-opus-5-5`, viết tự nhiên |
+| OpenAI | Kịch bản, OpenAI TTS, Whisper API | <https://platform.openai.com/api-keys> | Đổi Base URL được (Azure OpenAI, proxy…) |
+| Groq | Kịch bản (Llama, Qwen…), **Groq Whisper** | <https://console.groq.com/keys> | Miễn phí có giới hạn, rất nhanh |
+| DeepSeek / OpenRouter / xAI / Mistral / Qwen | Viết kịch bản | xem nút *Lấy key* trong app | |
+| Ollama / LM Studio | Viết kịch bản **offline** | <https://ollama.com> | Không cần key, ví dụ `ollama pull qwen2.5:14b` |
+| ElevenLabs | Giọng siêu thật, giọng nhân bản | <https://elevenlabs.io/app/settings/api-keys> | |
+| Google Cloud TTS | Giọng WaveNet/Neural2/Chirp | <https://console.cloud.google.com/apis/credentials> | Bật *Cloud Text-to-Speech API* |
+| TMDB (tùy chọn) | Nhận diện phim, tên nhân vật chuẩn | <https://www.themoviedb.org/settings/api> | Miễn phí |
+| Azure Speech | 500+ giọng, có cảm xúc | Azure Portal → Speech service | Nhập cả **vùng** (vd `southeastasia`) |
+| FPT.AI | Giọng Việt 3 miền | <https://console.fpt.ai> | |
+
+Key chỉ lưu trên máy bạn: `%APPDATA%\MovieRecapAI\settings.json` (Windows).
+
+**Tự động hoàn toàn, miễn phí:** ở Bước 2 bấm **⚡ Lấy key miễn phí**. App mở trang tạo key Gemini, bạn đăng nhập Google, bấm *Create API key* rồi bấm **Copy**: app **tự nhận key, tự lưu, tự chọn Gemini**. Từ đó bấm ⚡ là app làm hết, không phải copy-dán gì. Nếu bấm ⚡ khi chưa có key, app cũng tự mời bạn làm bước này.
+
+**Dùng bản web (ChatGPT / Gemini / AI Studio / Claude...) không cần key:** chọn **🌐 Dùng bản WEB** ở Bước 2, bấm **🔐 Đăng nhập AI web** để đăng nhập ngay trong app (1 lần, app nhớ phiên đăng nhập). Khi cần AI, trang web hiện ngay trong app và câu lệnh đã được copy sẵn: bạn **Ctrl+V → Enter → bấm Copy** dưới câu trả lời, app **tự nhận** rồi chạy tiếp. App không tự gõ, tự gửi hay tự đọc trang web, vì các dịch vụ này cấm tự động hóa giao diện web và có thể khóa tài khoản. Google thường chặn đăng nhập tài khoản Google trong trình duyệt nhúng; khi đó bấm *↗ Mở bằng trình duyệt máy*, app vẫn tự nhận câu trả lời khi bạn bấm Copy.
+
+**AI báo lỗi 429 / hết tiền?** App phân biệt: *hết tiền/hết lượt trong ngày* (báo rõ cách khắc phục, không thử lại vô ích), *quá tải tạm thời* (đợi đúng thời gian nhà cung cấp yêu cầu), *yêu cầu quá dài* (tự chia nhỏ lời thoại). Nếu bạn đã nhập key của nhiều AI, app **tự chuyển sang AI khác** khi AI đang dùng hết tiền hoặc quá tải. Lưu ý: gói ChatGPT Plus **không** bao gồm API, API OpenAI phải nạp tiền riêng.
+
+**Bộ miễn phí 100%:** Whisper offline + Gemini (free) + Edge TTS. Hoặc **offline hoàn toàn:** Whisper + Ollama + Piper.
+
+## 🎬 Cách dùng
+
+1. **Video nguồn**: kéo thả phim hoặc dán link, rồi bấm **Tải về**.
+2. Bấm **⚡ TỰ ĐỘNG LÀM TẤT CẢ** để app chạy hết các bước và xuất video. Muốn tự tay chỉnh thì làm lần lượt:
+3. **Kịch bản AI**: ① *Nhận dạng thoại* → ② *AI viết kịch bản*. Sau đó sửa trong bảng (để trống lời thuyết minh nghĩa là giữ âm thanh gốc của cảnh đó). Nhấp đúp mốc thời gian để xem cảnh.
+4. **Giọng đọc**: lọc theo ngôn ngữ và giới tính, chọn giọng, chỉnh tốc độ/cao độ, bấm *Nghe thử*.
+5. **Xuất video**: chọn mẫu *TikTok* hoặc *YouTube*, phụ đề, nhạc nền, logo, rồi bấm **🚀 XUẤT VIDEO**.
+   App xuất kèm file `.srt` (phụ đề) và `.txt` (kịch bản + mô tả để đăng).
+
+### Chạy dòng lệnh (không giao diện)
+
+```bash
+python main.py --cli "phim.mkv" --minutes 8 --provider gemini --voice vi-VN-NamMinhNeural --aspect 9:16
+python main.py --cli "https://www.youtube.com/watch?v=..." --subtitle phim.srt -o recap.mp4
+```
+
+## 💡 Mẹo
+
+- Phim có sẵn phụ đề `.srt` cùng tên thì app tự nhận ra. Dùng phụ đề nhanh và chuẩn hơn nhận dạng giọng nói.
+- Máy có GPU NVIDIA: Whisper `large-v3` cho độ chính xác cao nhất, bộ mã hóa `NVENC` cho tốc độ xuất nhanh (bấm *Kiểm tra GPU*).
+- Phim rất dài mà dùng model ngữ cảnh nhỏ (Groq, Ollama): app tự tóm tắt từng phần trước rồi mới viết kịch bản.
+- **Phát âm chuẩn nhất cho tiếng Việt:** chọn engine *⭐ VieNeu-TTS* (đã cài sẵn qua `install.bat`, lần đầu tự tải model), bật *Phát âm chuẩn*, bấm *🔎 Xem cách đọc* để xem câu sẽ được đọc ra sao. Tên riêng hay bị đọc sai thì thêm vào *📖 Từ điển phát âm* (vd `Thanos → Tha-nốt`). Nếu muốn kỹ hơn, bật *AI soát phát âm*.
+- **Tất cả giọng Piper offline:** engine *Piper* → *🔌 Kho giọng Piper*: tải **tất cả giọng chính thức** (hơn 100 giọng, khoảng chục GB) hoặc *Tất cả giọng tiếng Việt*; tải giọng cộng đồng từ **bất kỳ repo HuggingFace** nào; **nhập file** `.onnx` + `.onnx.json`; **đặt tên** cho giọng (vd "Ngọc Huyền - nữ hoạt ngôn"). Cách đọc (hoạt ngôn, nghiêm túc...) chỉnh cả độ biểu cảm của Piper.
+- **⭐ Giọng gợi ý:** chọn nhanh ở đầu trang Giọng đọc, vd *Ngọc Huyền · nữ hoạt ngôn* (VieNeu, offline).
+- **Cập nhật tool:** bấm **🔄 Cập nhật** ở góc trái dưới (nút chuyển màu khi có bản mới) → *Cập nhật ngay* → *Khởi động lại*. Bản cũ được sao lưu ở `_backup\<phiên bản>\`, bấm *Khôi phục bản trước* nếu bản mới có lỗi. (Từ bản 1.6 trở về trước chưa có nút này: tải zip bản 1.7 và chép đè một lần.)
+- **Video có 2 giọng khác nhau:** giữ bật *Giữ 1 giọng đồng nhất cả video* (trang Giọng đọc) và để *Âm lượng phim gốc khi thuyết minh* = 0 để không lẫn tiếng nhân vật trong phim.
+- **Phim có Vietsub in cứng:** trang *Xuất video* → tab *Chọn cảnh thông minh* → *Phụ đề gốc in cứng*. Muốn xóa sạch bằng AI: tải **video-subtitle-remover** bản `windows-directml` (card AMD như RX 5700 XT) hoặc bản `cuda` (card NVIDIA) tại trang Release của dự án, giải nén, mở VSR 1 lần, rồi chọn thư mục đó và chế độ *🧠 Xóa sạch bằng AI*.
+- Giọng Piper tiếng Việt: vào *Giọng đọc* → engine *Piper* → *Tải thêm giọng Piper* → lọc `vi_`.
+- Nhân bản giọng tiếng Việt: `pip install coqui-tts`, tải model **viXTTS** (<https://huggingface.co/capleaf/viXTTS>), rồi chọn engine *XTTS*, giọng *Nhân bản*, file mẫu và thư mục model.
+
+## 🧩 Mã nguồn mở được tích hợp
+
+| Dự án | Giấy phép | Vai trò |
+|---|---|---|
+| [FFmpeg](https://github.com/FFmpeg/FFmpeg) + [libass](https://github.com/libass/libass) | LGPL/GPL, ISC | Cắt ghép, mã hóa, trộn âm thanh, vẽ phụ đề |
+| [faster-whisper](https://github.com/SYSTRAN/faster-whisper) / [OpenAI Whisper](https://github.com/openai/whisper) / [CTranslate2](https://github.com/OpenNMT/CTranslate2) | MIT | Nhận dạng lời thoại offline |
+| [PySceneDetect](https://github.com/Breakthrough/PySceneDetect) + [OpenCV](https://github.com/opencv/opencv) | BSD-3, Apache-2.0 | Dò chuyển cảnh |
+| [yt-dlp](https://github.com/yt-dlp/yt-dlp) | Unlicense | Tải phim + phụ đề từ link |
+| [VieNeu-TTS](https://github.com/pnnbao97/VieNeu-TTS) | Apache-2.0 | AI giọng Việt phát âm chuẩn, nhân bản giọng |
+| [num2words](https://github.com/savoirfairelinux/num2words) | LGPL-2.1 | Đọc số thành chữ cho ngôn ngữ khác |
+| [edge-tts](https://github.com/rany2/edge-tts) | LGPL-3.0 | 400+ giọng Microsoft miễn phí |
+| [gTTS](https://github.com/pndurette/gTTS) | MIT | Giọng Google Translate |
+| [Piper](https://github.com/rhasspy/piper) + [piper-voices](https://huggingface.co/rhasspy/piper-voices) | MIT/GPL | Giọng neural offline |
+| [Coqui TTS (XTTS-v2)](https://github.com/idiap/coqui-ai-TTS) / [viXTTS](https://huggingface.co/capleaf/viXTTS) | MPL-2.0 / CPML | Nhân bản giọng nói |
+| [pyttsx3](https://github.com/nateshmbhat/pyttsx3) | MPL-2.0 | Giọng có sẵn của hệ điều hành |
+| [PySide6 (Qt)](https://wiki.qt.io/Qt_for_Python) | LGPL-3.0 | Giao diện |
+| [anthropic-sdk-python](https://github.com/anthropics/anthropic-sdk-python), [requests](https://github.com/psf/requests) | MIT, Apache-2.0 | Kết nối AI |
+| [imageio-ffmpeg](https://github.com/imageio/imageio-ffmpeg) | BSD-2 | FFmpeg dự phòng |
+| [Ollama](https://github.com/ollama/ollama) | MIT | Chạy LLM offline |
+| [whisper.cpp](https://github.com/ggml-org/whisper.cpp) | MIT | Nhận dạng thoại bằng card đồ họa (Vulkan) |
+| [Pillow](https://github.com/python-pillow/Pillow) | MIT-CMU | Vẽ ảnh thumbnail |
+| [video-subtitle-remover](https://github.com/YaoFANGUK/video-subtitle-remover) | Apache-2.0 | (tùy chọn, cài riêng) Xóa phụ đề in cứng bằng AI, gọi qua dòng lệnh |
+
+## 💡 Tham khảo ý tưởng
+
+Một số cơ chế được **tự viết lại** dựa trên ý tưởng từ các dự án sau (không sao chép mã nguồn):
+
+- [hulkbetii/recap](https://github.com/hulkbetii/recap) (chưa có giấy phép): khớp tiếng–hình theo câu, không lặp cảnh, dò lớp chèn cứng, recap theo season, bỏ OP/ED.
+- [zcbacxc/movie-narrator](https://github.com/zcbacxc/movie-narrator) (AGPL-3.0): chạy nhiều phương án rồi chấm điểm, học phong cách từ video mẫu, góc nhìn người kể, kiểm tra video cuối.
+- [danberlyne/recap-video-generator](https://github.com/danberlyne/recap-video-generator) (MIT): chuyển cảnh mềm và chuẩn hóa âm lượng khi ghép clip.
+
+## 🗂️ Cấu trúc mã nguồn
+
+```
+MovieRecapAI/
+├── main.py                 # khởi động GUI / CLI
+├── recap/                  # lõi xử lý (không phụ thuộc giao diện)
+│   ├── config.py           # cấu hình + API key
+│   ├── ffmpeg_utils.py     # tìm/chạy FFmpeg, đọc thông tin media
+│   ├── transcribe.py       # nhận dạng lời thoại
+│   ├── scenes.py           # dò chuyển cảnh
+│   ├── llm.py              # kết nối các AI
+│   ├── script_writer.py    # prompt + xử lý kịch bản
+│   ├── tts.py              # 12 công cụ giọng đọc
+│   ├── textnorm.py         # phát âm chuẩn: đọc số/ngày/đơn vị, từ điển, AI soát phát âm
+│   ├── film_id.py          # nhận diện phim, TMDB, AI xem hình ảnh cảnh phim
+│   ├── components.py       # tự kiểm tra & cài thư viện, FFmpeg, model
+│   ├── footage.py          # chọn cảnh theo câu, không lặp cảnh, né đoạn bị chặn
+│   ├── overlays.py         # dò quảng cáo chèn cứng, logo cố định & phụ đề in cứng
+│   ├── vsr.py              # gọi video-subtitle-remover xóa phụ đề bằng AI
+│   ├── whisper_gpu.py      # nhận dạng thoại bằng card đồ họa (whisper.cpp Vulkan)
+│   ├── reframe.py          # khung dọc bám khuôn mặt / nhân vật
+│   ├── publish.py          # thumbnail, tiêu đề, mô tả, hashtag, mốc chương
+│   ├── updater.py          # cập nhật tool từ GitHub, sao lưu & khôi phục
+│   ├── season.py           # gộp nhiều tập -> recap cả season
+│   ├── style_ref.py        # học phong cách từ video recap mẫu
+│   ├── qa.py               # kiểm tra video thành phẩm
+│   ├── warmup.py           # chuẩn bị nền khi mở app
+│   ├── subtitles.py        # đọc/ghi SRT, ASS
+│   ├── editor.py           # dựng video
+│   └── pipeline.py         # quản lý dự án, chuỗi xử lý, tải video
+├── gui/                    # giao diện PySide6
+└── tests/test_pipeline.py  # kiểm thử end-to-end offline
+```
+
+Chạy kiểm thử: `python tests/test_pipeline.py`, `python tests/test_textnorm.py`, `python tests/test_features.py`, `python tests/test_piper.py`, `python tests/test_recap_mech.py`. Bài kiểm thử tạo phim giả lập, giả lập AI và giọng đọc, rồi dựng ra video 16:9, 9:16 và highlight.
+
+## ⚖️ Lưu ý bản quyền
+
+Chỉ dùng app với phim bạn có quyền sử dụng: phim của bạn, phim được cấp phép, nội dung public domain, hoặc trong
+phạm vi *sử dụng hợp lý* theo luật nơi bạn sinh sống. Bạn tự chịu trách nhiệm về nội dung mình đăng tải và về việc tuân
+thủ điều khoản của từng dịch vụ AI.
