@@ -86,7 +86,7 @@ data class UpdateInfo(
  * newer than the latest published release). Keep this in sync with the build.
  */
 internal val RELEASE_NOTES: String
-    get() = I18n.t("upd_default_notes", "• A new MyTube build is available.")
+    get() = I18n.t("upd_default_notes", "• A new TTube build is available.")
 
 /**
  * Checks the GitHub releases feed, downloads the newest APK and hands it to the system installer.
@@ -171,7 +171,7 @@ class UpdateState(private val scope: CoroutineScope) {
     fun install(context: Context) {
         val file = downloaded ?: return
         if (Build.VERSION.SDK_INT >= 26 && !context.packageManager.canRequestPackageInstalls()) {
-            error = I18n.t("upd_allow_installs", "Allow installs from MyTube, then tap Update again.")
+            error = I18n.t("upd_allow_installs", "Allow installs from TTube, then tap Update again.")
             runCatching {
                 context.startActivity(
                     Intent(
@@ -213,7 +213,7 @@ class UpdateState(private val scope: CoroutineScope) {
         val request = Request.Builder()
             .url("https://api.github.com/repos/$UPDATE_REPO/releases?per_page=50")
             .header("Accept", "application/vnd.github+json")
-            .header("User-Agent", "MyTube/${BuildConfig.VERSION_NAME}")
+            .header("User-Agent", "TTube/${BuildConfig.VERSION_NAME}")
             .build()
         Net.client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) return null
@@ -259,11 +259,11 @@ class UpdateState(private val scope: CoroutineScope) {
         onProgress: (Float) -> Unit,
     ): File {
         val dir = File(context.cacheDir, "updates").apply { mkdirs() }
-        val target = File(dir, "MyTube.apk")
+        val target = File(dir, "TTube.apk")
         if (target.exists()) target.delete()
         val request = Request.Builder()
             .url(update.apkUrl)
-            .header("User-Agent", "MyTube/${BuildConfig.VERSION_NAME}")
+            .header("User-Agent", "TTube/${BuildConfig.VERSION_NAME}")
             .build()
         Net.client.newCall(request).execute().use { response ->
             if (!response.isSuccessful) error("HTTP ${response.code}")
@@ -395,7 +395,7 @@ fun UpdateOverlay(state: UpdateState, backdrop: Backdrop) {
                                 fontWeight = FontWeight.Bold,
                             )
                             Text(
-                                "MyTube ${update?.version.orEmpty()}" +
+                                "TTube ${update?.version.orEmpty()}" +
                                     formatUpdateSize(update?.sizeBytes ?: 0L).let { if (it.isBlank()) "" else " · $it" },
                                 color = c.onSurfaceVariant,
                                 fontSize = 12.5.sp,

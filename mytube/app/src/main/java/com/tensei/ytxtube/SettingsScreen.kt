@@ -227,7 +227,7 @@ fun SettingsScreen(
                     SettingsRow(
                         icon = Icons.Rounded.Info,
                         title = I18n.t("version", "Version"),
-                        subtitle = "MyTube ${BuildConfig.VERSION_NAME}",
+                        subtitle = "TTube ${BuildConfig.VERSION_NAME}",
                         trailing = {
                             Box(
                                 modifier = Modifier
@@ -286,7 +286,7 @@ fun SettingsScreen(
                     SettingsRow(
                         icon = Icons.Rounded.Person,
                         title = I18n.t("developer", "Developer"),
-                        subtitle = "MyTube \u00b7 based on YTXTube by Koustubh12345 (GPL-3.0)",
+                        subtitle = "TTube \u00b7 based on YTXTube by Koustubh12345 (GPL-3.0)",
                         onClick = { openRepo(ytxRepo) },
                     )
                 }
