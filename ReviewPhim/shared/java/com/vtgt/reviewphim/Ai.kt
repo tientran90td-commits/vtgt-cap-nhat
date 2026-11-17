@@ -212,12 +212,12 @@ object Ai {
             check(p, code, text, after)
             val o = JSONObject(text)
             val msg = o.getJSONArray("choices").getJSONObject(0).getJSONObject("message")
-            val content = msg.optString("content", "")
+            val answer = msg.optString("content", "")
             // token đã dùng (AI báo trong "usage"; không có thì ước tính ~4 ký tự / token)
             val u = o.optJSONObject("usage")
             val tin = u?.optLong("prompt_tokens", -1)?.takeIf { it >= 0 } ?: ((system.length + user.length) / 4L + images.size * 1000L)
-            val tout = u?.optLong("completion_tokens", -1)?.takeIf { it >= 0 } ?: (content.length / 4L)
-            content to (tin to tout)
+            val tout = u?.optLong("completion_tokens", -1)?.takeIf { it >= 0 } ?: (answer.length / 4L)
+            answer to (tin to tout)
         }
 
     /** (mã HTTP, nội dung, số giây AI yêu cầu chờ - header Retry-After). */
