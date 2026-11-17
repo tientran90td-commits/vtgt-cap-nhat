@@ -1,30 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- MyTube icon: white "T" + yellow play triangle on a blue-violet gradient. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="108dp"
     android:height="108dp"
     android:viewportWidth="108"
     android:viewportHeight="108">
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M 18,0 L 90,0 C 99.94,0 108,8.06 108,18 L 108,90 C 108,99.94 99.94,108 90,108 L 18,108 C 8.06,108 0,99.94 0,90 L 0,18 C 0,8.06 8.06,0 18,0 Z" />
+    <path android:pathData="M 18,0 L 90,0 C 99.94,0 108,8.06 108,18 L 108,90 C 108,99.94 99.94,108 90,108 L 18,108 C 8.06,108 0,99.94 0,90 L 0,18 C 0,8.06 8.06,0 18,0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0"
+                android:startY="0"
+                android:endX="108"
+                android:endY="108">
+                <item android:offset="0" android:color="#FF2563EB" />
+                <item android:offset="1" android:color="#FF7C3AED" />
+            </gradient>
+        </aapt:attr>
+    </path>
     <group
-        android:translateX="-4.350713"
-        android:translateY="-3.231268"
-        android:scaleX="0.11177629"
-        android:scaleY="0.11177629">
-        <group
-            android:rotation="-7"
-            android:pivotX="512"
-            android:pivotY="512">
-            <path
-                android:fillColor="#FF0033"
-                android:pathData="M 446,258 L 698,258 C 765,258 848,326 848,408 L 848,635 C 848,715 803,780 703,780 L 441,780 C 380,780 326,735 326,665 L 326,378 C 326,312 370,258 446,258 Z" />
-            <path
-                android:fillColor="#FF0033"
-                android:pathData="M 302,375 L 245,347 C 222,338 204,346 200,366 C 190,405 186,465 187,525 C 188,595 191,648 196,674 C 202,700 219,708 236,694 L 296,646 C 308,638 312,625 311,612 L 306,430 C 305,414 308,390 302,375 Z" />
-            <path
-                android:fillColor="#000000"
-                android:pathData="M 491,435 C 490,416 509,405 526,415 L 652,483 C 671,494 671,513 653,527 L 531,613 C 514,626 494,615 492,595 Z" />
-        </group>
+        android:pivotX="55"
+        android:pivotY="55"
+        android:scaleX="0.95"
+        android:scaleY="0.95"
+        android:translateX="-1"
+        android:translateY="0">
+        <path android:fillColor="#FFFFFF" android:pathData="M31,28 L63,28 A7,7 0 0 1 70,35 A7,7 0 0 1 63,42 L31,42 A7,7 0 0 1 24,35 A7,7 0 0 1 31,28 Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M39,34 L55,34 L55,74 A8,8 0 0 1 47,82 A8,8 0 0 1 39,74 Z" />
+        <path
+            android:fillColor="#FFC93C"
+            android:strokeColor="#FFC93C"
+            android:strokeWidth="4"
+            android:strokeLineJoin="round"
+            android:pathData="M62,52 L62,78 L84,65 Z" />
     </group>
 </vector>

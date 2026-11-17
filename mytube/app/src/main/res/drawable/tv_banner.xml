@@ -1,21 +1,38 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- MyTube icon: white "T" + yellow play triangle on a blue-violet gradient. -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
     android:width="320dp"
     android:height="180dp"
     android:viewportWidth="320"
     android:viewportHeight="180">
-
-    <path
-        android:fillColor="#0F0F0F"
-        android:pathData="M0,0h320v180h-320z" />
-    <path
-        android:fillColor="#FF0033"
-        android:pathData="M104,46h112a24,24 0 0 1 24,24v40a24,24 0 0 1 -24,24h-112a24,24 0 0 1 -24,-24v-40a24,24 0 0 1 24,-24z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:pathData="M143,66l44,24l-44,24z" />
-    <path
-        android:fillColor="#FFFFFF"
-        android:fillAlpha="0.72"
-        android:pathData="M64,148h192v5h-192z" />
+    <path android:pathData="M0,0h320v180h-320z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:type="linear"
+                android:startX="0"
+                android:startY="0"
+                android:endX="320"
+                android:endY="180">
+                <item android:offset="0" android:color="#FF2563EB" />
+                <item android:offset="1" android:color="#FF7C3AED" />
+            </gradient>
+        </aapt:attr>
+    </path>
+    <group
+        android:pivotX="55"
+        android:pivotY="55"
+        android:scaleX="1.5"
+        android:scaleY="1.5"
+        android:translateX="105"
+        android:translateY="35">
+        <path android:fillColor="#FFFFFF" android:pathData="M31,28 L63,28 A7,7 0 0 1 70,35 A7,7 0 0 1 63,42 L31,42 A7,7 0 0 1 24,35 A7,7 0 0 1 31,28 Z" />
+        <path android:fillColor="#FFFFFF" android:pathData="M39,34 L55,34 L55,74 A8,8 0 0 1 47,82 A8,8 0 0 1 39,74 Z" />
+        <path
+            android:fillColor="#FFC93C"
+            android:strokeColor="#FFC93C"
+            android:strokeWidth="4"
+            android:strokeLineJoin="round"
+            android:pathData="M62,52 L62,78 L84,65 Z" />
+    </group>
 </vector>
