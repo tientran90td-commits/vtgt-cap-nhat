@@ -24,6 +24,7 @@ object PlaybackBandwidth {
     // arrives fast, then climb as real throughput is measured. Later videos in the
     // same session start from the speed already measured.
     private const val INITIAL_BITRATE_BPS = 500_000L
+    private const val FIXED_PICK_UNMEASURED_KBPS = 2_500
 
     @Volatile
     private var meter: DefaultBandwidthMeter? = null
@@ -49,12 +50,12 @@ object PlaybackBandwidth {
         }
     }
 
-    /** Current measured downstream estimate in kbps, or 0 before the first real sample. */
+    /** Current measured downstream estimate in kbps (2.5 Mbps assumed before the first real sample). */
     fun measuredKbps(): Int {
         val bps = meter?.bitrateEstimate ?: 0L
-        // The low start value is only for the adaptive player; fixed-quality picks (Shorts,
-        // non-adaptive fallbacks) treat "nothing measured yet" as unknown, not as slow.
-        if (bps == INITIAL_BITRATE_BPS) return 0
+        // The low start value is only for the adaptive player. Fixed-quality picks (Shorts,
+        // non-adaptive fallbacks) keep the previous 2.5 Mbps assumption until a real sample.
+        if (bps == INITIAL_BITRATE_BPS) return FIXED_PICK_UNMEASURED_KBPS
         return (bps / 1000L).toInt().coerceAtLeast(0)
     }
 }
