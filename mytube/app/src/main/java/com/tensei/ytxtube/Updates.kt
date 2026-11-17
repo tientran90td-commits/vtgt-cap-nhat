@@ -85,15 +85,8 @@ data class UpdateInfo(
  * Shown when the GitHub release body is empty (or when testing an APK that is
  * newer than the latest published release). Keep this in sync with the build.
  */
-internal val RELEASE_NOTES = """
-    • Added Caption support: Choose from all available subtitle and caption languages in the player without playback interruption.
-    • Fixed bottom bar: Liquid Glass active pill now renders behind tab icons and labels, matches glass blur at rest, and clears on hold.
-    • Added multiple Google/YouTube account login: Easily add, switch between, or remove accounts with smooth switching animations.
-    • Added landscape video gestures switch: Easily turn on or off volume (right edge) and brightness (left edge) vertical swipes in Settings.
-    • Adaptive stream quality: Auto resolution adapts to your measured connection speed to prevent buffering on videos and Shorts.
-    • Reorganized Settings: Appearance & Theme followed by General with corrected switch text layouts.
-    • Replaced header mark with the official YTXTube app icon.
-""".trimIndent()
+internal val RELEASE_NOTES: String
+    get() = I18n.t("upd_default_notes", "• A new MyTube build is available.")
 
 /**
  * Checks the GitHub releases feed, downloads the newest APK and hands it to the system installer.
@@ -120,6 +113,11 @@ class UpdateState(private val scope: CoroutineScope) {
 
     private var downloadJob: Job? = null
 
+    /** Version the user chose to skip; automatic checks stay quiet until something newer ships. */
+    private val prefs by lazy {
+        YTXTubeApplication.appContext.getSharedPreferences("mytube_updates", Context.MODE_PRIVATE)
+    }
+
     fun check(manual: Boolean = false) {
         if (checking) return
         checking = true
@@ -127,15 +125,17 @@ class UpdateState(private val scope: CoroutineScope) {
             val latest = withContext(Dispatchers.IO) { runCatching { fetchLatest() }.getOrNull() }
             checking = false
             if (latest == null) {
-                if (manual) message = "Couldn't check for updates. Try again in a moment."
+                if (manual) message = I18n.t("upd_check_failed", "Couldn't check for updates. Try again in a moment.")
                 return@launch
             }
-            if (isNewer(latest.version, BuildConfig.VERSION_NAME)) {
+            val skipped = prefs.getString(KEY_SKIPPED, null)
+            val skippedThis = skipped != null && !isNewer(latest.version, skipped)
+            if (isNewer(latest.version, BuildConfig.VERSION_NAME) && (manual || !skippedThis)) {
                 info = latest
                 error = null
                 visible = true
             } else if (manual) {
-                message = "You're on the latest version (${BuildConfig.VERSION_NAME})."
+                message = I18n.t("upd_latest", "You're on the latest version") + " (${BuildConfig.VERSION_NAME})."
             }
         }
     }
@@ -156,7 +156,7 @@ class UpdateState(private val scope: CoroutineScope) {
                 downloaded = file
                 install(context)
             } else {
-                error = "Download failed. Check your connection and try again."
+                error = I18n.t("upd_download_failed", "Download failed. Check your connection and try again.")
             }
         }
     }
@@ -171,7 +171,7 @@ class UpdateState(private val scope: CoroutineScope) {
     fun install(context: Context) {
         val file = downloaded ?: return
         if (Build.VERSION.SDK_INT >= 26 && !context.packageManager.canRequestPackageInstalls()) {
-            error = "Allow installs from YTXTube, then tap Install again."
+            error = I18n.t("upd_allow_installs", "Allow installs from MyTube, then tap Update again.")
             runCatching {
                 context.startActivity(
                     Intent(
@@ -191,12 +191,20 @@ class UpdateState(private val scope: CoroutineScope) {
             }
             context.startActivity(intent)
         }.onFailure {
-            error = "Couldn't open the installer. Try again."
+            error = I18n.t("upd_installer_failed", "Couldn't open the installer. Try again.")
         }
     }
 
+    /** "Later": hide for now; the dialog comes back on the next app launch. */
     fun dismiss() {
         if (!downloading) visible = false
+    }
+
+    /** "Skip this version": keep the current build and stop reminding about this release. */
+    fun skip() {
+        if (downloading) return
+        info?.version?.let { prefs.edit().putString(KEY_SKIPPED, it).apply() }
+        visible = false
     }
 
     // MyTube: updates come from the owner's own GitHub releases whose tag starts
@@ -381,13 +389,13 @@ fun UpdateOverlay(state: UpdateState, backdrop: Backdrop) {
                         Spacer(Modifier.width(13.dp))
                         Column(Modifier.weight(1f)) {
                             Text(
-                                "Update available",
+                                I18n.t("upd_title", "Update available"),
                                 color = c.onSurface,
                                 fontSize = 19.sp,
                                 fontWeight = FontWeight.Bold,
                             )
                             Text(
-                                "YTXTube ${update?.version.orEmpty()}" +
+                                "MyTube ${update?.version.orEmpty()}" +
                                     formatUpdateSize(update?.sizeBytes ?: 0L).let { if (it.isBlank()) "" else " · $it" },
                                 color = c.onSurfaceVariant,
                                 fontSize = 12.5.sp,
@@ -412,7 +420,7 @@ fun UpdateOverlay(state: UpdateState, backdrop: Backdrop) {
 
                     Spacer(Modifier.height(16.dp))
                     Text(
-                        "What's new",
+                        I18n.t("upd_whats_new", "What's new"),
                         color = c.onSurface,
                         fontSize = 13.sp,
                         fontWeight = FontWeight.Bold,
@@ -454,26 +462,50 @@ fun UpdateOverlay(state: UpdateState, backdrop: Backdrop) {
                         )
                         Spacer(Modifier.height(7.dp))
                         Text(
-                            "${(state.progress * 100).toInt()}% · downloading YTXTube.apk",
+                            "${(state.progress * 100).toInt()}% · " + I18n.t("upd_downloading", "downloading update"),
                             color = c.onSurfaceVariant,
                             fontSize = 11.5.sp,
                             fontWeight = FontWeight.Medium,
                         )
                     }
 
-                    Spacer(Modifier.height(18.dp))
+                    if (!state.downloading && state.downloaded == null) {
+                        Spacer(Modifier.height(12.dp))
+                        Text(
+                            I18n.t(
+                                "upd_later_hint",
+                                "You can keep using this version and update anytime from Settings → Check for updates.",
+                            ),
+                            color = c.onSurfaceVariant,
+                            fontSize = 12.sp,
+                            lineHeight = 17.sp,
+                        )
+                    }
+
+                    Spacer(Modifier.height(14.dp))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End,
                         verticalAlignment = Alignment.CenterVertically,
                     ) {
+                        if (!state.downloading) {
+                            TextButton(onClick = { state.skip() }) {
+                                Text(
+                                    I18n.t("upd_skip", "Skip this version"),
+                                    color = c.onSurfaceVariant.copy(alpha = 0.8f),
+                                    fontWeight = FontWeight.Medium,
+                                    fontSize = 12.5.sp,
+                                )
+                            }
+                        }
+                        Spacer(Modifier.weight(1f))
                         TextButton(
                             onClick = {
                                 if (state.downloading) state.cancelDownload() else state.dismiss()
                             },
                         ) {
                             Text(
-                                "Cancel",
+                                if (state.downloading) I18n.t("upd_cancel", "Cancel") else I18n.t("upd_later", "Later"),
                                 color = c.onSurfaceVariant,
                                 fontWeight = FontWeight.SemiBold,
                             )
@@ -497,7 +529,7 @@ fun UpdateOverlay(state: UpdateState, backdrop: Backdrop) {
                                 )
                             } else {
                                 Text(
-                                    "Install",
+                                    I18n.t("upd_install", "Update"),
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 13.sp,
                                 )
@@ -520,3 +552,4 @@ fun UpdateOverlay(state: UpdateState, backdrop: Backdrop) {
 
 private const val UPDATE_REPO = "tientran90td-commits/vtgt-cap-nhat"
 private const val UPDATE_TAG_PREFIX = "mytube-v"
+private const val KEY_SKIPPED = "skipped_version"

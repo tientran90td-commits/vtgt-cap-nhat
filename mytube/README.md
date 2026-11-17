@@ -20,7 +20,15 @@ Mỗi lần có thay đổi trong thư mục `mytube/`, GitHub Actions (workflow
 
 Vào tab **Releases** của repo → chọn release `MyTube …` → tải file `MyTube-….apk` về điện thoại và cài đặt (cho phép "Cài ứng dụng không rõ nguồn gốc"). Yêu cầu Android 7.0+.
 
-Lần sau app tự báo khi có bản build mới hơn (Cài đặt → kiểm tra cập nhật).
+## Cập nhật
+
+Mỗi lần mở app, MyTube tự kiểm tra release mới. Nếu có bản mới hơn, app hiện hộp thoại **"Có bản cập nhật mới"** kèm nội dung thay đổi và 3 lựa chọn:
+
+- **Cập nhật**: tải APK về và cài đè, dữ liệu vẫn giữ nguyên.
+- **Để sau**: tiếp tục dùng bản cũ, lần mở app sau sẽ nhắc lại.
+- **Bỏ qua bản này**: không nhắc lại bản đó nữa, chỉ nhắc khi có bản mới hơn.
+
+Muốn cập nhật thủ công thì vào **Cài đặt → Kiểm tra cập nhật**. Cách này vẫn hiện cả bản đã bỏ qua.
 
 ## Tự build trên máy
 

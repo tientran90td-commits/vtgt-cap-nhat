@@ -227,7 +227,7 @@ fun SettingsScreen(
                     SettingsRow(
                         icon = Icons.Rounded.Info,
                         title = I18n.t("version", "Version"),
-                        subtitle = "YTXTube ${BuildConfig.VERSION_NAME}",
+                        subtitle = "MyTube ${BuildConfig.VERSION_NAME}",
                         trailing = {
                             Box(
                                 modifier = Modifier
@@ -268,7 +268,6 @@ fun SettingsScreen(
                                 val elapsed = System.currentTimeMillis() - start
                                 if (elapsed < 1200) delay(1200 - elapsed)
                                 checkingUpdate = false
-                                updateFeedback = "You're on the latest version (${BuildConfig.VERSION_NAME})"
                             }
                         },
                     )
