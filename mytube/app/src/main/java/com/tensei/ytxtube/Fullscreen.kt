@@ -1,7 +1,15 @@
 package com.tensei.ytxtube
 
 import android.app.Activity
+import android.app.PendingIntent
 import android.app.PictureInPictureParams
+import android.app.RemoteAction
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
+import android.content.IntentFilter
+import android.graphics.drawable.Icon
+import androidx.core.content.ContextCompat
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
 import android.util.Rational
@@ -153,47 +161,115 @@ class PipController(private val activity: ComponentActivity) {
 
     var videoBounds: Rect? = null
 
+    /** Set by the headphones button: closing PiP should keep the audio going. */
+    private var keepPlayingOnClose = false
+    private var playing = true
+    private var lastAspect = 16f / 9f
+    private var autoEnter = false
+
+    /** Play/pause + headphones (background audio) buttons shown inside the PiP window. */
+    private fun pipActions(): List<RemoteAction> {
+        if (android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) return emptyList()
+        fun action(id: String, code: Int, icon: Int, title: String): RemoteAction {
+            val intent = Intent(id).setPackage(activity.packageName)
+            val pending = PendingIntent.getBroadcast(
+                activity,
+                code,
+                intent,
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+            )
+            return RemoteAction(Icon.createWithResource(activity, icon), title, title, pending)
+        }
+        return listOf(
+            if (playing) {
+                action(ACTION_TOGGLE, 1, R.drawable.ic_pip_pause, I18n.t("p_pause", "Pause"))
+            } else {
+                action(ACTION_TOGGLE, 1, R.drawable.ic_pip_play, I18n.t("p_play", "Play"))
+            },
+            action(ACTION_BACKGROUND, 2, R.drawable.ic_pip_headphones, I18n.t("p_background_audio", "Play in background")),
+        )
+    }
+
+    private fun params(aspect: Float, autoEnterEnabled: Boolean?): PictureInPictureParams {
+        val ratio = aspect.coerceIn(0.42f, 2.38f)
+        return PictureInPictureParams.Builder()
+            .setAspectRatio(Rational((ratio * 1000).toInt(), 1000))
+            .setActions(pipActions())
+            .apply {
+                videoBounds?.let { b -> setSourceRectHint(android.graphics.Rect(b.left.toInt(), b.top.toInt(), b.right.toInt(), b.bottom.toInt())) }
+                if (autoEnterEnabled != null && android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
+                    setAutoEnterEnabled(autoEnterEnabled)
+                }
+            }
+            .build()
+    }
 
     fun enter(videoAspect: Float): Boolean {
         if (!supported) return false
-
-        val ratio = videoAspect.coerceIn(0.42f, 2.38f)
-        val params = PictureInPictureParams.Builder()
-            .setAspectRatio(Rational((ratio * 1000).toInt(), 1000))
-            .apply {
-                videoBounds?.let { b -> setSourceRectHint(android.graphics.Rect(b.left.toInt(), b.top.toInt(), b.right.toInt(), b.bottom.toInt())) }
-            }
-            .build()
-        return activity.enterPictureInPictureMode(params)
+        keepPlayingOnClose = false
+        lastAspect = videoAspect
+        return runCatching { activity.enterPictureInPictureMode(params(videoAspect, null)) }.getOrDefault(false)
     }
 
     fun updateAutoPip(enabled: Boolean, videoAspect: Float = 16f / 9f) {
         if (!supported) return
         if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) {
-            val builder = PictureInPictureParams.Builder()
-                .setAutoEnterEnabled(enabled)
-            if (enabled) {
-                val ratio = videoAspect.coerceIn(0.42f, 2.38f)
-                builder.setAspectRatio(Rational((ratio * 1000).toInt(), 1000))
-                videoBounds?.let { b ->
-                    builder.setSourceRectHint(android.graphics.Rect(b.left.toInt(), b.top.toInt(), b.right.toInt(), b.bottom.toInt()))
-                }
-            }
-            activity.setPictureInPictureParams(builder.build())
+            autoEnter = enabled
+            if (enabled) lastAspect = videoAspect
+            runCatching { activity.setPictureInPictureParams(params(lastAspect, enabled)) }
         }
     }
 
+    /** Keeps the play/pause button in the PiP window in sync with the player. */
+    fun updatePlaying(isPlaying: Boolean) {
+        if (playing == isPlaying) return
+        playing = isPlaying
+        if (!supported || android.os.Build.VERSION.SDK_INT < android.os.Build.VERSION_CODES.O) return
+        val auto = if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.S) autoEnter else null
+        runCatching { activity.setPictureInPictureParams(params(lastAspect, auto)) }
+    }
+
     @Composable
-    fun Bind(onClosed: () -> Unit) {
+    fun Bind(onClosed: () -> Unit, onTogglePlay: () -> Unit) {
         DisposableEffect(activity) {
             val listener = Consumer<PictureInPictureModeChangedInfo> { info ->
                 active = info.isInPictureInPictureMode
-
-                if (!info.isInPictureInPictureMode && !activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) onClosed()
+                if (info.isInPictureInPictureMode) {
+                    keepPlayingOnClose = false
+                } else if (!activity.lifecycle.currentState.isAtLeast(Lifecycle.State.STARTED)) {
+                    if (keepPlayingOnClose) keepPlayingOnClose = false else onClosed()
+                }
             }
             activity.addOnPictureInPictureModeChangedListener(listener)
-            onDispose { activity.removeOnPictureInPictureModeChangedListener(listener) }
+
+            val receiver = object : BroadcastReceiver() {
+                override fun onReceive(context: Context, intent: Intent) {
+                    when (intent.action) {
+                        ACTION_TOGGLE -> onTogglePlay()
+                        ACTION_BACKGROUND -> {
+                            // Close the PiP window but keep the sound playing in the background.
+                            keepPlayingOnClose = true
+                            activity.moveTaskToBack(true)
+                        }
+                    }
+                }
+            }
+            val filter = IntentFilter().apply {
+                addAction(ACTION_TOGGLE)
+                addAction(ACTION_BACKGROUND)
+            }
+            ContextCompat.registerReceiver(activity, receiver, filter, ContextCompat.RECEIVER_NOT_EXPORTED)
+
+            onDispose {
+                activity.removeOnPictureInPictureModeChangedListener(listener)
+                runCatching { activity.unregisterReceiver(receiver) }
+            }
         }
+    }
+
+    private companion object {
+        const val ACTION_TOGGLE = "com.tensei.ytxtube.PIP_TOGGLE"
+        const val ACTION_BACKGROUND = "com.tensei.ytxtube.PIP_BACKGROUND"
     }
 }
 

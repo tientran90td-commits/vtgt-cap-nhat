@@ -447,7 +447,11 @@ fun YtxTubeApp() {
         onDispose { mainActivity?.intentHandler = null }
     }
 
-    pip.Bind(onClosed = { player.controller?.pause() })
+    pip.Bind(
+        onClosed = { player.controller?.pause() },
+        onTogglePlay = { player.togglePlay() },
+    )
+    LaunchedEffect(player.isPlaying) { pip.updatePlaying(player.isPlaying) }
     val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
     val isTabletOrTv = TvMode.isTv || LocalConfiguration.current.smallestScreenWidthDp >= 600
 

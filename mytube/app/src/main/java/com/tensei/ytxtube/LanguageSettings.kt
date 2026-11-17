@@ -2126,6 +2126,9 @@ object I18n {
             "search_hint" to "Search YouTube",
         ),
         "vi" to mapOf(
+            "p_play" to "Phát",
+            "p_pause" to "Tạm dừng",
+            "p_background_audio" to "Phát nền (chỉ âm thanh)",
             "p_brightness" to "Độ sáng",
             "p_volume" to "Âm lượng",
             "p_fit_screen" to "Vừa màn hình",
