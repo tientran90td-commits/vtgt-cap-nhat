@@ -30,7 +30,7 @@ Mỗi lần mở app, TTube tự kiểm tra release mới. Nếu có bản mới
 - **Để sau**: tiếp tục dùng bản cũ, lần mở app sau sẽ nhắc lại.
 - **Bỏ qua bản này**: không nhắc lại bản đó nữa, chỉ nhắc khi có bản mới hơn.
 
-Muốn cập nhật thủ công thì vào **Cài đặt → Kiểm tra cập nhật**. Cách này vẫn hiện cả bản đã bỏ qua.
+Muốn cập nhật thủ công thì vào **Cài đặt → bấm vào dòng Phiên bản**. Cách này vẫn hiện cả bản đã bỏ qua.
 
 ## Tự build trên máy
 

@@ -228,6 +228,20 @@ fun SettingsScreen(
                         icon = Icons.Rounded.Info,
                         title = I18n.t("version", "Version"),
                         subtitle = "TTube ${BuildConfig.VERSION_NAME}",
+                        // Tap to check for updates now (the separate row was removed).
+                        onClick = {
+                            if (!checkingUpdate) {
+                                checkingUpdate = true
+                                updateFeedback = null
+                                scope.launch {
+                                    val start = System.currentTimeMillis()
+                                    onCheckUpdate()
+                                    val elapsed = System.currentTimeMillis() - start
+                                    if (elapsed < 1200) delay(1200 - elapsed)
+                                    checkingUpdate = false
+                                }
+                            }
+                        },
                         trailing = {
                             Box(
                                 modifier = Modifier
@@ -253,41 +267,6 @@ fun SettingsScreen(
                                 }
                             }
                         }
-                    )
-                    SettingsRow(
-                        icon = Icons.Rounded.FileDownload,
-                        title = I18n.t("check_updates", "Check for updates"),
-                        subtitle = I18n.t("check_updates_sub", "New GitHub releases install from inside the app"),
-                        onClick = {
-                            if (checkingUpdate) return@SettingsRow
-                            checkingUpdate = true
-                            updateFeedback = null
-                            scope.launch {
-                                val start = System.currentTimeMillis()
-                                onCheckUpdate()
-                                val elapsed = System.currentTimeMillis() - start
-                                if (elapsed < 1200) delay(1200 - elapsed)
-                                checkingUpdate = false
-                            }
-                        },
-                    )
-                    val openRepo: (String) -> Unit = { url ->
-                        runCatching {
-                            context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(url)))
-                        }
-                    }
-                    val ytxRepo = "https://github.com/Koustubh12345/YTXTube"
-                    SettingsRow(
-                        icon = Icons.Rounded.Code,
-                        title = I18n.t("open_source", "Open Source"),
-                        subtitle = I18n.t("open_source_sub", "View source code on GitHub"),
-                        onClick = { openRepo(ytxRepo) },
-                    )
-                    SettingsRow(
-                        icon = Icons.Rounded.Person,
-                        title = I18n.t("developer", "Developer"),
-                        subtitle = I18n.t("developer_credit", "TTube \u00b7 based on YTXTube by Koustubh12345 (GPL-3.0)"),
-                        onClick = { openRepo(ytxRepo) },
                     )
                 }
             }

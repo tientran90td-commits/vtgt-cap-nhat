@@ -99,6 +99,6 @@ object CaptionTracks {
         val language = runCatching {
             Locale.forLanguageTag(tag).getDisplayLanguage(Locale.getDefault())
         }.getOrNull()?.takeIf { it.isNotBlank() && !it.equals("und", true) } ?: tag
-        return if (auto) "$language (auto)" else language
+        return if (auto) "$language (" + I18n.t("p_auto_generated", "auto") + ")" else language
     }
 }

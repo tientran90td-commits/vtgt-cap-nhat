@@ -181,16 +181,16 @@ internal fun audioTrackKey(stream: AudioStream): String {
 }
 
 internal fun audioTrackLabel(stream: AudioStream, original: Boolean): String {
-    if (original) return "Original"
+    if (original) return I18n.t("p_original", "Original")
     stream.audioTrackName?.takeIf { it.isNotBlank() }?.let { return it }
     val locale = stream.audioLocale
     val language = locale?.getDisplayLanguage(Locale.getDefault())?.takeIf { it.isNotBlank() }
-    return language?.replaceFirstChar { it.titlecase(Locale.getDefault()) } ?: "Audio track"
+    return language?.replaceFirstChar { it.titlecase(Locale.getDefault()) } ?: I18n.t("p_audio_track", "Audio track")
 }
 
 internal fun audioTrackDetail(stream: AudioStream, original: Boolean): String = listOfNotNull(
-    if (original) "Default audio" else stream.audioLocale?.getDisplayLanguage(Locale.getDefault())?.takeIf { it.isNotBlank() },
-    if (stream.audioTrackType == AudioTrackType.DESCRIPTIVE) "Descriptive" else null,
+    if (original) I18n.t("p_default_audio", "Default audio") else stream.audioLocale?.getDisplayLanguage(Locale.getDefault())?.takeIf { it.isNotBlank() },
+    if (stream.audioTrackType == AudioTrackType.DESCRIPTIVE) I18n.t("p_descriptive", "Descriptive") else null,
     stream.format?.name?.replace('_', ' ')?.lowercase(Locale.US)?.replaceFirstChar { it.titlecase(Locale.US) },
     stream.averageBitrate.takeIf { it > 0 }?.let { "${it / 1000} kbps" },
 ).joinToString(" · ")

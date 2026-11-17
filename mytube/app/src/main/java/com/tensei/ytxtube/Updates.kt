@@ -485,7 +485,7 @@ fun UpdateOverlay(state: UpdateState, backdrop: Backdrop) {
                         Text(
                             I18n.t(
                                 "upd_later_hint",
-                                "You can keep using this version and update anytime from Settings → Check for updates.",
+                                "You can keep using this version and update anytime: Settings → tap Version.",
                             ),
                             color = c.onSurfaceVariant,
                             fontSize = 12.sp,

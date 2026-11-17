@@ -69,7 +69,7 @@ fun SpeedSheet(state: PlayerState, backdrop: Backdrop, onDismiss: () -> Unit) {
         state.commitSpeed(value)
     }
 
-    PlayerGlassSheet("Playback speed", backdrop, onDismiss) {
+    PlayerGlassSheet(I18n.t("p_speed", "Playback speed"), backdrop, onDismiss) {
         Row(
             Modifier.fillMaxWidth().padding(bottom = 10.dp),
             horizontalArrangement = Arrangement.Center,
@@ -109,7 +109,7 @@ fun SpeedSheet(state: PlayerState, backdrop: Backdrop, onDismiss: () -> Unit) {
                     SpeedChip(
                         label = PlaybackSpeed.label(speed) + "×",
                         selected = abs(value - speed) < 0.001f,
-                        caption = if (speed == 1f) "Normal" else null,
+                        caption = if (speed == 1f) I18n.t("p_normal", "Normal") else null,
                         modifier = Modifier.weight(1f),
                     ) { apply(speed) }
                 }
@@ -127,9 +127,9 @@ fun SpeedSheet(state: PlayerState, backdrop: Backdrop, onDismiss: () -> Unit) {
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Column(Modifier.weight(1f)) {
-                Text("Remember speed", fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
+                Text(I18n.t("p_remember_speed", "Remember speed"), fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
                 Text(
-                    "Use this speed for every video",
+                    I18n.t("p_remember_speed_sub", "Use this speed for every video"),
                     color = c.onSurfaceVariant,
                     fontSize = 12.5.sp,
                     fontWeight = FontWeight.SemiBold,
@@ -174,9 +174,9 @@ fun AudioTrackSheet(state: PlayerState, backdrop: Backdrop, onDismiss: () -> Uni
     val c = MaterialTheme.colorScheme
     LaunchedEffect(Unit) { state.refreshTracks() }
     val activeKey = state.audioOptions.firstOrNull { it.key == AudioTrackPreference.key }?.key
-    PlayerGlassSheet("Audio track", backdrop, onDismiss) {
+    PlayerGlassSheet(I18n.t("p_audio_track", "Audio track"), backdrop, onDismiss) {
         Text(
-            "Original audio is the default for every show, so dubs never take over.",
+            I18n.t("p_audio_note", "Original audio is the default for every show, so dubs never take over."),
             color = c.onSurfaceVariant,
             fontSize = 12.5.sp,
             fontWeight = FontWeight.SemiBold,
@@ -184,8 +184,8 @@ fun AudioTrackSheet(state: PlayerState, backdrop: Backdrop, onDismiss: () -> Uni
         )
 
         TrackRow(
-            title = "Original",
-            detail = "The creator's own audio track",
+            title = I18n.t("p_original", "Original"),
+            detail = I18n.t("p_original_sub", "The creator's own audio track"),
             selected = activeKey == null,
             icon = Icons.Rounded.Headphones,
         ) {
@@ -208,7 +208,7 @@ fun AudioTrackSheet(state: PlayerState, backdrop: Backdrop, onDismiss: () -> Uni
 
         if (state.audioOptions.isEmpty()) {
             Text(
-                "No alternate audio tracks for this video.",
+                I18n.t("p_no_alt_audio", "No alternate audio tracks for this video."),
                 color = c.onSurfaceVariant,
                 fontSize = 12.5.sp,
                 fontWeight = FontWeight.Medium,
@@ -228,11 +228,11 @@ fun AudioTrackSheet(state: PlayerState, backdrop: Backdrop, onDismiss: () -> Uni
             Icon(Icons.Rounded.Subtitles, null, tint = c.primary, modifier = Modifier.size(20.dp))
             Spacer(Modifier.width(12.dp))
             Column(Modifier.weight(1f)) {
-                Text("Captions", fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
+                Text(I18n.t("p_captions", "Captions"), fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
                 Text(
                     when {
-                        state.selectedSubtitleLanguage != null -> "Showing captions"
-                        else -> "Turn on captions for this video"
+                        state.selectedSubtitleLanguage != null -> I18n.t("p_showing_captions", "Showing captions")
+                        else -> I18n.t("p_turn_on_captions", "Turn on captions for this video")
                     },
                     color = c.onSurfaceVariant,
                     fontSize = 12.5.sp,

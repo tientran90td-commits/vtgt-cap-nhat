@@ -129,7 +129,7 @@ fun AudioOnlyButton(state: PlayerState) {
     ) {
         Icon(
             if (on) Icons.Rounded.Headphones else Icons.Outlined.Headphones,
-            if (on) "Audio only is on" else "Audio only",
+            if (on) I18n.t("p_audio_only_on", "Audio only is on") else I18n.t("p_audio_only", "Audio only"),
             tint = ink, modifier = Modifier.size(18.dp),
         )
     }
@@ -210,7 +210,7 @@ private fun SpeedPanelContent(state: PlayerState) {
     ) {
         SpeedReadout({ value.value }, Modifier.align(Alignment.CenterHorizontally))
         Text(
-            if (PlaybackSpeed.remember) "Every video" else "This video only",
+            if (PlaybackSpeed.remember) I18n.t("p_every_video", "Every video") else I18n.t("p_this_video", "This video only"),
             color = c.onSurfaceVariant, fontSize = 12.sp, fontWeight = FontWeight.Bold,
             modifier = Modifier.align(Alignment.CenterHorizontally).padding(top = 4.dp),
         )
@@ -342,8 +342,8 @@ private fun RememberCheck(checked: Boolean, modifier: Modifier, onToggle: () -> 
         }
         Spacer(Modifier.width(13.dp))
         Column {
-            Text("Remember for every video", fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
-            Text("Until you set it back to 1×", color = c.onSurfaceVariant, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
+            Text(I18n.t("p_remember_every", "Remember for every video"), fontSize = 14.5.sp, fontWeight = FontWeight.Bold)
+            Text(I18n.t("p_until_reset", "Until you set it back to 1×"), color = c.onSurfaceVariant, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold)
         }
     }
 }
