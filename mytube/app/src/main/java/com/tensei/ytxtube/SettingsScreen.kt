@@ -286,7 +286,7 @@ fun SettingsScreen(
                     SettingsRow(
                         icon = Icons.Rounded.Person,
                         title = I18n.t("developer", "Developer"),
-                        subtitle = "TTube \u00b7 based on YTXTube by Koustubh12345 (GPL-3.0)",
+                        subtitle = I18n.t("developer_credit", "TTube \u00b7 based on YTXTube by Koustubh12345 (GPL-3.0)"),
                         onClick = { openRepo(ytxRepo) },
                     )
                 }
@@ -400,7 +400,7 @@ fun SettingsScreen(
                     }
                     Spacer(Modifier.height(14.dp))
                     Text(
-                        text = "Sign out?",
+                        text = I18n.t("sign_out_confirm_title", "Sign out?"),
                         fontFamily = RoundedHeavy,
                         fontWeight = FontWeight.Bold,
                         fontSize = 19.sp,
@@ -408,7 +408,7 @@ fun SettingsScreen(
                     )
                     Spacer(Modifier.height(6.dp))
                     Text(
-                        text = "Are you sure you want to sign out from ${Account.profile?.name ?: "this account"}?",
+                        text = I18n.t("sign_out_confirm_msg", "Are you sure you want to sign out from") + " ${Account.profile?.name ?: I18n.t("this_account", "this account")}?",
                         fontSize = 13.sp,
                         lineHeight = 18.sp,
                         color = c.onSurfaceVariant,
@@ -428,7 +428,7 @@ fun SettingsScreen(
                                 .padding(vertical = 11.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text("Cancel", fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, color = c.onSurface)
+                            Text(I18n.t("cancel", "Cancel"), fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, color = c.onSurface)
                         }
                         Box(
                             modifier = Modifier
@@ -443,7 +443,7 @@ fun SettingsScreen(
                                 .padding(vertical = 11.dp),
                             contentAlignment = Alignment.Center,
                         ) {
-                            Text("Sign out", fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, color = c.onError)
+                            Text(I18n.t("sign_out", "Sign out"), fontWeight = FontWeight.SemiBold, fontSize = 13.5.sp, color = c.onError)
                         }
                     }
                 }
@@ -490,7 +490,7 @@ fun SettingsScreen(
                         )
                         Spacer(Modifier.height(16.dp))
                         Text(
-                            text = "Checking for updates…",
+                            text = I18n.t("checking_updates", "Checking for updates…"),
                             fontFamily = RoundedHeavy,
                             fontWeight = FontWeight.Bold,
                             fontSize = 17.sp,
@@ -498,7 +498,7 @@ fun SettingsScreen(
                         )
                         Spacer(Modifier.height(4.dp))
                         Text(
-                            text = "Connecting to GitHub releases…",
+                            text = I18n.t("connecting_github", "Connecting to GitHub releases…"),
                             fontSize = 12.sp,
                             color = c.onSurfaceVariant,
                         )
@@ -519,7 +519,7 @@ fun SettingsScreen(
                         }
                         Spacer(Modifier.height(14.dp))
                         Text(
-                            text = "Up to date",
+                            text = I18n.t("up_to_date", "Up to date"),
                             fontFamily = RoundedHeavy,
                             fontWeight = FontWeight.Bold,
                             fontSize = 18.sp,
@@ -1116,7 +1116,7 @@ private fun DownloadFolderSelectionDialog(
                 )
                 Spacer(Modifier.height(4.dp))
                 Text(
-                    text = "Active: $currentPath",
+                    text = I18n.t("active_folder", "Active:") + " $currentPath",
                     fontSize = 11.5.sp,
                     color = c.onSurfaceVariant,
                     maxLines = 2,
@@ -1950,7 +1950,7 @@ private fun SettingsProfileCard(
                     val displayName = when {
                         current?.name != null && Account.isCleanAccountName(current.name) -> current.name
                         !current?.handle.isNullOrBlank() -> current!!.handle!!
-                        else -> "YouTube account"
+                        else -> I18n.t("youtube_account", "YouTube account")
                     }
                     val subtitleText = when {
                         current != null -> {
@@ -1958,7 +1958,7 @@ private fun SettingsProfileCard(
                             if (!h.isNullOrBlank() && h != displayName) h
                             else "${accounts.size} account${if (accounts.size == 1) "" else "s"}"
                         }
-                        else -> "Sign in to sync your account"
+                        else -> I18n.t("sign_in_sync", "Sign in to sync your account")
                     }
 
                     Column(Modifier.weight(1f)) {
@@ -1980,7 +1980,7 @@ private fun SettingsProfileCard(
 
             if (profile == null) {
                 Text(
-                    "Sign in",
+                    I18n.t("sign_in", "Sign in"),
                     modifier = Modifier.pressable(onClick = onSignIn).padding(8.dp),
                     fontWeight = FontWeight.SemiBold,
                     fontSize = 13.sp,
@@ -2040,7 +2040,7 @@ private fun SettingsProfileCard(
                         Icon(Icons.Rounded.Add, null, tint = c.primary, modifier = Modifier.size(18.dp))
                     }
                     Spacer(Modifier.width(10.dp))
-                    Text("Add account", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = c.primary)
+                    Text(I18n.t("add_account", "Add account"), fontWeight = FontWeight.Medium, fontSize = 13.sp, color = c.primary)
                 }
 
                 Row(
@@ -2063,7 +2063,7 @@ private fun SettingsProfileCard(
                         )
                     }
                     Spacer(Modifier.width(10.dp))
-                    Text("Sign out", fontWeight = FontWeight.Medium, fontSize = 13.sp, color = c.error)
+                    Text(I18n.t("sign_out", "Sign out"), fontWeight = FontWeight.Medium, fontSize = 13.sp, color = c.error)
                 }
             }
         }
@@ -2114,7 +2114,7 @@ private fun SettingsAccountRow(
             Account.isCleanAccountName(account.name) -> account.name
             !account.email.isNullOrBlank() -> account.email
             !account.handle.isNullOrBlank() && Account.isCleanAccountName(account.handle) -> account.handle
-            else -> "Google Account"
+            else -> I18n.t("google_account", "Google Account")
         }
         val handleText = when {
             account.handle != null && account.handle != displayName && Account.isCleanAccountName(account.handle) -> account.handle
