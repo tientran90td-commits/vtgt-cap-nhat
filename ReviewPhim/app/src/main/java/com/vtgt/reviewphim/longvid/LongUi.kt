@@ -67,6 +67,7 @@ import com.vtgt.reviewphim.Muted
 import com.vtgt.reviewphim.Prompts
 import com.vtgt.reviewphim.Section
 import com.vtgt.reviewphim.Toggle
+import com.vtgt.reviewphim.Advanced
 import com.vtgt.reviewphim.VieNeu
 import com.vtgt.reviewphim.VoiceStudio
 import kotlinx.coroutines.launch
@@ -74,27 +75,19 @@ import kotlinx.coroutines.launch
 @Composable
 fun LongScreen(vm: LongVM, embedded: Boolean = false) {
     var tab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("📦 Dự án", "📋 Tiến độ", "⚙️ Cài đặt")
+    val tabs = listOf("📦 Dự án", "📋 Tiến độ")
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding()) {
-        if (!embedded) {
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text("LongRecap AI", fontSize = 22.sp, fontWeight = FontWeight.Bold, color = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.width(8.dp))
-                Text("v${BuildConfig.VERSION_NAME} · video dài tới 10 tiếng", color = Muted, fontSize = 12.sp)
-            }
-            UpdateBanner(vm)
-        }
         TabRow(selectedTabIndex = tab) {
             tabs.forEachIndexed { i, t -> Tab(selected = tab == i, onClick = { tab = i }, text = { Text(t) }) }
         }
         Box(Modifier.weight(1f)) {
-            when (tab) {
-                0 -> ProjectTab(vm)
-                1 -> ProgressTab(vm)
-                else -> SettingsTab(vm)
-            }
+            androidx.compose.animation.Crossfade(tab, label = "tab") { t -> if (t == 0) ProjectTab(vm) else ProgressTab(vm) }
         }
-        BottomBar(vm)
+        @Suppress("UNUSED_VARIABLE") val rv = vm.rev
+        val started = vm.project?.parts?.any { it.state > 0 } == true
+        com.vtgt.reviewphim.ProgressPanel(vm.busy, vm.status, vm.progress, vm.apiWaiting, vm.logs, vm.result,
+            if (started) "▶ TIẾP TỤC LÀM VIDEO DÀI" else "⚡ LÀM VIDEO DÀI", vm.project?.parts?.isNotEmpty() == true,
+            vm::start, vm::cancel, vm::skipToManual, eta = vm.eta, stopLabel = "⏸ Dừng")
     }
     vm.ask?.let { ManualDialog(it, vm::answerManual, vm::cancel) }
 }
@@ -105,7 +98,7 @@ private fun ProjectTab(vm: LongVM) {
     @Suppress("UNUSED_VARIABLE") val r = vm.rev   // vẽ lại khi dự án đổi
     var newBox by remember { mutableStateOf(false) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 6.dp)) {
-        Section("1. Dự án") {
+        Section("Dự án", 1, vm.project != null) {
             if (vm.projects.isNotEmpty()) {
                 Choice("Dự án đang làm", vm.project?.dir?.name ?: "", vm.projects.map {
                     it.dir.name to "${kindIcon(it.kind)} ${it.title} (${it.doneParts}/${it.parts.size})"
@@ -129,9 +122,9 @@ private fun ProjectTab(vm: LongVM) {
             }
         }
         vm.project?.let { p ->
-            Section("2. Nội dung (${p.parts.size} ${if (p.kind == "film") "tập" else "chương"})") { AddContent(vm, p) }
-            Section("3. Cách làm") { HowSection(vm, p) }
-            Section("4. Giọng đọc") { VoicePicker(vm) }
+            Section("Nội dung (${p.parts.size} ${if (p.kind == "film") "tập" else "chương"})", 2, p.parts.isNotEmpty()) { AddContent(vm, p) }
+            Section("Cách làm", 3) { HowSection(vm, p) }
+            Section("Giọng đọc", 4) { VoicePicker(vm) }
         }
         if (vm.project == null) Section("Bắt đầu") {
             Hint("Tạo dự án: truyện audio dài (đọc nguyên văn hoặc AI kể lại cả bộ tiểu thuyết / light novel / web novel), " +
@@ -250,6 +243,7 @@ private fun HowSection(vm: LongVM, p: Project) {
         "std" to "Chuẩn 720p",
         "hd" to "Nét 1080p (file lớn, dựng lâu)")) { vm.quality = it; vm.save("l_quality", it) }
     Hint("Ước tính: ${vm.summary(p)}")
+    Advanced("⚙ Tùy chọn thêm: phụ đề, khung tranh, xuất, nhạc nền") {
     Toggle("Phụ đề karaoke (chữ đổi màu theo giọng đọc)", vm.karaoke) { vm.karaoke = it; vm.prefs.setBool("l_karaoke", it) }
     if (p.kind == "manga") {
         Toggle("Chiếu lần lượt từng khung tranh", vm.panelZoom) { vm.panelZoom = it; vm.prefs.setBool("m_panels", it) }
@@ -266,6 +260,7 @@ private fun HowSection(vm: LongVM, p: Project) {
         Text("🎵 Nhạc nền: " + vm.bgmName.ifBlank { "không có" }, modifier = Modifier.weight(1f), fontSize = 14.sp)
         OutlinedButton(onClick = { pickBgm.launch("audio/*") }, enabled = !vm.busy) { Text("Chọn") }
         if (vm.bgmName.isNotBlank()) TextButton(onClick = { vm.setBgm(null) }) { Text("✖") }
+    }
     }
 }
 
@@ -368,144 +363,4 @@ private fun ProgressTab(vm: LongVM) {
 }
 
 // ==================================================================== thanh dưới
-@Composable
-private fun BottomBar(vm: LongVM) {
-    @Suppress("UNUSED_VARIABLE") val r = vm.rev
-    val ctx = LocalContext.current
-    var showLog by remember { mutableStateOf(false) }
-    Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
-        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (vm.busy || vm.status.isNotEmpty()) {
-                LinearProgressIndicator(progress = { vm.progress }, modifier = Modifier.fillMaxWidth())
-                Text(vm.status, fontSize = 13.sp, maxLines = 2)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (vm.busy && vm.apiWaiting) Button(onClick = vm::skipToManual, modifier = Modifier.weight(1f)) { Text("🖐 Làm tay ngay") }
-                if (vm.busy) {
-                    Button(onClick = vm::cancel, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB3261E)),
-                        modifier = Modifier.weight(if (vm.apiWaiting) 0.6f else 1f)) { Text("⏸ Dừng") }
-                } else {
-                    val p = vm.project
-                    val started = p != null && p.parts.any { it.state > 0 }
-                    Button(onClick = vm::start, enabled = p != null && p.parts.isNotEmpty(), modifier = Modifier.weight(1f).height(52.dp)) {
-                        Text(if (started) "▶ TIẾP TỤC LÀM VIDEO DÀI" else "⚡ LÀM VIDEO DÀI", fontWeight = FontWeight.Bold)
-                    }
-                }
-                OutlinedButton(onClick = { showLog = !showLog }) { Text(if (showLog) "Ẩn log" else "Log") }
-            }
-            vm.result?.let { uri ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = {
-                        ctx.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "video/mp4").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
-                    }, modifier = Modifier.weight(1f)) { Text("▶ Xem video") }
-                    OutlinedButton(onClick = {
-                        ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("video/mp4")
-                            .putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), "Chia sẻ video"))
-                    }, modifier = Modifier.weight(1f)) { Text("📤 Chia sẻ") }
-                }
-            }
-            if (showLog) {
-                val st = rememberLazyListState()
-                LaunchedEffect(vm.logs.size) { if (vm.logs.isNotEmpty()) st.animateScrollToItem(vm.logs.size - 1) }
-                SelectionContainer {
-                    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 220.dp), state = st) {
-                        itemsIndexed(vm.logs) { _, l -> Text(l, fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Muted) }
-                    }
-                }
-            }
-        }
-    }
-}
-
 // ==================================================================== tab Cài đặt
-@Composable
-private fun SettingsTab(vm: LongVM) {
-    val ctx = LocalContext.current
-    val uri = LocalUriHandler.current
-    Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 6.dp).imePadding()) {
-        Section("AI dịch / kể lại / đọc tranh / viết kịch bản") {
-            var ai by remember { mutableStateOf(vm.prefs.str("ai", "auto")) }
-            Choice("Dùng", ai, listOf("manual" to "🖐 Làm tay: chép / dán sang DeepSeek, Gemini",
-                "auto" to "⚡ API tự động (nên dùng cho video dài)")) { ai = it; vm.prefs.set("ai", it) }
-            Hint("Video dài cần AI hàng chục / hàng trăm lần (mỗi chương / tập): nên có key. Gemini miễn phí (đọc được cả tranh), " +
-                "DeepSeek rẻ cho dịch / kể lại. Truyện tiếng Việt đọc nguyên văn thì không cần AI. Key chỉ lưu trong máy.")
-            Ai.PROVS.forEach { p ->
-                var k by remember { mutableStateOf(vm.prefs.str("key_${p.id}")) }
-                OutlinedTextField(k, { k = it.trim(); vm.prefs.set("key_${p.id}", k) }, Modifier.fillMaxWidth(), singleLine = true,
-                    label = { Text("${p.name} key - ${p.note}") }, visualTransformation = PasswordVisualTransformation())
-                TextButton(onClick = { uri.openUri(p.keyUrl) }) { Text("Lấy key ${p.name} ↗") }
-            }
-            Hint("Mỗi AI nhập được nhiều key, cách nhau dấu phẩy: key này quá tải / hết lượt thì app tự đổi sang key kế.")
-            com.vtgt.reviewphim.CustomAiSection(vm.prefs)
-        }
-        Section("Tên riêng") {
-            var g by remember { mutableStateOf(vm.prefs.str("glossary")) }
-            OutlinedTextField(g, { g = it; vm.prefs.set("glossary", it) }, Modifier.fillMaxWidth().heightIn(min = 90.dp),
-                label = { Text("Tên riêng AI luôn dùng (mỗi dòng: gốc = Việt)") }, placeholder = { Text("林动 = Lâm Động") })
-            Hint("Tên AI đã dùng được tự nhớ thêm vào đây, các chương sau dùng đúng tên đó.")
-        }
-        Section("🎙 VoiceStudio trên máy tính (tùy chọn)") {
-            var u by remember { mutableStateOf(vm.prefs.str("vs_url")) }
-            OutlinedTextField(u, { u = it.trim(); vm.prefs.set("vs_url", u) }, Modifier.fillMaxWidth(), singleLine = true,
-                label = { Text("Địa chỉ máy tính (vd 192.168.1.10:3900)") })
-            var pin by remember { mutableStateOf(vm.prefs.str("vs_pin")) }
-            OutlinedTextField(pin, { pin = it.trim(); vm.prefs.set("vs_pin", pin) }, Modifier.fillMaxWidth(), singleLine = true,
-                label = { Text("Mã PIN Network share (nếu có)") })
-        }
-        Section("Giọng đọc của máy") {
-            var engines by remember { mutableStateOf<List<Pair<String, String>>>(emptyList()) }
-            LaunchedEffect(Unit) { engines = try { vm.tts.engines() } catch (e: Exception) { emptyList() } }
-            var eng by remember { mutableStateOf(vm.prefs.str("tts_engine")) }
-            if (engines.isNotEmpty()) Choice("Bộ đọc", eng, listOf("" to "Mặc định của máy") + engines) {
-                eng = it; vm.prefs.set("tts_engine", it); vm.voice = ""; vm.save("voice", "")
-            }
-            OutlinedButton(onClick = {
-                runCatching { ctx.startActivity(Intent(TextToSpeech.Engine.ACTION_INSTALL_TTS_DATA).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                    .onFailure { uri.openUri("https://play.google.com/store/apps/details?id=com.google.android.tts") }
-            }) { Text("⬇ Tải giọng tiếng Việt") }
-        }
-        Section("Cập nhật") {
-            val scope = rememberCoroutineScope()
-            var msg by remember { mutableStateOf("") }
-            Button(onClick = {
-                scope.launch {
-                    msg = "Đang kiểm tra..."
-                    val r = runCatching { vm.updater.check() }.getOrNull()
-                    vm.update = r
-                    msg = when {
-                        r == null -> "Không kiểm tra được (cần mạng)."
-                        vm.updater.newer(r) -> "Có bản mới: ${r.name} - bấm nút Cập nhật ở trên cùng."
-                        else -> "Đang dùng bản mới nhất."
-                    }
-                }
-            }) { Text("🔄 Kiểm tra bản mới") }
-            if (msg.isNotEmpty()) Hint(msg)
-        }
-        Spacer(Modifier.height(12.dp))
-    }
-}
-
-@Composable
-private fun UpdateBanner(vm: LongVM) {
-    val scope = rememberCoroutineScope()
-    LaunchedEffect(Unit) { vm.update = runCatching { vm.updater.check() }.getOrNull() }
-    val r = vm.update
-    if (!vm.updater.newer(r) || r == null) return
-    var p by remember { mutableStateOf(-1f) }
-    Row(Modifier.fillMaxWidth().background(Color(0xFF2E7D32)).padding(horizontal = 16.dp, vertical = 6.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        Text(if (p < 0) "Có bản mới ${r.name}" else "Đang tải ${(p * 100).toInt()}%", modifier = Modifier.weight(1f))
-        TextButton(onClick = {
-            scope.launch {
-                try {
-                    p = 0f
-                    vm.updater.install(vm.updater.download(r) { p = it })
-                } catch (e: Exception) {
-                    vm.log("Cập nhật lỗi: ${e.message}")
-                } finally {
-                    p = -1f
-                }
-            }
-        }, enabled = p < 0) { Text("Cập nhật", color = Color.White) }
-    }
-}

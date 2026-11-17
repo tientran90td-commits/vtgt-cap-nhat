@@ -10,6 +10,12 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.draw.rotate
+import androidx.compose.ui.draw.clip
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.clickable
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -92,12 +98,125 @@ const val RETRY_API = "\u0000api"
 val Muted = Color(0xFF9A9AB0)
 
 @Composable
-fun Section(title: String, content: @Composable () -> Unit) {
-    Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
-            content()
+fun Section(title: String, step: Int = 0, done: Boolean = false, content: @Composable () -> Unit) {
+    // hiện dần + trượt lên khi mở màn hình (kiểu flutter_animate fadeIn().slideY())
+    val shown = remember { androidx.compose.animation.core.MutableTransitionState(false).apply { targetState = true } }
+    androidx.compose.animation.AnimatedVisibility(shown,
+        enter = androidx.compose.animation.fadeIn(androidx.compose.animation.core.tween(380)) +
+            androidx.compose.animation.slideInVertically(androidx.compose.animation.core.tween(380)) { it / 6 }) {
+        Card(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp),
+            shape = RoundedCornerShape(18.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+            Column(Modifier.padding(14.dp).animateContentSize(), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (step > 0) {
+                        val bg by androidx.compose.animation.animateColorAsState(
+                            if (done) Color(0xFF2E7D32) else MaterialTheme.colorScheme.primary, label = "step")
+                        Box(Modifier.size(28.dp).background(bg, CircleShape), contentAlignment = Alignment.Center) {
+                            Text(if (done) "✓" else "$step", color = Color.White, fontWeight = FontWeight.Bold, fontSize = 14.sp)
+                        }
+                        Spacer(Modifier.width(10.dp))
+                    }
+                    Text(title, fontWeight = FontWeight.Bold, fontSize = 16.sp)
+                }
+                content()
+            }
+        }
+    }
+}
+
+/** Tùy chọn ít dùng: đóng sẵn, bấm để mở / đóng (mở rộng mượt). */
+@Composable
+fun Advanced(title: String = "⚙ Tùy chọn thêm", content: @Composable () -> Unit) {
+    var open by androidx.compose.runtime.saveable.rememberSaveable(title) { mutableStateOf(false) }
+    val rot by androidx.compose.animation.core.animateFloatAsState(if (open) 180f else 0f, label = "adv")
+    Column(Modifier.fillMaxWidth()) {
+        Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).clickable { open = !open }
+            .background(MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)).padding(horizontal = 10.dp, vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Text(title, color = MaterialTheme.colorScheme.primary, fontSize = 14.sp, fontWeight = FontWeight.SemiBold,
+                modifier = Modifier.weight(1f))
+            Text("▾", color = MaterialTheme.colorScheme.primary, modifier = Modifier.rotate(rot))
+        }
+        androidx.compose.animation.AnimatedVisibility(open,
+            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()) {
+            Column(Modifier.padding(top = 8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) { content() }
+        }
+    }
+}
+
+/**
+ * Bảng tiến trình dưới cùng (dùng chung 3 chế độ): thanh tiến độ chạy mượt, trạng thái nhấp nháy khi đang làm,
+ * nút chính / Dừng / Làm tay ngay, kết quả trượt vào khi xong, log ẩn sau "Chi tiết".
+ */
+@Composable
+fun ProgressPanel(busy: Boolean, status: String, progress: Float, apiWaiting: Boolean, logs: List<String>, result: Uri?,
+                  mainLabel: String, mainEnabled: Boolean, onMain: () -> Unit, onCancel: () -> Unit, onManual: () -> Unit,
+                  eta: String = "", stopLabel: String = "⏹ Dừng") {
+    val ctx = LocalContext.current
+    var showLog by remember { mutableStateOf(false) }
+    val p by androidx.compose.animation.core.animateFloatAsState(progress.coerceIn(0f, 1f),
+        androidx.compose.animation.core.tween(600), label = "prog")
+    val pulse = androidx.compose.animation.core.rememberInfiniteTransition(label = "pulse")
+    val glow by pulse.animateFloat(0.45f, 1f, androidx.compose.animation.core.infiniteRepeatable(
+        androidx.compose.animation.core.tween(800), androidx.compose.animation.core.RepeatMode.Reverse), label = "glow")
+    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = RoundedCornerShape(topStart = 20.dp, topEnd = 20.dp),
+        tonalElevation = 3.dp) {
+        Column(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 10.dp).animateContentSize(),
+            verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (busy || status.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    if (busy) Text("●", color = MaterialTheme.colorScheme.primary.copy(alpha = glow), fontSize = 14.sp)
+                    if (busy) Spacer(Modifier.width(6.dp))
+                    Text(status, fontSize = 13.sp, maxLines = 2, modifier = Modifier.weight(1f))
+                    if (busy) Text("${(p * 100).toInt()}%", fontSize = 13.sp, fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.primary)
+                }
+                LinearProgressIndicator(progress = { p }, modifier = Modifier.fillMaxWidth().height(6.dp).clip(RoundedCornerShape(3.dp)))
+                if (eta.isNotBlank()) Hint("⏱ $eta")
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                androidx.compose.animation.AnimatedVisibility(busy && apiWaiting) {
+                    Button(onClick = onManual) { Text("🖐 Làm tay ngay") }
+                }
+                if (busy) {
+                    Button(onClick = onCancel, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB3261E)),
+                        modifier = Modifier.weight(1f).height(50.dp)) { Text(stopLabel) }
+                } else {
+                    Button(onClick = onMain, enabled = mainEnabled, shape = RoundedCornerShape(14.dp),
+                        modifier = Modifier.weight(1f).height(52.dp)) { Text(mainLabel, fontWeight = FontWeight.Bold) }
+                }
+                TextButton(onClick = { showLog = !showLog }) { Text(if (showLog) "Ẩn" else "Chi tiết", fontSize = 13.sp) }
+            }
+            androidx.compose.animation.AnimatedVisibility(result != null && !busy,
+                enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 2 },
+                exit = androidx.compose.animation.fadeOut()) {
+                val uri = result
+                Surface(color = Color(0x332E7D32), shape = RoundedCornerShape(14.dp)) {
+                    Row(Modifier.fillMaxWidth().padding(8.dp), horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Text("✅ Video đã lưu", fontWeight = FontWeight.SemiBold, modifier = Modifier.weight(1f))
+                        OutlinedButton(onClick = {
+                            if (uri != null) ctx.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "video/mp4")
+                                .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+                        }) { Text("▶ Xem") }
+                        OutlinedButton(onClick = {
+                            if (uri != null) ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("video/mp4")
+                                .putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), "Chia sẻ video"))
+                        }) { Text("📤 Chia sẻ") }
+                    }
+                }
+            }
+            androidx.compose.animation.AnimatedVisibility(showLog) {
+                val st = rememberLazyListState()
+                LaunchedEffect(logs.size) { if (logs.isNotEmpty()) st.animateScrollToItem(logs.size - 1) }
+                SelectionContainer {
+                    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 220.dp), state = st) {
+                        itemsIndexed(logs) { _, l -> Text(l, fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Muted) }
+                    }
+                }
+            }
         }
     }
 }

@@ -81,7 +81,7 @@ import kotlinx.coroutines.launch
 @Composable
 fun AppScreen(vm: MainVM, embedded: Boolean = false) {
     var tab by remember { mutableIntStateOf(0) }
-    val tabs = listOf("🎬 Làm video", "✏️ Kịch bản", "⚙️ Cài đặt")
+    val tabs = listOf("🎬 Làm video", "✏️ Kịch bản")
     Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background).safeDrawingPadding()) {
         if (!embedded) {
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -95,13 +95,11 @@ fun AppScreen(vm: MainVM, embedded: Boolean = false) {
             tabs.forEachIndexed { i, t -> Tab(selected = tab == i, onClick = { tab = i }, text = { Text(t) }) }
         }
         Box(Modifier.weight(1f)) {
-            when (tab) {
-                0 -> MakeTab(vm)
-                1 -> ScriptTab(vm)
-                else -> SettingsTab(vm)
-            }
+            androidx.compose.animation.Crossfade(tab, label = "tab") { t -> if (t == 0) MakeTab(vm) else ScriptTab(vm) }
         }
-        BottomBar(vm)
+        ProgressPanel(vm.busy, vm.status, vm.progress, vm.apiWaiting, vm.logs, vm.result,
+            if (vm.mode == "recap") "⚡ LÀM VIDEO REVIEW" else "⚡ VIỆT HÓA VIDEO", vm.video != null,
+            vm::makeVideo, vm::cancel, vm::skipToManual)
     }
     vm.ask?.let { ManualDialog(it, vm::answerManual, vm::cancel) }
 }
@@ -115,7 +113,7 @@ private fun MakeTab(vm: MainVM) {
     var link by remember { mutableStateOf("") }
     val clip = LocalClipboardManager.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 6.dp)) {
-        Section("1. Video gốc") {
+        Section("Video gốc", 1, vm.video != null) {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Button(onClick = { pick.launch("video/*") }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("📂 Chọn video") }
             }
@@ -148,7 +146,7 @@ private fun MakeTab(vm: MainVM) {
                     if (vm.lines.isNotEmpty()) " · lời gốc ${vm.lines.size} câu" else "")
             }
         }
-        Section("2. Làm gì?") {
+        Section("Làm gì?", 2) {
             Choice("Chế độ", vm.mode, listOf(
                 "recap" to "🎬 Review / tóm tắt phim thành video ngắn",
                 "translate" to "🌐 Dịch nguyên video sang tiếng Việt",
@@ -157,6 +155,7 @@ private fun MakeTab(vm: MainVM) {
                 Choice("Độ dài video review", vm.targetSec, listOf(60 to "1 phút", 120 to "2 phút", 180 to "3 phút",
                     300 to "5 phút", 600 to "10 phút", 900 to "15 phút")) { vm.targetSec = it; vm.save("target", "$it") }
                 Choice("Văn phong", vm.style, Prompts.STYLES.map { it.key to it.value }) { vm.style = it; vm.save("style", it) }
+                Advanced("⚙ Tùy chọn thêm: xem hình, cảnh, phụ đề, nhạc nền") {
                 Toggle("👁 AI xem hình cả video (kể cả cảnh hành động không có thoại)", vm.watch) {
                     vm.watch = it; vm.prefs.setBool("watch", it)
                 }
@@ -177,12 +176,32 @@ private fun MakeTab(vm: MainVM) {
                     Hint("Âm lượng nhạc nền: ${(bv * 100).toInt()}% (tự nhỏ lại khi có giọng đọc)")
                     Slider(bv, { bv = it; vm.prefs.setNum("bgm_vol", it) }, valueRange = 0.05f..0.6f)
                 }
+                }
             } else {
                 Choice("Xuất ra", vm.output, listOf("dub_sub" to "Thuyết minh + Vietsub", "sub" to "Chỉ Vietsub (giữ tiếng gốc)",
                     "dub" to "Chỉ thuyết minh")) { vm.output = it; vm.save("output", it) }
             }
         }
-        Section("Tên nhân vật đúng ngay từ đầu") {
+        Section("Lời gốc của video", 3, vm.lines.isNotEmpty()) {
+            Choice("Lấy lời gốc bằng", vm.stt, listOf(
+                "whisper" to "🎧 Nghe lời thoại (Groq API; lỗi / không key → 🖐 nhờ Gemini)",
+                "gemini" to "🖐 Nhờ Gemini nghe (làm tay, không cần key)",
+                "ocr" to "🔤 Đọc phụ đề cứng trên hình (không cần mạng)",
+                "srt" to "📄 File phụ đề (.srt / .ass / .vtt)",
+            )) { vm.stt = it; vm.save("stt", it); vm.lines = emptyList() }
+            if (vm.stt == "srt") OutlinedButton(onClick = { pickSrt.launch("*/*") }, enabled = !vm.busy) { Text("Chọn file phụ đề") }
+            if (vm.stt == "ocr") {
+                Hint("Đọc chữ Trung + Latin. Kéo 2 thanh dưới để khung vàng ôm đúng dòng phụ đề.")
+                BandEditor(vm)
+            }
+            Advanced("✂ Phụ đề gốc trên hình (che / đặt phụ đề Việt)") {
+                if (vm.stt != "ocr") BandEditor(vm)
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Checkbox(vm.cover, { vm.cover = it; vm.prefs.setBool("cover", it) })
+                    Text("Che phụ đề gốc (phụ đề Việt hiện đúng chỗ đó)")
+                }
+            }
+            Advanced("📚 Tên nhân vật đúng ngay từ đầu (MyAnimeList)") {
             var q by remember { mutableStateOf("") }
             Hint("Gõ tên anime / phim (tiếng Anh hoặc Nhật, vd: Bleach) → app lấy danh sách nhân vật chính thức từ MyAnimeList " +
                 "để AI gọi đúng tên. Tên AI đã dùng cũng được nhớ lại cho các tập sau.")
@@ -194,35 +213,23 @@ private fun MakeTab(vm: MainVM) {
                 Text("📚 ${vm.castInfo}", modifier = Modifier.weight(1f), fontSize = 13.sp)
                 TextButton(onClick = vm::clearCast) { Text("✖") }
             }
+                    }
         }
-        Section("3. Lời gốc của video") {
-            Choice("Lấy lời gốc bằng", vm.stt, listOf(
-                "whisper" to "🎧 Nghe lời thoại (Groq API; lỗi / không key → 🖐 nhờ Gemini)",
-                "gemini" to "🖐 Nhờ Gemini nghe (làm tay, không cần key)",
-                "ocr" to "🔤 Đọc phụ đề cứng trên hình (không cần mạng)",
-                "srt" to "📄 File phụ đề (.srt / .ass / .vtt)",
-            )) { vm.stt = it; vm.save("stt", it); vm.lines = emptyList() }
-            if (vm.stt == "srt") OutlinedButton(onClick = { pickSrt.launch("*/*") }, enabled = !vm.busy) { Text("Chọn file phụ đề") }
-            if (vm.stt == "ocr") Hint("Đọc chữ Trung + Latin. Kéo 2 thanh dưới để khung vàng ôm đúng dòng phụ đề.")
-            BandEditor(vm)
-            Row(verticalAlignment = Alignment.CenterVertically) {
-                Checkbox(vm.cover, { vm.cover = it; vm.prefs.setBool("cover", it) })
-                Text("Che phụ đề gốc (phụ đề Việt hiện đúng chỗ đó)")
-            }
-        }
-        Section("Các bước sẽ làm") {
+        Section("📋 Các bước sẽ làm") {
             vm.plan().forEachIndexed { k, (t, manual) ->
                 Text("${k + 1}. $t", fontSize = 14.sp, color = if (manual) Color(0xFFFFD54F) else MaterialTheme.colorScheme.onSurface)
             }
             Hint("🖐 = bước bạn làm tay: app chép sẵn yêu cầu, bạn dán sang DeepSeek / Gemini rồi dán câu trả lời lại. " +
                 "Không cần API, không lo lỗi hết tiền / quá tải.")
         }
-        Section("4. Khung hình & giọng đọc") {
+        Section("Khung hình & giọng đọc", 4) {
             Choice("Khung hình", vm.aspect, Aspect.entries.map { it to it.label }) { vm.aspect = it; vm.save("aspect", it.name) }
-            Choice("Chất lượng", vm.quality, listOf(540 to "540p (nhanh nhất)", 720 to "720p HD", 1080 to "1080p Full HD")) {
-                vm.quality = it; vm.save("quality", "$it")
-            }
             VoicePicker(vm)
+            Advanced("⚙ Chất lượng video") {
+                Choice("Chất lượng", vm.quality, listOf(540 to "540p (nhanh nhất)", 720 to "720p HD", 1080 to "1080p Full HD")) {
+                    vm.quality = it; vm.save("quality", "$it")
+                }
+            }
         }
         Spacer(Modifier.height(8.dp))
     }
@@ -375,55 +382,6 @@ private fun VieNeuPanel(vm: MainVM) {
 }
 
 // ==================================================================== thanh dưới: nút làm + tiến độ + log
-@Composable
-private fun BottomBar(vm: MainVM) {
-    val ctx = LocalContext.current
-    var showLog by remember { mutableStateOf(false) }
-    Surface(color = MaterialTheme.colorScheme.surfaceVariant) {
-        Column(Modifier.fillMaxWidth().padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            if (vm.busy || vm.status.isNotEmpty()) {
-                LinearProgressIndicator(progress = { vm.progress }, modifier = Modifier.fillMaxWidth())
-                Text(vm.status, fontSize = 13.sp, maxLines = 2)
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                if (vm.busy && vm.apiWaiting) {
-                    Button(onClick = vm::skipToManual, modifier = Modifier.weight(1f)) { Text("🖐 Làm tay ngay") }
-                }
-                if (vm.busy) {
-                    Button(onClick = vm::cancel, colors = ButtonDefaults.buttonColors(containerColor = Color(0xFFB3261E)),
-                        modifier = Modifier.weight(if (vm.apiWaiting) 0.6f else 1f)) { Text("⏹ Hủy") }
-                } else {
-                    Button(onClick = vm::makeVideo, enabled = vm.video != null, modifier = Modifier.weight(1f).height(52.dp)) {
-                        Text(if (vm.mode == "recap") "⚡ LÀM VIDEO REVIEW" else "⚡ VIỆT HÓA VIDEO", fontWeight = FontWeight.Bold)
-                    }
-                }
-                OutlinedButton(onClick = { showLog = !showLog }) { Text(if (showLog) "Ẩn log" else "Log") }
-            }
-            vm.result?.let { uri ->
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = {
-                        ctx.startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri, "video/mp4")
-                            .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
-                    }, modifier = Modifier.weight(1f)) { Text("▶ Xem video") }
-                    OutlinedButton(onClick = {
-                        ctx.startActivity(Intent.createChooser(Intent(Intent.ACTION_SEND).setType("video/mp4")
-                            .putExtra(Intent.EXTRA_STREAM, uri).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION), "Chia sẻ video"))
-                    }, modifier = Modifier.weight(1f)) { Text("📤 Chia sẻ") }
-                }
-            }
-            if (showLog) {
-                val st = rememberLazyListState()
-                LaunchedEffect(vm.logs.size) { if (vm.logs.isNotEmpty()) st.animateScrollToItem(vm.logs.size - 1) }
-                SelectionContainer {
-                    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 220.dp), state = st) {
-                        itemsIndexed(vm.logs) { _, l -> Text(l, fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Muted) }
-                    }
-                }
-            }
-        }
-    }
-}
-
 // ==================================================================== tab Kịch bản
 @Composable
 private fun ScriptTab(vm: MainVM) {
@@ -474,15 +432,16 @@ private fun ScriptTab(vm: MainVM) {
 // ==================================================================== dán tay qua DeepSeek web
 // ==================================================================== tab Cài đặt
 @Composable
-private fun SettingsTab(vm: MainVM) {
+fun SettingsScreen(vm: MainVM) {
     val ctx = LocalContext.current
     val uri = LocalUriHandler.current
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 6.dp).imePadding()) {
-        Section("AI viết kịch bản & dịch") {
+        Section("🤖 AI (dùng chung cho Phim, Truyện, Video dài)") {
             var ai by remember { mutableStateOf(vm.prefs.str("ai", "auto")) }
             Choice("Dùng", ai, listOf("manual" to "🖐 Làm tay: chép / dán sang DeepSeek (miễn phí, không lỗi API)",
                 "auto" to "⚡ API tự động (lỗi thì tự chuyển sang làm tay)")) { ai = it; vm.prefs.set("ai", it) }
-            Hint("Key chỉ lưu trong máy này. Thứ tự dùng: DeepSeek → Gemini → OpenRouter → Groq → OpenAI; AI nào lỗi/hết tiền thì tự sang AI kế.")
+            Hint("Key chỉ lưu trong máy này. Thứ tự dùng: Máy chủ AI riêng → DeepSeek → Gemini → OpenRouter → Groq → OpenAI; AI nào lỗi / hết tiền thì tự sang AI kế. " +
+                "Đọc tranh / xem hình cần AI nhìn được ảnh (Gemini miễn phí, OpenRouter, Groq, OpenAI). Video dài gọi AI rất nhiều lần: nên có key.")
             Ai.PROVS.forEach { p ->
                 var k by remember { mutableStateOf(vm.prefs.str("key_${p.id}")) }
                 OutlinedTextField(k, { k = it.trim(); vm.prefs.set("key_${p.id}", k) }, Modifier.fillMaxWidth(), singleLine = true,
