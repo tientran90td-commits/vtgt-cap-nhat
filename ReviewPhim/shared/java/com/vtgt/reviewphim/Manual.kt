@@ -10,6 +10,8 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.size
@@ -369,5 +371,23 @@ fun CustomAiSection(prefs: Prefs) {
     if (msg.isNotEmpty()) Hint(msg)
     if (found.isNotEmpty() && model.isBlank()) Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
         found.take(3).forEach { m -> TextButton(onClick = { model = m; prefs.set("custom_model", m) }) { Text(m.take(24)) } }
+    }
+}
+
+/** Ô chọn nhanh: biểu tượng to + chữ ngắn (gọn trên màn hình nhỏ), nhấn có hiệu ứng thu nhỏ. */
+@Composable
+fun Tile(icon: String, label: String, enabled: Boolean, modifier: Modifier = Modifier, primary: Boolean = false, onClick: () -> Unit) {
+    val src = remember { androidx.compose.foundation.interaction.MutableInteractionSource() }
+    val pressed by src.collectIsPressedAsState()
+    val sc by androidx.compose.animation.core.animateFloatAsState(if (pressed) 0.94f else 1f, label = "tile")
+    val bg = if (primary) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.surfaceVariant
+    val fg = if (primary) MaterialTheme.colorScheme.onPrimary else MaterialTheme.colorScheme.onSurface
+    Surface(modifier.height(76.dp).graphicsLayer { scaleX = sc; scaleY = sc; alpha = if (enabled) 1f else 0.45f },
+        shape = RoundedCornerShape(16.dp), color = bg) {
+        Column(Modifier.fillMaxSize().clickable(src, androidx.compose.material3.ripple(), enabled = enabled, onClick = onClick)
+            .padding(4.dp), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.Center) {
+            Text(icon, fontSize = 22.sp)
+            Text(label, fontSize = 12.sp, color = fg, maxLines = 1, fontWeight = FontWeight.Medium)
+        }
     }
 }

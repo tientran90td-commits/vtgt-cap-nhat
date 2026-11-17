@@ -106,21 +106,16 @@ private fun MakeTab(vm: MangaVM) {
     var browser by remember { mutableStateOf<String?>(null) }
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(vertical = 6.dp)) {
         Section("Truyện", 1, vm.book != null) {
-            Hint("Truyện tranh (manga / manhwa / manhua): dán link chương, chọn ảnh các trang, cả thư mục, hoặc file CBZ / ZIP / PDF. " +
-                "Light novel / tiểu thuyết: dán link chương, file EPUB / TXT hoặc dán chữ. Trang manhwa dài được tự nối / cắt theo khung tranh.")
+            Hint("Manga / manhwa / manhua hoặc light novel / tiểu thuyết: chọn 1 cách đưa truyện vào.")
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { pickImages.launch("image/*") }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("🖼 Ảnh trang") }
-                Button(onClick = { pickTree.launch(null) }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("📁 Thư mục") }
+                com.vtgt.reviewphim.Tile("🔗", "Link", !vm.busy, Modifier.weight(1f), primary = true) { linkBox = true }
+                com.vtgt.reviewphim.Tile("🖼", "Ảnh trang", !vm.busy, Modifier.weight(1f)) { pickImages.launch("image/*") }
+                com.vtgt.reviewphim.Tile("📁", "Thư mục", !vm.busy, Modifier.weight(1f)) { pickTree.launch(null) }
             }
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { pickFile.launch(arrayOf("*/*")) }, enabled = !vm.busy, modifier = Modifier.weight(1f)) {
-                    Text("📦 CBZ/PDF/EPUB/TXT")
-                }
-                OutlinedButton(onClick = { paste = true }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("📋 Dán chữ") }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { linkBox = true }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("🔗 Lấy từ link") }
-                OutlinedButton(onClick = { browser = "" }, enabled = !vm.busy, modifier = Modifier.weight(1f)) { Text("🌐 Trình duyệt") }
+                com.vtgt.reviewphim.Tile("📦", "CBZ·PDF·EPUB", !vm.busy, Modifier.weight(1f)) { pickFile.launch(arrayOf("*/*")) }
+                com.vtgt.reviewphim.Tile("📋", "Dán chữ", !vm.busy, Modifier.weight(1f)) { paste = true }
+                com.vtgt.reviewphim.Tile("🌐", "Trình duyệt", !vm.busy, Modifier.weight(1f)) { browser = "" }
             }
             Choice("Kiểu truyện tranh", vm.layout, listOf("auto" to "Tự nhận",
                 "page" to "Theo trang (manga, manhua, comic)",
