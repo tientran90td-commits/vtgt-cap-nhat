@@ -30,6 +30,7 @@ module.exports = {
 
   // ===== LUẬT CỜ =====
   boardSize: 8, // cờ vua 8 x 8 (cột a-h, hàng 1-8)
+  likeGuard: 'normal', // chống auto-click thả tim: off = tắt | loose = lỏng | normal = vừa | strict = chặt (xem src/likeguard.js)
   themeAuto: true, // mỗi ván đổi màu bàn cờ, màu phòng, tóc/áo 2 nhân vật (chống nhàm chán)
   showCellLabels: true, // ghi ký hiệu (a1, e4...) mờ mờ trong từng ô để người xem biết gõ gì
 

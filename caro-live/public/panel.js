@@ -342,7 +342,7 @@ function render(s) {
 
   const top = $('topList');
   top.innerHTML = s.top && s.top.length
-    ? s.top.map((u) => `<li><b>${esc(u.name)}</b> <span class="pt">${u.points} điểm${u.diamonds ? ' • ' + u.diamonds + '💎' : ''}</span></li>`).join('')
+    ? s.top.map((u) => `<li><b>${esc(u.name)}</b>${u.suspect ? ' <span title="Nghi auto-click thả tim">⚠</span>' : ''} <span class="pt">${u.points} điểm${u.diamonds ? ' • ' + u.diamonds + '💎' : ''}</span></li>`).join('')
     : '<li class="pt">Chưa ai tương tác.</li>';
 
   const label = { moved: 'đã đi', ignored: 'bỏ qua', seen: 'chưa tới lượt' };

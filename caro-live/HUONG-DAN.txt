@@ -173,3 +173,11 @@ LOI THOAI + NHAN VAT TIEN HIEP
 - Dieu phoi vien/trong tai goi nguoi choi la "dao huu", tu xung "tai ha". Sua cau o muc "Loi thoai" cua bang dieu khien.
 - Neu ban DA TUNG sua loi thoai (file data\thoai.json), cau cu cua ban van duoc giu: bam nut "Khoi phuc tat ca thoai goc" o muc Loi thoai de lay cau tien hiep moi.
 - Hai nhan vat mac dao bao / tien phuc (kim quan, tram ngoc, tay ao rong, lua phi doi).
+
+CHONG AUTO-CLICK THA TIM
+- Nguoi bam tay thi bam tung dot roi nghi, app auto-click thi bam deu deu khong nghi. Moi nguoi co "binh suc bam tim":
+  het suc thi luot tim chi duoc tinh 1 phan nho (khong ve 0). Nghi 1 chut la suc hoi lai.
+- Bang dieu khien > cai dat van > "Chong auto-click tha tim": Vua (khuyen dung) / Long / Chat / Tat.
+- Nguoi nghi auto-click hien dau canh bao trong bang xep hang cua bang dieu khien va co dong thong bao.
+- Chi anh huong diem tha tim. Qua tang, follow, chia se va viec "tha tim xac nhan len dai" khong bi anh huong.
+- Muon chinh so: sua file src\likeguard.js (muc PRESETS).

@@ -82,6 +82,7 @@ module.exports = {
   showSign: true,
   themeAuto: true, // mỗi ván đổi màu bàn cờ, màu phòng, tóc/áo 2 nhân vật
   boardSkin: 'auto', // kiểu bàn cờ: 'auto' = mỗi ván 1 kiểu | 'wood' = bàn gỗ | rong-vang, thanh-long, bach-ho, chu-tuoc, huyen-vu, cong-nghe, neon-tim, thien-ha
+  likeGuard: 'normal', // chống auto-click thả tim: off = tắt | loose = lỏng | normal = vừa | strict = chặt (xem src/likeguard.js)
   ledOn: true, // đèn LED chạy ở đường kẻ bàn cờ
   // Đến lượt mà người chơi chưa bình luận gì sau bấy nhiêu giây -> biển báo nhấp nháy để gây chú ý (0 = tắt).
   idleHintSeconds: fast ? 0 : 12,

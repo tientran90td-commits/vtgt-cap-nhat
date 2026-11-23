@@ -670,6 +670,7 @@ class Match {
       avatar: u.avatar,
       points: u.points,
       diamonds: u.diamonds,
+      suspect: !!u.suspect,
       mark: this.markOf(u.id),
     }));
     const preview = [];

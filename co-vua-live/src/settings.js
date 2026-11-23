@@ -56,6 +56,10 @@ class Settings {
         changed.push(k);
       }
     }
+    if (typeof patch.likeGuard === 'string' && ['off', 'loose', 'normal', 'strict'].includes(patch.likeGuard) && c.likeGuard !== patch.likeGuard) {
+      c.likeGuard = patch.likeGuard;
+      changed.push('likeGuard');
+    }
     for (const k of BOOLS) {
       if (patch[k] === undefined) continue;
       const v = !!patch[k];
@@ -123,6 +127,7 @@ class Settings {
     const out = { voice: { ...c.voice }, sfx: { ...(c.sfx || { on: true, volume: 0.7 }) }, music: { ...(c.music || { on: true, volume: 0.3 }) } };
     for (const k of Object.keys(NUMBERS)) out[k] = c[k];
     for (const k of BOOLS) out[k] = c[k];
+    out.likeGuard = c.likeGuard || 'normal';
     return out;
   }
 

@@ -175,3 +175,11 @@ CAP NHAT TRUC TIEP (khong can tai lai ban zip)
    - Giu nguyen: cai dat, thong ke (thu muc data), ID TikTok (ten-tiktok.txt). File bi thay se duoc sao luu o data/backup-ban-<so>/
      (neu ban tu sua config.js, ban cu nam trong thu muc sao luu do).
    - Dang LIVE thi nen cap nhat luc nghi giua ca vi game se tat/mo lai.
+
+CHONG AUTO-CLICK THA TIM
+- Nguoi bam tay thi bam tung dot roi nghi, app auto-click thi bam deu deu khong nghi. Moi nguoi co "binh suc bam tim":
+  het suc thi luot tim chi duoc tinh 1 phan nho (khong ve 0). Nghi 1 chut la suc hoi lai.
+- Bang dieu khien > cai dat van > "Chong auto-click tha tim": Vua (khuyen dung) / Long / Chat / Tat.
+- Nguoi nghi auto-click hien dau canh bao trong bang xep hang cua bang dieu khien va co dong thong bao.
+- Chi anh huong diem tha tim. Qua tang, follow, chia se va viec "tha tim xac nhan len dai" khong bi anh huong.
+- Muon chinh so: sua file src\likeguard.js (muc PRESETS).

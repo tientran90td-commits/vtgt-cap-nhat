@@ -121,6 +121,12 @@
         <div class="form" id="setForm">
           <label>Giây chờ chọn người chơi (ván đầu) <input type="number" data-k="lobbySeconds" min="5" max="300"></label>
           <label>Giây chờ chọn người chơi (các ván sau) <input type="number" data-k="nextLobbySeconds" min="3" max="300"></label>
+          <label>Chống auto-click thả tim <select data-k="likeGuard">
+            <option value="normal">Vừa (khuyên dùng)</option>
+            <option value="loose">Lỏng</option>
+            <option value="strict">Chặt</option>
+            <option value="off">Tắt</option>
+          </select></label>
           <label class="chk"><input type="checkbox" data-k="autoNextGame"> Hết ván tự sang ván kế tiếp (rút ngắn thời gian chờ)</label>
           <label>Giây tung đồng xu <input type="number" data-k="coinSeconds" min="4" max="20"></label>
           <label>Giây mỗi lượt đi <input type="number" data-k="turnSeconds" min="8" max="180"></label>
