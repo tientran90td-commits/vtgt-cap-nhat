@@ -17,7 +17,12 @@ export class Celebrate {
     this.v.preload = 'auto';
     this.v.playsInline = true;
     this.v.addEventListener('ended', () => this.stop());
+    // lỗi nguồn: chỉ dừng khi cả mp4 lẫn webm đều không phát được (lỗi của thẻ <source> cuối cùng)
     this.v.addEventListener('error', () => this.stop());
+    const srcs = this.v.querySelectorAll('source');
+    if (srcs.length) srcs[srcs.length - 1].addEventListener('error', () => this.stop());
+    this.v.addEventListener('timeupdate', () => this.tick()); // không phụ thuộc vòng vẽ khung hình (tab nền / OBS bị giảm tốc)
+    setInterval(() => this.tick(), 250);
     window.addEventListener('resize', () => this.layout());
   }
 
@@ -30,6 +35,7 @@ export class Celebrate {
     const v = this.v;
     this.running = true;
     this.shown = false;
+    this.startedAt = Date.now();
     try { v.currentTime = 0; } catch (e) {}
     v.muted = false;
     v.volume = 0.9;
@@ -63,6 +69,13 @@ export class Celebrate {
 
   /** Gọi mỗi khung hình. */
   tick() {
+    // video bị trình duyệt giữ lại (chưa phát được) sau 1,5 giây -> thử lại không tiếng
+    if (this.running && !this.shown && this.v.paused && Date.now() - (this.startedAt || 0) > 1500 && !this.v.ended) {
+      this.startedAt = Date.now();
+      this.v.muted = true;
+      const q = this.v.play();
+      if (q && q.catch) q.catch(() => {});
+    }
     if (this.running && (this.v.ended || (isFinite(this.v.duration) && this.v.currentTime >= this.v.duration - 0.04))) { this.stop(); return; } // hết video -> về như cũ
     if (!this.running || this.shown) return;
     if (this.v.currentTime >= SHOW_AT && !this.v.paused) {

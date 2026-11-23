@@ -183,8 +183,8 @@ CHONG AUTO-CLICK THA TIM
 - Muon chinh so: sua file src\likeguard.js (muc PRESETS).
 
 VIDEO AN MUNG KHI CO NGUOI THANG
-- Co nguoi thang van -> nhac cua video phat ngay, 4 giay sau hinh moi hien len thay cho 2 nhan vat o duoi. Het video thi tro ve nhu cu
-  (2 nhan vat quay lai) va game chay cac buoc tiep theo binh thuong. Man hinh ket qua duoc giu it nhat 13 giay de video chay het.
+- Co nguoi thang van -> nhac cua video phat ngay, 4 giay sau hinh moi hien len thay cho 2 nhan vat o duoi. Neu trinh duyet khong phat duoc mp4 thi tu dung ban webm (celebrate.webm). Het video thi tro ve nhu cu
+  (2 nhan vat quay lai) va game chay cac buoc tiep theo binh thuong. Man hinh ket qua duoc giu it nhat 22 giay de video chay het.
 - Bat/tat: Bang dieu khien > cai dat van > "Video an mung khi co nguoi thang".
 - Doi video khac: thay file public\media\celebrate.mp4 (nen dung mp4 ma H.264 + AAC, hinh vuong cho dep). Neu video dai hon, tang
   celebrateMinSeconds trong config.js.

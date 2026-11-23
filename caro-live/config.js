@@ -84,7 +84,7 @@ module.exports = {
   boardSkin: 'auto', // kiểu bàn cờ: 'auto' = mỗi ván 1 kiểu | 'wood' = bàn gỗ | rong-vang, thanh-long, bach-ho, chu-tuoc, huyen-vu, cong-nghe, neon-tim, thien-ha
   likeGuard: 'normal', // chống auto-click thả tim: off = tắt | loose = lỏng | normal = vừa | strict = chặt (xem src/likeguard.js)
   celebrateOn: true, // có người thắng -> phát video ăn mừng (public/media/celebrate.mp4): có tiếng ngay, 4 giây sau mới hiện hình thế chỗ 2 nhân vật
-  celebrateMinSeconds: Number(process.env.CARO_CELEB_MIN) || (fast ? 0 : 13), // màn hình kết quả giữ ít nhất bấy nhiêu giây để video chạy hết (video dài khoảng 10,4 giây)
+  celebrateMinSeconds: Number(process.env.CARO_CELEB_MIN) || (fast ? 0 : 22), // màn hình kết quả giữ ít nhất bấy nhiêu giây để video chạy hết (video ~10,4 giây + vài giây quân cuối còn đang đặt xuống)
   ledOn: true, // đèn LED chạy ở đường kẻ bàn cờ
   // Đến lượt mà người chơi chưa bình luận gì sau bấy nhiêu giây -> biển báo nhấp nháy để gây chú ý (0 = tắt).
   idleHintSeconds: fast ? 0 : 12,

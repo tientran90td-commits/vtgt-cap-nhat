@@ -25,6 +25,7 @@ const MIME = {
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
   '.mp4': 'video/mp4',
+  '.webm': 'video/webm',
 };
 
 const log = (...a) => console.log(new Date().toLocaleTimeString('vi-VN'), ...a);
@@ -118,7 +119,7 @@ const server = http.createServer((req, res) => {
     res.writeHead(403);
     return res.end('Forbidden');
   }
-  if (path.extname(file).toLowerCase() === '.mp4') {
+  if (/^\.(mp4|webm)$/i.test(path.extname(file))) {
     // video: phát theo từng đoạn (Range) để trình duyệt / OBS tua và phát mượt
     fs.stat(file, (err, st) => {
       if (err || !st.isFile()) {
