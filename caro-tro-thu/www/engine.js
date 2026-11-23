@@ -373,6 +373,118 @@
       return -1;
     }
 
+    // ---------- ĐÁNH NHÂY: nước trêu đối thủ mà VẪN CHẮC CHẮN THẮNG ----------
+    /**
+     * p tới lượt. Trả danh sách nước "nhây" đã được KIỂM CHỨNG: sau nước đó, dù đối thủ đáp thế nào
+     * p vẫn có chuỗi tạo-4 liên tiếp (VCF) hoặc thắng ngay. Không có nước nào đạt thì trả [] (nút Nhây tắt).
+     *  - kind 'chan' : đi chặn trước điểm mạnh của đối thủ rồi vẫn thắng sau (trêu nhất)
+     *  - kind 'ep'   : đi 1 nước tạo 4 thừa, ép đối thủ chặn rồi vẫn thắng
+     * Kiểm chứng bảo thủ: hết giờ / không chắc thì loại nước đó.
+     */
+    nhay(p, opts = {}) {
+      const ms = opts.ms || 1500;
+      const max = opts.max || 4;
+      const o = 3 - p;
+      const n = this.n;
+      this.deadline = Date.now() + ms;
+      this.aborted = false;
+      this.nodes = 0;
+      const out = [];
+      if (this.stones < 5) return out;
+      if (this.winningCells(o).length) return out; // đối thủ đang có 4: phải lo chặn, không nhây được
+      const hasWin = () => this.winningCells(p).length > 0;
+      // p có thắng chắc không? (thắng ngay hoặc VCF)
+      const myNow = hasWin();
+      if (!myNow) {
+        if (this.vcf(p, 14) === -1 || this.aborted) return out;
+      }
+      const sureWin = () => {
+        // kiểm chứng tại thế cờ hiện tại (tới lượt p): thắng ngay, hoặc có VCF
+        if (hasWin()) return true;
+        if (this.aborted) return false;
+        const v = this.vcf(p, 14);
+        return v !== -1 && !this.aborted;
+      };
+      const lastOpp = opts.lastOpp != null ? opts.lastOpp : -1;
+      const cands = [];
+      // --- loại 'ep': các nước tạo 4 (đối thủ buộc phải chặn đúng 1 ô)
+      const tried = new Set();
+      for (let w = 0; w < this.win.length; w++) {
+        if (this.cnt[p][w] !== 3 || this.cnt[o][w] !== 0) continue;
+        for (const c of this.win[w]) if (this.b[c] === 0 && !tried.has(c)) tried.add(c);
+      }
+      const fours = [];
+      for (const c of tried) {
+        this.place(c % n, (c / n) | 0, p);
+        const wc = this.winningCells(p);
+        const block = wc.length === 1 ? wc[0] : -1;
+        this.undo();
+        if (block >= 0) fours.push([c, block]);
+      }
+      fours.sort((a, b) => this.cellScore(b[0], p) - this.cellScore(a[0], p));
+      for (const [c, r] of fours) {
+        if (Date.now() > this.deadline) break;
+        this.place(c % n, (c / n) | 0, p);
+        this.place(r % n, (r / n) | 0, o);
+        let ok = false;
+        if (!this.isWinAt(r % n, (r / n) | 0, o)) {
+          if (this.winningCells(o).length) ok = hasWin(); // việc chặn tạo 4 cho họ: chỉ ổn nếu mình thắng ngay
+          else ok = sureWin();
+        }
+        this.undo();
+        this.undo();
+        if (ok && !this.aborted) cands.push({ c, kind: 'ep', reply: r });
+        this.aborted = false;
+        if (Date.now() > this.deadline) break;
+      }
+      // --- loại 'chan': nước yên lặng chặn điểm mạnh của đối thủ; thử MỌI cách đáp của đối thủ
+      const quiet = [];
+      for (let c = 0; c < n * n; c++) {
+        if (this.b[c] !== 0 || this.nb[c] === 0 || tried.has(c)) continue;
+        // giá trị của ô c với đối thủ (nếu họ đặt vào đó)
+        let gain = 0;
+        for (const w of this.cellWins[c]) {
+          const cp = this.cnt[p][w];
+          const co = this.cnt[o][w];
+          if (cp === 0) gain += W[co + 1] - W[co];
+        }
+        if (lastOpp >= 0) {
+          const dx = Math.abs((c % n) - (lastOpp % n));
+          const dy = Math.abs(((c / n) | 0) - ((lastOpp / n) | 0));
+          if (Math.max(dx, dy) === 1) gain += 40; // sát quân đối thủ vừa đánh: trêu hơn
+        }
+        if (gain > 0) quiet.push([c, gain]);
+      }
+      quiet.sort((a, b) => b[1] - a[1]);
+      const empties = [];
+      for (let c = 0; c < n * n; c++) if (this.b[c] === 0) empties.push(c);
+      const budgetEnd = this.deadline;
+      for (const [c] of quiet.slice(0, 8)) {
+        if (Date.now() > budgetEnd) break;
+        this.place(c % n, (c / n) | 0, p);
+        let ok = true;
+        for (const r of empties) {
+          if (r === c) continue;
+          if (Date.now() > budgetEnd) { ok = false; break; }
+          this.place(r % n, (r / n) | 0, o);
+          let good;
+          if (this.isWinAt(r % n, (r / n) | 0, o)) good = false;
+          else if (hasWin()) good = !this.winningCells(o).length || true; // mình thắng trước
+          else if (this.winningCells(o).length) good = false; // họ tạo 4: không chắc, loại cho an toàn
+          else good = sureWin();
+          this.undo();
+          if (!good || this.aborted) { ok = false; this.aborted = false; break; }
+        }
+        this.undo();
+        if (ok) cands.push({ c, kind: 'chan' });
+        if (cands.length >= max + 2) break;
+      }
+      cands.sort((a, b) => (a.kind === b.kind ? 0 : a.kind === 'chan' ? -1 : 1));
+      for (const k of cands.slice(0, max)) out.push({ x: k.c % n, y: (k.c / n) | 0, kind: k.kind, reply: k.reply != null ? { x: k.reply % n, y: (k.reply / n) | 0 } : null });
+      this.aborted = false;
+      return out;
+    }
+
     // ---------- alpha-beta ----------
     evalFor(p) {
       return this.score[p] - this.score[3 - p] * 1.05;

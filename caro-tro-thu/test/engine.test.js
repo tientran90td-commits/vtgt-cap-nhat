@@ -99,5 +99,48 @@ ok(results.random.every((r) => r === 'win'), 'thắng bot ngẫu nhiên');
   ok(e3.winningCells(1).length === 0 && m3.why.indexOf('ép thắng') >= 0, 'ép thắng bằng ba: ' + JSON.stringify(m3));
   ok(Date.now() - t0 < 2500, 'không quá giờ');
 }
+
+// 7) NÚT NHÂY: chỉ cho nước đã kiểm chứng vẫn chắc thắng; thế không thắng chắc thì trả rỗng
+{
+  ok(new Engine(15, false).nhay(1, { ms: 300 }).length === 0, 'bàn trống: không nhây');
+  const MV = [[7,9,1],[6,9,2],[5,6,1],[9,5,2],[6,8,1],[5,8,2],[5,7,1],[4,6,2],[4,7,1],[7,10,2],[6,7,1],[3,7,2],[8,10,1],[9,11,2],[8,7,1],[7,7,2],[8,9,1],[8,11,2],[9,12,1],[7,8,2],[8,6,1],[8,8,2],[6,5,1],[7,4,2]];
+  const base = fromMoves(15, false, MV);
+  const list = base.nhay(1, { ms: 1500 });
+  ok(list.length >= 2, 'thế có thắng chắc: có nước nhây (' + list.length + ')');
+  ok(list.some((k) => k.kind === 'chan') && list.some((k) => k.kind === 'ep'), 'có cả nhây chặn và nhây ép');
+  // nước nhây không được trùng ô có quân
+  ok(list.every((k) => base.b[k.y * 15 + k.x] === 0), 'nước nhây nằm ô trống');
+  // mô phỏng độc lập: sau mỗi nước nhây, đối thủ đáp nhiều kiểu, bộ não vẫn thắng
+  let allWin = true, sims = 0;
+  const rnd = (a) => Math.floor(Math.random() * a);
+  for (const k of list) {
+    const empt = []; for (let c = 0; c < 225; c++) if (base.b[c] === 0 && base.nb[c] > 0 && c !== k.y * 15 + k.x) empt.push(c);
+    const replies = []; if (k.reply) replies.push(k.reply.y * 15 + k.reply.x);
+    for (let i = 0; i < 5; i++) replies.push(empt[rnd(empt.length)]);
+    for (const rc of replies) {
+      const g = fromMoves(15, false, MV);
+      g.place(k.x, k.y, 1);
+      if (g.isWinAt(k.x, k.y, 1)) continue;
+      g.place(rc % 15, (rc / 15) | 0, 2);
+      if (g.isWinAt(rc % 15, (rc / 15) | 0, 2)) { allWin = false; continue; }
+      let won = false, cur = 1;
+      for (let st = 0; st < 14 && !won; st++) {
+        const m = g.bestMove(cur, { ms: cur === 1 ? 500 : 100, maxDepth: 6 });
+        g.place(m.x, m.y, cur);
+        if (g.isWinAt(m.x, m.y, cur)) { won = cur === 1; break; }
+        cur = 3 - cur;
+      }
+      sims++;
+      if (!won) allWin = false;
+    }
+  }
+  ok(allWin && sims >= 8, 'sau nhây vẫn thắng trong ' + sims + ' ván mô phỏng');
+  // đối thủ đang có 4 -> phải chặn, không nhây
+  const e4 = fromMoves(15, false, [[3,3,2],[4,3,2],[5,3,2],[6,3,2],[8,8,1],[9,8,1],[10,8,1],[8,9,1],[9,9,1],[1,1,1]]);
+  ok(e4.nhay(1, { ms: 300 }).length === 0, 'đối thủ có 4: không nhây');
+  // thế không có đường thắng chắc -> rỗng
+  const e5 = fromMoves(15, false, [[7,7,1],[8,8,2],[6,6,1],[9,9,2],[7,8,1],[8,7,2]]);
+  ok(e5.nhay(1, { ms: 300 }).length === 0, 'chưa có đường thắng chắc: không nhây');
+}
 console.log(`engine tests: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

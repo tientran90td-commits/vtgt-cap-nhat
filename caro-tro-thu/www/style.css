@@ -8,12 +8,14 @@ h1 { font-size:18px; margin:0; }
 button { font:inherit; color:var(--txt); background:#2a3558; border:0; border-radius:10px; padding:9px 12px; font-weight:700; }
 button:active { transform: scale(.97); }
 button.primary { background:#1f8f4e; }
+button.nhay { background:#7b3fc4; }
 button.warn { background:#a23b3b; }
 button:disabled { opacity:.4; }
 #status { background:var(--panel); border-radius:12px; padding:10px 12px; min-height:62px; display:flex; flex-direction:column; justify-content:center; gap:2px; }
 #status .big { font-size:22px; font-weight:900; }
 #status .big.me { color:var(--green); }
 #status .big.opp { color:var(--red); }
+#status .big.nhay { color:#c58bff; }
 #status .sub { font-size:13px; color:var(--mut); }
 #boardWrap { flex:1; min-height:0; overflow:auto; border-radius:10px; background:#0b1020; display:flex; align-items:flex-start; justify-content:center; touch-action: pan-x pan-y; }
 canvas { display:block; }

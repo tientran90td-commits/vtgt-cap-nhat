@@ -8,8 +8,7 @@ App Android (APK) hỗ trợ chơi cờ caro: bạn nhập nước đi của **�
 - Chạy hoàn toàn offline, không cần mạng, không cần quyền gì.
 
 ## Tải APK
-Vào mục **Releases** của kho này, mở bản `caro-tro-thu-apk`, tải `CaroTroThu.apk`, cài trên điện thoại Android.
-Link trực tiếp: https://github.com/tientran90td-commits/vtgt-cap-nhat/releases/download/caro-tro-thu-apk/CaroTroThu.apk
+Vào mục **Releases** của kho này, tải `CaroTroThu.apk` (bản mới nhất), cài trên điện thoại Android.
 APK được GitHub tự dựng mỗi khi có thay đổi (xem tab **Actions**).
 
 ## Cấu trúc
@@ -21,7 +20,7 @@ APK được GitHub tự dựng mỗi khi có thay đổi (xem tab **Actions**).
 
 Bộ não: chấm điểm theo các cửa sổ 5 ô, alpha-beta tăng dần độ sâu theo thời gian, tìm chuỗi "liên tiếp tạo 4" (VCF) để thấy sớm đường thắng ép buộc và chặn đường thắng ép buộc của đối thủ. Không có chương trình nào thắng chắc 100%, nhưng bản này mạnh hơn người chơi thông thường.
 
-## Engine Rapfi
-Khi luật là "5 quân liền là thắng", app dùng Rapfi (mã nguồn mở, GPL-3) nếu bản dựng có đính kèm; chân dưới bàn cờ ghi "bộ não: Rapfi".
-Nếu Rapfi không tải được hoặc quá giờ, app tự chuyển sang bộ não nội bộ. Luật "chặn 2 đầu không thắng" luôn dùng bộ não nội bộ.
-Xem `THIRD_PARTY.md`.
+## Nút Nhây
+Khi máy tìm được thế thắng chắc (chuỗi tạo 4 liên tiếp), nút "😜 Nhây" sáng lên. Bấm để đổi gợi ý sang một nước trêu đối thủ
+(chặn trước điểm mạnh của họ, hoặc ép họ chặn một nước thừa). Mỗi nước nhây đều được máy kiểm chứng: dù đối thủ đáp thế nào
+bạn vẫn thắng. Không có nước nào chắc thắng thì nút tắt. Bấm tiếp để xem nước nhây khác, hết danh sách thì quay về gợi ý gốc.

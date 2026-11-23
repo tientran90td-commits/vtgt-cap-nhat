@@ -16,6 +16,10 @@
   let worker = null;
   let reqId = 0;
   let pulse = 0;
+  // ---- NHÂY: nước trêu đối thủ nhưng máy đã kiểm tra vẫn chắc thắng ----
+  let nhay = { list: [], idx: -1, orig: null, busy: false };
+  let nhayWorker = null;
+  let nhayReq = 0;
 
   const colName = (x) => String.fromCharCode(65 + x);
   const cellName = (x, y) => colName(x) + (y + 1);
@@ -85,6 +89,64 @@
     }
   }
 
+  // ---------- Nhây (chạy riêng 1 luồng để không làm đơ gợi ý chính) ----------
+  function runNhay(payload, cb) {
+    if (nhayWorker === null) {
+      try {
+        const src = document.getElementById('engine').textContent +
+          '\nself.onmessage=function(e){var d=e.data;var g=CaroEngine.fromMoves(d.size,d.strict,d.moves);var l=g.nhay(d.p,{ms:d.ms,lastOpp:d.lastOpp,max:4});self.postMessage({id:d.id,list:l});};';
+        nhayWorker = new Worker(URL.createObjectURL(new Blob([src], { type: 'text/javascript' })));
+      } catch (e) { nhayWorker = false; }
+    }
+    if (nhayWorker) {
+      nhayWorker.onmessage = (e) => { if (e.data.id === payload.id) cb(e.data.list || []); };
+      nhayWorker.onerror = () => { nhayWorker = false; cb([]); };
+      nhayWorker.postMessage(payload);
+    } else {
+      setTimeout(() => {
+        try { cb(CaroEngine.fromMoves(payload.size, payload.strict, payload.moves).nhay(payload.p, { ms: payload.ms, lastOpp: payload.lastOpp, max: 4 })); } catch (e) { cb([]); }
+      }, 30);
+    }
+  }
+  function resetNhay() { nhay = { list: [], idx: -1, orig: null, busy: false }; nhayReq++; }
+  // tính các nước nhây cho thế cờ TRƯỚC nước gợi ý hiện tại của bạn
+  function computeNhay() {
+    resetNhay();
+    const last = S.moves[S.moves.length - 1];
+    if (!last || last.p !== ME || S.over) { render(); return; }
+    const before = S.moves.slice(0, -1);
+    let lastOpp = -1;
+    for (let i = before.length - 1; i >= 0; i--) if (before[i].p === OPP) { lastOpp = before[i].y * S.size + before[i].x; break; }
+    const id = nhayReq;
+    nhay.busy = true;
+    runNhay({ id, size: S.size, strict: S.strict, moves: before.map((m) => [m.x, m.y, m.p]), p: ME, ms: 1400, lastOpp }, (list) => {
+      if (id !== nhayReq) return;
+      nhay.busy = false;
+      const cur = S.moves[S.moves.length - 1];
+      nhay.list = cur ? list.filter((k) => !(k.x === cur.x && k.y === cur.y)) : list; // bỏ nước trùng gợi ý gốc
+      render();
+    });
+    render();
+  }
+  function nhayNote(k) {
+    if (k.kind === 'chan') return 'Chặn trước điểm mạnh của đối thủ, trêu họ một nước. Máy đã kiểm tra: dù họ đáp thế nào bạn vẫn thắng.';
+    return 'Ép đối thủ phải chặn ô ' + (k.reply ? cellName(k.reply.x, k.reply.y) : '?') + ' rồi vẫn thắng tiếp. Máy đã kiểm tra: chắc thắng.';
+  }
+  function nhayPress() {
+    const last = S.moves[S.moves.length - 1];
+    if (thinking || S.over || mode !== 'opp' || tent || !last || last.p !== ME || !nhay.list.length) return;
+    if (nhay.idx === -1) nhay.orig = { x: last.x, y: last.y, why: last.why, depth: last.depth };
+    nhay.idx++;
+    if (nhay.idx >= nhay.list.length) { // hết nước nhây -> về lại gợi ý gốc
+      Object.assign(last, nhay.orig); delete last.nhay; delete last.note;
+      nhay.idx = -1;
+    } else {
+      const k = nhay.list[nhay.idx];
+      last.x = k.x; last.y = k.y; last.why = 'nhây'; last.depth = 0; last.nhay = k.kind; last.note = nhayNote(k);
+    }
+    save(); render();
+  }
+
   // ---------- luật thắng ----------
   function checkOver() {
     const m = S.moves[S.moves.length - 1];
@@ -102,6 +164,7 @@
   }
 
   function computeMine() {
+    resetNhay();
     thinking = true; render();
     think((r) => {
       thinking = false;
@@ -111,11 +174,13 @@
       checkOver();
       if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) {} }
       save(); render();
+      computeNhay();
     });
   }
 
   function confirmOpp() {
     if (!tent || thinking || S.over || mode !== 'opp') return;
+    resetNhay();
     S.moves.push({ x: tent.x, y: tent.y, p: OPP });
     tent = null;
     checkOver();
@@ -144,6 +209,7 @@
     if (!last || last.p !== ME) return;
     altIdx = (altIdx + 1) % lastAlts.length;
     const a = lastAlts[altIdx];
+    nhay.idx = -1; delete last.nhay; delete last.note;
     last.x = a.x; last.y = a.y; last.why = 'gợi ý khác';
     checkOver(); save(); render();
   }
@@ -152,13 +218,13 @@
     if (thinking) return;
     const last = S.moves[S.moves.length - 1];
     if (last && last.p === ME) S.moves.pop();
-    S.over = null; mode = 'mine'; tent = null; lastAlts = [];
+    S.over = null; mode = 'mine'; tent = null; lastAlts = []; resetNhay();
     save(); render();
   }
 
   function undo() {
     if (thinking) return;
-    mode = 'opp'; tent = null; lastAlts = []; S.over = null;
+    mode = 'opp'; tent = null; lastAlts = []; S.over = null; resetNhay();
     // gỡ về trước nước đối thủ gần nhất
     while (S.moves.length) {
       const m = S.moves.pop();
@@ -232,8 +298,9 @@
     if (last && last.p === ME && !S.over) {
       const X = cx(last.x), Y = cy(last.y);
       const k = 0.5 + 0.5 * Math.sin(pulse * 5);
-      ctx.fillStyle = 'rgba(61,220,132,' + (0.18 + 0.18 * k) + ')'; ctx.fillRect(X - cell / 2, Y - cell / 2, cell, cell);
-      ctx.strokeStyle = '#3ddc84'; ctx.lineWidth = Math.max(2, cell * 0.1);
+      const rgb = last.nhay ? '179,107,255' : '61,220,132';
+      ctx.fillStyle = 'rgba(' + rgb + ',' + (0.18 + 0.18 * k) + ')'; ctx.fillRect(X - cell / 2, Y - cell / 2, cell, cell);
+      ctx.strokeStyle = last.nhay ? '#b36bff' : '#3ddc84'; ctx.lineWidth = Math.max(2, cell * 0.1);
       ctx.beginPath(); ctx.arc(X, Y, cell * (0.55 + 0.12 * k), 0, Math.PI * 2); ctx.stroke();
     }
     // ô đối thủ đang chọn (chưa xác nhận)
@@ -274,9 +341,9 @@
     } else if (thinking) { big = '⏳ Đang tính nước đi…'; sub = 'Chờ một chút.'; }
     else if (mode === 'mine') { big = 'Chạm ô bạn đã đánh'; sub = 'Chạm vào ô trống bạn thực sự đi (thay cho gợi ý).'; cls = 'me'; }
     else if (last && last.p === ME && !tent) {
-      big = '👉 Bạn đánh ô ' + cellName(last.x, last.y); cls = 'me';
+      big = (last.nhay ? '😜 Nhây: bạn đánh ô ' : '👉 Bạn đánh ô ') + cellName(last.x, last.y); cls = last.nhay ? 'nhay' : 'me';
       const why = last.why ? ' (' + last.why + (last.depth ? ', sâu ' + last.depth : '') + ')' : '';
-      sub = 'Đánh xong, chạm vào ô đối thủ vừa đi để nhập nước tiếp theo' + why + '.';
+      sub = last.nhay ? last.note + ' Đánh xong, chạm vào ô đối thủ vừa đi để nhập nước tiếp theo.' : 'Đánh xong, chạm vào ô đối thủ vừa đi để nhập nước tiếp theo' + why + '.';
     } else if (tent) { big = 'Đối thủ đánh ' + cellName(tent.x, tent.y) + '?'; cls = 'opp'; sub = 'Bấm "Xác nhận" hoặc chạm lại đúng ô đó.'; }
     else if (!S.moves.length) { big = S.first === 'me' ? 'Đang chuẩn bị…' : 'Đối thủ đi trước'; sub = 'Chạm vào ô đối thủ vừa đánh.'; }
     else { big = 'Chạm ô đối thủ vừa đánh'; cls = 'opp'; sub = 'Nước đối thủ ở ngoài game, nhập vào đây.'; }
@@ -284,6 +351,10 @@
     st.firstChild.textContent = big; st.lastChild.textContent = sub;
     $('bConfirm').disabled = !(tent && mode === 'opp' && !thinking && !S.over);
     $('bAlt').disabled = !(last && last.p === ME && lastAlts.length > 1 && !thinking && !S.over);
+    const canNhay = !!(last && last.p === ME && !thinking && !S.over && mode === 'opp' && !tent && nhay.list.length);
+    const bn = $('bNhay');
+    bn.disabled = !canNhay;
+    bn.textContent = nhay.busy ? '😜 Nhây…' : canNhay ? '😜 Nhây' + (nhay.idx >= 0 ? ' (' + (nhay.idx + 1) + '/' + nhay.list.length + ')' : ' (' + nhay.list.length + ')') : '😜 Nhây';
     $('bMine').disabled = thinking || !S.moves.length || !!S.over;
     $('bUndo').disabled = thinking || !S.moves.length;
     $('bZoom').textContent = zoom ? '🔍 Thu nhỏ' : '🔍 Phóng to';
@@ -313,6 +384,7 @@
   $('bNew').onclick = openSetup;
   $('bConfirm').onclick = confirmOpp;
   $('bAlt').onclick = altMove;
+  $('bNhay').onclick = nhayPress;
   $('bMine').onclick = mineElsewhere;
   $('bUndo').onclick = undo;
   $('bZoom').onclick = () => { zoom = !zoom; L = null; render(); };
@@ -329,6 +401,7 @@
     $('setup').classList.add('hidden'); $('bResume').style.display = '';
     checkOver(); render();
     if (S.first === 'me' && !S.moves.length) computeMine();
+    else if (S.moves.length && S.moves[S.moves.length - 1].p === ME && !S.over) computeNhay();
   } else {
     $('bResume').style.display = 'none';
     S = newState({ first: 'opp', size: 15, strict: false, level: 'mid' });
