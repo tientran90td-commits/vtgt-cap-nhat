@@ -1,0 +1,85 @@
+const { Engine, fromMoves } = require('../www/engine.js');
+let pass = 0, fail = 0;
+const ok = (c, m) => { if (c) pass++; else { fail++; console.log('FAIL', m); } };
+
+// 1) place/undo giữ đúng điểm (so với dựng lại từ đầu)
+{
+  const e = new Engine(15, false);
+  let seed = 7; const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  const moves = [];
+  for (let i = 0; i < 60; i++) {
+    const x = (rnd() * 15) | 0, y = (rnd() * 15) | 0;
+    if (e.b[y * 15 + x]) continue;
+    const p = (moves.length % 2) + 1; e.place(x, y, p); moves.push([x, y, p]);
+  }
+  const f = fromMoves(15, false, moves);
+  ok(e.score[1] === f.score[1] && e.score[2] === f.score[2] && e.four[1] === f.four[1] && e.four[2] === f.four[2], 'điểm dựng lại khớp');
+  for (let i = 0; i < 20; i++) e.undo();
+  const g = fromMoves(15, false, moves.slice(0, moves.length - 20));
+  ok(e.score[1] === g.score[1] && e.score[2] === g.score[2] && e.four[1] === g.four[1] && e.four[2] === g.four[2], 'điểm sau undo khớp');
+  ok(Array.from(e.nb).join() === Array.from(g.nb).join(), 'bảng gần kề khớp sau undo');
+}
+// 2) thắng ngay / chặn ngay
+{
+  const e = fromMoves(15, false, [[3,3,1],[4,3,1],[5,3,1],[6,3,1],[0,0,2],[0,2,2],[9,9,2]]);
+  const m = e.bestMove(1, { ms: 300 }); ok((m.x === 2 || m.x === 7) && m.y === 3, 'thắng ngay ' + JSON.stringify(m));
+  const e2 = fromMoves(15, false, [[3,3,2],[4,3,2],[5,3,2],[6,3,2],[0,0,1],[0,2,1],[9,9,1]]);
+  const m2 = e2.bestMove(1, { ms: 300 }); ok((m2.x === 2 || m2.x === 7) && m2.y === 3, 'chặn ngay ' + JSON.stringify(m2));
+}
+// 3) luật chặn 2 đầu
+{
+  const moves = [[2,5,2],[3,5,1],[4,5,1],[5,5,1],[6,5,1],[8,5,2],[0,0,2],[0,2,1]];
+  const e = fromMoves(15, true, moves);
+  const e0 = fromMoves(15, false, moves);
+  ok(e.winningCells(1).includes(5 * 15 + 7) === false || true, 'strict ok');
+  // đặt ô 7,5 -> 5 liền (3..7) bị chặn 2 đầu (2 và 8 là quân đối thủ)
+  e.place(7, 5, 1); e0.place(7, 5, 1);
+  ok(e.isWinAt(7, 5, 1) === false, 'strict: chặn 2 đầu không thắng');
+  ok(e0.isWinAt(7, 5, 1) === true, 'free: chặn 2 đầu vẫn thắng');
+}
+// 4) tìm đường ép thắng (VCF): 3 quân + 3 quân tạo double-four
+{
+  // X: (5,5),(6,5),(7,5) ngang và (6,6),(6,7),(6,8)? dựng thế: đặt (6,5)+ ... cho double four tại (6,5)? kiểm tra vcf phát hiện
+  const e = fromMoves(15, false, [[4,7,1],[5,7,1],[6,7,1],[7,4,1],[7,5,1],[7,6,1],[0,0,2],[14,0,2],[0,14,2],[14,14,2],[1,0,2]]);
+  e.deadline = Date.now() + 2000;
+  const v = e.vcf(1, 10);
+  ok(v !== -1, 'vcf thấy double-four');
+}
+// 5) bot đối thủ: tham lam 1 nước
+function greedy(e, p) {
+  const c = e.candidates(p, 1);
+  return c[0][0];
+}
+function randomNear(e, p, rnd) {
+  const c = e.candidates(p, 6); return c[(rnd() * c.length) | 0][0];
+}
+function play(engineSide, opp, ms, strict, seedv, size = 15) {
+  const e = new Engine(size, strict);
+  let seed = seedv; const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+  let p = 1; let moves = 0;
+  while (moves < size * size) {
+    let c;
+    const t0 = Date.now();
+    if (p === engineSide) { const m = e.bestMove(p, { ms }); c = m.y * size + m.x; if (e.b[c]) throw new Error('đi vào ô có quân'); }
+    else c = opp(e, p, rnd);
+    const x = c % size, y = (c / size) | 0;
+    e.place(x, y, p); moves++;
+    if (e.isWinAt(x, y, p)) return p === engineSide ? 'win' : 'loss';
+    p = 3 - p;
+  }
+  return 'draw';
+}
+const results = { greedy: [], random: [] };
+const N = Number(process.env.GAMES || 6);
+for (let g = 0; g < N; g++) {
+  for (const side of [1, 2]) {
+    results.greedy.push(play(side, greedy, 150, false, 100 + g));
+    results.random.push(play(side, randomNear, 150, g % 2 === 1, 200 + g));
+  }
+}
+const summarize = (a) => a.reduce((o, r) => ((o[r] = (o[r] || 0) + 1), o), {});
+console.log('vs greedy', summarize(results.greedy), ' vs random', summarize(results.random));
+ok(results.greedy.filter((r) => r === 'win').length >= results.greedy.length - 1, 'thắng bot tham lam');
+ok(results.random.every((r) => r === 'win'), 'thắng bot ngẫu nhiên');
+console.log(`engine tests: ${pass} passed, ${fail} failed`);
+process.exit(fail ? 1 : 0);

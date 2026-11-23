@@ -1,0 +1,49 @@
+name: Build APK Caro Tro Thu
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'caro-tro-thu/**'
+      - '.github/workflows/caro-tro-thu-apk.yml'
+  workflow_dispatch:
+
+defaults:
+  run:
+    working-directory: caro-tro-thu
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Chấp nhận giấy phép Android SDK
+        run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+
+      - name: Dựng APK
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Đổi tên file
+        run: cp app/build/outputs/apk/debug/app-debug.apk CaroTroThu.apk
+
+      - name: Đăng lên Releases (link tải cố định)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: caro-tro-thu-apk
+          name: Caro Trợ Thủ - APK mới nhất
+          body: Tải file CaroTroThu.apk bên dưới, mở trên điện thoại Android và cài đặt (cho phép cài từ nguồn không rõ nếu máy hỏi).
+          files: caro-tro-thu/CaroTroThu.apk
+          make_latest: false

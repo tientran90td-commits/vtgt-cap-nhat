@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#10162a">
+<title>Caro Trợ Thủ</title>
+<style>:root { --bg:#10162a; --panel:#1a2340; --txt:#eef2ff; --mut:#9fb0d6; --red:#ff4d4f; --blue:#2f9bff; --green:#3ddc84; --gold:#ffd54a; }
+* { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+html, body { margin:0; height:100%; background:var(--bg); color:var(--txt); font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif; overscroll-behavior: none; }
+#app { display:flex; flex-direction:column; height:100%; max-width:680px; margin:0 auto; padding:8px 8px calc(8px + env(safe-area-inset-bottom)); gap:8px; }
+header { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+h1 { font-size:18px; margin:0; }
+.hbtns { display:flex; gap:6px; }
+button { font:inherit; color:var(--txt); background:#2a3558; border:0; border-radius:10px; padding:9px 12px; font-weight:700; }
+button:active { transform: scale(.97); }
+button.primary { background:#1f8f4e; }
+button.warn { background:#a23b3b; }
+button:disabled { opacity:.4; }
+#status { background:var(--panel); border-radius:12px; padding:10px 12px; min-height:62px; display:flex; flex-direction:column; justify-content:center; gap:2px; }
+#status .big { font-size:22px; font-weight:900; }
+#status .big.me { color:var(--green); }
+#status .big.opp { color:var(--red); }
+#status .sub { font-size:13px; color:var(--mut); }
+#boardWrap { flex:1; min-height:0; overflow:auto; border-radius:10px; background:#0b1020; display:flex; align-items:flex-start; justify-content:center; touch-action: pan-x pan-y; }
+canvas { display:block; }
+#actions { display:flex; gap:6px; flex-wrap:wrap; }
+#actions button { flex:1; min-width:0; }
+#legend { font-size:12px; color:var(--mut); text-align:center; }
+#setup { position:fixed; inset:0; background:rgba(5,8,18,.92); display:flex; align-items:center; justify-content:center; padding:14px; z-index:10; overflow:auto; }
+#setup.hidden { display:none; }
+.card { background:var(--panel); border-radius:16px; padding:16px; width:100%; max-width:420px; display:flex; flex-direction:column; gap:12px; }
+.card h2 { margin:0; font-size:20px; }
+.card label { font-size:13px; color:var(--mut); display:flex; flex-direction:column; gap:4px; }
+select { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a3558; color:var(--txt); }
+.row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.row2 button { padding:16px 8px; font-size:16px; }
+.note { font-size:12px; color:var(--mut); line-height:1.4; }
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>♟ Caro Trợ Thủ</h1>
+    <div class="hbtns"><button id="bUndo">↩ Lùi</button><button id="bNew">🔄 Ván mới</button></div>
+  </header>
+  <div id="status"></div>
+  <div id="boardWrap"><canvas id="board"></canvas></div>
+  <div id="actions">
+    <button id="bConfirm" class="primary">✔ Xác nhận</button>
+    <button id="bAlt">Gợi ý khác</button>
+    <button id="bMine">Tôi đi ô khác</button>
+    <button id="bZoom">🔍 Phóng to</button>
+  </div>
+  <div id="legend"></div>
+</div>
+
+<div id="setup">
+  <div class="card">
+    <h2>♟ Caro Trợ Thủ</h2>
+    <div class="note">Chạm vào bàn cờ để nhập nước đi của ĐỐI THỦ (ở ngoài). App tự tính và tô sáng ô BẠN nên đánh.</div>
+    <div class="row2">
+      <label>Cỡ bàn<select id="selSize"><option value="15" selected>15 x 15</option><option value="19">19 x 19</option><option value="20">20 x 20</option><option value="12">12 x 12</option><option value="10">10 x 10</option></select></label>
+      <label>Mức nghĩ<select id="selLevel"><option value="fast">Nhanh (0,7 giây)</option><option value="mid" selected>Vừa (2 giây)</option><option value="deep">Sâu (6 giây)</option></select></label>
+    </div>
+    <label>Luật thắng<select id="selRule"><option value="free" selected>5 quân liền là thắng (kể cả bị chặn 2 đầu)</option><option value="strict">5 quân liền nhưng bị chặn cả 2 đầu thì KHÔNG thắng</option></select></label>
+    <div class="note">Ai đi trước?</div>
+    <div class="row2"><button id="goMe" class="primary">Tôi đi trước</button><button id="goOpp" class="warn">Đối thủ đi trước</button></div>
+    <button id="bResume">Quay lại ván đang chơi</button>
+  </div>
+</div>
+<script id="engine">/*
+ * BỘ NÃO CARO (gomoku) - chạy được cả trong trình duyệt/WebView và Node.
+ * Người chơi 1 và 2. Luật: đủ 5 quân liền là thắng; chế độ strict = "chặn 2 đầu thì không tính thắng".
+ * Cách làm: chấm điểm theo các cửa sổ 5 ô (cập nhật từng bước), alpha-beta tăng dần độ sâu theo thời gian,
+ * thêm tìm chuỗi "liên tiếp tạo 4" (VCF) để thấy sớm đường thắng ép buộc, và chặn đường thắng ép buộc của đối thủ.
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory();
+  else root.CaroEngine = factory();
+})(typeof self !== 'undefined' ? self : this, function () {
+  const DIRS = [
+    [1, 0],
+    [0, 1],
+    [1, 1],
+    [1, -1],
+  ];
+  const W = [0, 1, 12, 140, 1600, 200000]; // điểm theo số quân trong cửa sổ 5 ô (chỉ 1 phe)
+  const WIN = 1e7;
+
+  class Engine {
+    /** size: cạnh bàn cờ; strict: true = 5 quân bị chặn cả 2 đầu thì không thắng. */
+    constructor(size = 15, strict = false) {
+      this.n = size;
+      this.strict = !!strict;
+      const n = size;
+      this.b = new Int8Array(n * n); // 0 trống, 1, 2
+      this.nb = new Int16Array(n * n); // số quân nằm trong vòng 2 ô quanh mỗi ô
+      this.win = []; // các cửa sổ: mảng 5 chỉ số ô
+      this.cellWins = Array.from({ length: n * n }, () => []);
+      for (const [dx, dy] of DIRS) {
+        for (let y = 0; y < n; y++) {
+          for (let x = 0; x < n; x++) {
+            const ex = x + 4 * dx;
+            const ey = y + 4 * dy;
+            if (ex < 0 || ex >= n || ey < 0 || ey >= n) continue;
+            const id = this.win.length;
+            const cells = [];
+            for (let k = 0; k < 5; k++) {
+              const c = (y + k * dy) * n + (x + k * dx);
+              cells.push(c);
+              this.cellWins[c].push(id);
+            }
+            this.win.push(cells);
+          }
+        }
+      }
+      this.cnt = [null, new Int8Array(this.win.length), new Int8Array(this.win.length)];
+      this.score = [0, 0, 0];
+      this.four = [0, 0, 0]; // số cửa sổ có 4 quân 1 phe + 1 ô trống
+      this.stones = 0;
+      this.stack = [];
+      this.nodes = 0;
+      this.deadline = 0;
+      this.aborted = false;
+    }
+
+    // ---------- đặt / gỡ quân ----------
+    place(x, y, p) {
+      const n = this.n;
+      const c = y * n + x;
+      this.b[c] = p;
+      const o = 3 - p;
+      for (const w of this.cellWins[c]) {
+        const cp = this.cnt[p][w];
+        const co = this.cnt[o][w];
+        // phe p
+        if (co === 0) {
+          this.score[p] += W[cp + 1] - W[cp];
+          if (cp === 4) this.four[p]--;
+          if (cp + 1 === 4) this.four[p]++;
+        }
+        // phe o bị chặn cửa sổ này
+        if (cp === 0 && co > 0) {
+          this.score[o] -= W[co];
+          if (co === 4) this.four[o]--;
+        }
+        this.cnt[p][w] = cp + 1;
+      }
+      this.bump(x, y, 1);
+      this.stones++;
+      this.stack.push(c);
+    }
+
+    undo() {
+      const n = this.n;
+      const c = this.stack.pop();
+      const p = this.b[c];
+      const o = 3 - p;
+      this.b[c] = 0;
+      for (const w of this.cellWins[c]) {
+        const cp = this.cnt[p][w] - 1;
+        const co = this.cnt[o][w];
+        this.cnt[p][w] = cp;
+        if (co === 0) {
+          this.score[p] -= W[cp + 1] - W[cp];
+          if (cp + 1 === 4) this.four[p]--;
+          if (cp === 4) this.four[p]++;
+        }
+        if (cp === 0 && co > 0) {
+          this.score[o] += W[co];
+          if (co === 4) this.four[o]++;
+        }
+      }
+      this.bump(c % n, (c / n) | 0, -1);
+      this.stones--;
+    }
+
+    bump(x, y, d) {
+      const n = this.n;
+      for (let yy = Math.max(0, y - 2); yy <= Math.min(n - 1, y + 2); yy++) {
+        for (let xx = Math.max(0, x - 2); xx <= Math.min(n - 1, x + 2); xx++) this.nb[yy * n + xx] += d;
+      }
+    }
+
+    // ---------- thắng / thua ----------
+    /** quân p vừa đặt ở (x,y) có tạo thành 5 liền (đúng luật) không */
+    isWinAt(x, y, p) {
+      const n = this.n;
+      for (const [dx, dy] of DIRS) {
+        let len = 1;
+        let ax = x + dx;
+        let ay = y + dy;
+        while (ax >= 0 && ax < n && ay >= 0 && ay < n && this.b[ay * n + ax] === p) {
+          len++;
+          ax += dx;
+          ay += dy;
+        }
+        const endA = ax < 0 || ax >= n || ay < 0 || ay >= n || this.b[ay * n + ax] !== 0; // bị chặn?
+        let bx = x - dx;
+        let by = y - dy;
+        while (bx >= 0 && bx < n && by >= 0 && by < n && this.b[by * n + bx] === p) {
+          len++;
+          bx -= dx;
+          by -= dy;
+        }
+        const endB = bx < 0 || bx >= n || by < 0 || by >= n || this.b[by * n + bx] !== 0;
+        if (len >= 5 && (!this.strict || !(endA && endB))) return true;
+      }
+      return false;
+    }
+
+    /** đường 5 quân thắng (để tô sáng), hoặc null */
+    winLineAt(x, y, p) {
+      const n = this.n;
+      for (const [dx, dy] of DIRS) {
+        const cells = [[x, y]];
+        let ax = x + dx;
+        let ay = y + dy;
+        while (ax >= 0 && ax < n && ay >= 0 && ay < n && this.b[ay * n + ax] === p) {
+          cells.push([ax, ay]);
+          ax += dx;
+          ay += dy;
+        }
+        const endA = ax < 0 || ax >= n || ay < 0 || ay >= n || this.b[ay * n + ax] !== 0;
+        let bx = x - dx;
+        let by = y - dy;
+        while (bx >= 0 && bx < n && by >= 0 && by < n && this.b[by * n + bx] === p) {
+          cells.unshift([bx, by]);
+          bx -= dx;
+          by -= dy;
+        }
+        const endB = bx < 0 || bx >= n || by < 0 || by >= n || this.b[by * n + bx] !== 0;
+        if (cells.length >= 5 && (!this.strict || !(endA && endB))) return cells;
+      }
+      return null;
+    }
+
+    /** các ô mà p đặt vào là thắng ngay */
+    winningCells(p) {
+      const out = [];
+      if (this.four[p] === 0) return out;
+      const n = this.n;
+      const seen = new Set();
+      for (let w = 0; w < this.win.length; w++) {
+        if (this.cnt[p][w] !== 4 || this.cnt[3 - p][w] !== 0) continue;
+        for (const c of this.win[w]) {
+          if (this.b[c] !== 0 || seen.has(c)) continue;
+          seen.add(c);
+          const x = c % n;
+          const y = (c / n) | 0;
+          this.b[c] = p; // thử đặt (chỉ để kiểm tra luật chặn 2 đầu)
+          const ok = this.isWinAt(x, y, p);
+          this.b[c] = 0;
+          if (ok) out.push(c);
+        }
+      }
+      return out;
+    }
+
+    // ---------- chọn ứng viên ----------
+    /** điểm sắp xếp: tấn công + phòng thủ khi p đặt vào ô c */
+    cellScore(c, p) {
+      const o = 3 - p;
+      let a = 0;
+      let d = 0;
+      for (const w of this.cellWins[c]) {
+        const cp = this.cnt[p][w];
+        const co = this.cnt[o][w];
+        if (co === 0) a += W[cp + 1] - W[cp];
+        if (cp === 0) d += W[co + 1] - W[co];
+      }
+      return a + d * 0.92;
+    }
+
+    candidates(p, limit) {
+      const n = this.n;
+      const list = [];
+      if (this.stones === 0) return [[(n >> 1) * n + (n >> 1), 1]];
+      for (let c = 0; c < n * n; c++) {
+        if (this.b[c] !== 0 || this.nb[c] === 0) continue;
+        list.push([c, this.cellScore(c, p)]);
+      }
+      list.sort((u, v) => v[1] - u[1]);
+      return limit ? list.slice(0, limit) : list;
+    }
+
+    // ---------- tìm chuỗi liên tiếp tạo 4 (VCF) ----------
+    /** p đang tới lượt: có chuỗi tạo 4 liên tiếp dẫn tới thắng không. Trả ô đi đầu tiên hoặc -1. */
+    vcf(p, depth) {
+      if (depth <= 0) return -1;
+      if ((++this.nodes & 255) === 0 && Date.now() > this.deadline) {
+        this.aborted = true;
+        return -1;
+      }
+      const o = 3 - p;
+      const wins = this.winningCells(p);
+      if (wins.length) return wins[0];
+      if (this.four[o] > 0) return -1; // đối thủ đang có 4: phải chặn, không còn đi ép được
+      const n = this.n;
+      // ô tạo ra 4: nằm trong cửa sổ có 3 quân p và không có quân o
+      const tried = new Set();
+      const moves = [];
+      for (let w = 0; w < this.win.length; w++) {
+        if (this.cnt[p][w] !== 3 || this.cnt[o][w] !== 0) continue;
+        for (const c of this.win[w]) if (this.b[c] === 0 && !tried.has(c)) (tried.add(c), moves.push(c));
+      }
+      moves.sort((a, b) => this.cellScore(b, p) - this.cellScore(a, p));
+      for (const c of moves) {
+        const x = c % n;
+        const y = (c / n) | 0;
+        this.place(x, y, p);
+        const comp = this.winningCells(p);
+        let res = -1;
+        if (comp.length >= 2) res = c; // đối thủ không chặn nổi 2 chỗ
+        else if (comp.length === 1) {
+          const bc = comp[0];
+          this.place(bc % n, (bc / n) | 0, o);
+          // nếu việc chặn của đối thủ tạo thành 5 thì không phải chuỗi thắng
+          const oWin = this.isWinAt(bc % n, (bc / n) | 0, o);
+          if (!oWin && this.vcf(p, depth - 1) !== -1) res = c;
+          this.undo();
+        }
+        this.undo();
+        if (res !== -1) return res;
+        if (this.aborted) return -1;
+      }
+      return -1;
+    }
+
+    // ---------- alpha-beta ----------
+    evalFor(p) {
+      return this.score[p] - this.score[3 - p] * 1.05;
+    }
+
+    negamax(p, depth, alpha, beta, ply, width) {
+      if ((++this.nodes & 255) === 0 && Date.now() > this.deadline) this.aborted = true;
+      if (this.aborted) return 0;
+      const o = 3 - p;
+      if (this.winningCells(p).length) return WIN - ply;
+      const oWins = this.winningCells(o);
+      if (oWins.length >= 2) return -(WIN - ply - 1);
+      if (depth <= 0) return this.evalFor(p);
+      let cand;
+      if (oWins.length === 1) cand = [[oWins[0], 0]];
+      else cand = this.candidates(p, width);
+      if (!cand.length) return 0;
+      const n = this.n;
+      let best = -Infinity;
+      for (const [c] of cand) {
+        const x = c % n;
+        const y = (c / n) | 0;
+        this.place(x, y, p);
+        const v = -this.negamax(o, depth - 1, -beta, -alpha, ply + 1, width > 6 ? width - 1 : width);
+        this.undo();
+        if (this.aborted) return 0;
+        if (v > best) best = v;
+        if (v > alpha) alpha = v;
+        if (alpha >= beta) break;
+      }
+      return best;
+    }
+
+    /**
+     * Chọn nước đi cho phe p. opts: { ms (thời gian nghĩ), maxDepth }.
+     * Trả { x, y, why, depth, nodes, alts:[{x,y}] }.
+     */
+    bestMove(p, opts = {}) {
+      const ms = opts.ms || 1500;
+      const maxDepth = opts.maxDepth || 8;
+      const n = this.n;
+      const o = 3 - p;
+      this.deadline = Date.now() + ms;
+      this.aborted = false;
+      this.nodes = 0;
+      const mk = (c, why, extra = {}) => ({ x: c % n, y: (c / n) | 0, why, ...extra });
+
+      if (this.stones === 0) return mk((n >> 1) * n + (n >> 1), 'giữa bàn');
+      // 1) thắng ngay
+      const myWins = this.winningCells(p);
+      if (myWins.length) return mk(myWins[0], 'thắng ngay');
+      // 2) chặn đối thủ thắng ngay
+      const oppWins = this.winningCells(o);
+      if (oppWins.length) return mk(oppWins[0], 'chặn đối thủ thắng');
+      // 3) chuỗi ép thắng của mình
+      this.deadline = Date.now() + Math.max(200, ms * 0.35);
+      const v = this.vcf(p, 14);
+      this.aborted = false;
+      if (v !== -1) return mk(v, 'ép thắng');
+      // 4) alpha-beta tăng dần độ sâu
+      this.deadline = Date.now() + ms;
+      let root = this.candidates(p, 14);
+      // nếu đối thủ có đường ép thắng (VCF) thì ưu tiên các nước phá được nó
+      this.deadline = Date.now() + Math.max(200, ms * 0.3);
+      const oppForce = this.vcf(o, 12) !== -1;
+      this.aborted = false;
+      if (oppForce) {
+        const safe = [];
+        for (const [c, sc] of root) {
+          this.place(c % n, (c / n) | 0, p);
+          this.deadline = Date.now() + Math.max(120, ms * 0.1);
+          const still = this.winningCells(p).length ? false : this.vcf(o, 12) !== -1;
+          this.aborted = false;
+          this.undo();
+          if (!still) safe.push([c, sc + 1e5]);
+        }
+        if (safe.length) root = safe.concat(root.filter(([c]) => !safe.some(([s]) => s === c)));
+      }
+      this.deadline = Date.now() + ms;
+      this.aborted = false;
+      let bestC = root[0][0];
+      let depthDone = 0;
+      let scores = root.map(([c, sc]) => [c, sc]);
+      for (let depth = 2; depth <= maxDepth; depth += 1) {
+        let curBest = -1;
+        let curScore = -Infinity;
+        let alpha = -Infinity;
+        const cur = [];
+        for (const [c] of scores) {
+          this.place(c % n, (c / n) | 0, p);
+          const sc = -this.negamax(o, depth - 1, -WIN * 2, -alpha, 1, depth > 4 ? 8 : 10);
+          this.undo();
+          if (this.aborted) break;
+          cur.push([c, sc]);
+          if (sc > curScore) {
+            curScore = sc;
+            curBest = c;
+          }
+          if (sc > alpha) alpha = sc;
+        }
+        if (this.aborted) break;
+        bestC = curBest;
+        depthDone = depth;
+        cur.sort((a, b) => b[1] - a[1]);
+        scores = cur;
+        if (curScore > WIN / 2) break; // đã thấy đường thắng
+        if (Date.now() > this.deadline - ms * 0.15) break;
+      }
+      const alts = scores.slice(0, 4).map(([c]) => ({ x: c % n, y: (c / n) | 0 }));
+      return mk(bestC, 'tính nước', { depth: depthDone, nodes: this.nodes, alts });
+    }
+  }
+
+  /** dựng engine từ danh sách nước đã đi [[x,y,p],...] */
+  function fromMoves(size, strict, moves) {
+    const e = new Engine(size, strict);
+    for (const [x, y, p] of moves) e.place(x, y, p);
+    return e;
+  }
+
+  return { Engine, fromMoves };
+});
+</script>
+<script>/* GIAO DIỆN: nhập nước đi của ĐỐI THỦ (chạm vào bàn cờ) -> app tính và tự đặt nước của BẠN, tô sáng ô bạn cần đánh. */
+(function () {
+  const $ = (id) => document.getElementById(id);
+  const ME = 1; // người dùng
+  const OPP = 2; // đối thủ ở ngoài
+  const LEVELS = { fast: { ms: 700, depth: 6, name: 'Nhanh' }, mid: { ms: 2000, depth: 8, name: 'Vừa' }, deep: { ms: 6000, depth: 10, name: 'Sâu' } };
+  const SAVE = 'caroHelper.v1';
+
+  let S = null; // trạng thái ván
+  let tent = null; // ô đối thủ đang chọn (chưa xác nhận)
+  let mode = 'opp'; // 'opp' = nhập nước đối thủ; 'mine' = chọn ô tôi thực sự đánh
+  let thinking = false;
+  let zoom = false;
+  let lastAlts = [];
+  let altIdx = 0;
+  let worker = null;
+  let reqId = 0;
+  let pulse = 0;
+
+  const colName = (x) => String.fromCharCode(65 + x);
+  const cellName = (x, y) => colName(x) + (y + 1);
+
+  // ---------- lưu / tải ----------
+  function save() {
+    try { localStorage.setItem(SAVE, JSON.stringify(S)); } catch (e) {}
+  }
+  function load() {
+    try { const t = localStorage.getItem(SAVE); if (t) return JSON.parse(t); } catch (e) {}
+    return null;
+  }
+
+  function newState(opts) {
+    return { size: opts.size, strict: opts.strict, level: opts.level, first: opts.first, moves: [], over: null };
+  }
+
+  function engineOf() {
+    return CaroEngine.fromMoves(S.size, S.strict, S.moves.map((m) => [m.x, m.y, m.p]));
+  }
+
+  // ---------- bộ não (Web Worker, nếu không được thì chạy thẳng) ----------
+  function makeWorker() {
+    try {
+      const src = document.getElementById('engine').textContent +
+        '\nself.onmessage=function(e){var d=e.data;var g=CaroEngine.fromMoves(d.size,d.strict,d.moves);var m=g.bestMove(d.p,{ms:d.ms,maxDepth:d.depth});m.id=d.id;self.postMessage(m);};';
+      const url = URL.createObjectURL(new Blob([src], { type: 'text/javascript' }));
+      return new Worker(url);
+    } catch (e) { return null; }
+  }
+  function think(cb) {
+    const lv = LEVELS[S.level] || LEVELS.mid;
+    const payload = { id: ++reqId, size: S.size, strict: S.strict, moves: S.moves.map((m) => [m.x, m.y, m.p]), p: ME, ms: lv.ms, depth: lv.depth };
+    if (worker === null) worker = makeWorker() || false;
+    if (worker) {
+      const my = payload.id;
+      worker.onmessage = (e) => { if (e.data.id === my) cb(e.data); };
+      worker.onerror = () => { worker = false; setTimeout(() => think(cb), 0); };
+      worker.postMessage(payload);
+    } else {
+      setTimeout(() => {
+        const g = CaroEngine.fromMoves(S.size, S.strict, payload.moves);
+        cb(g.bestMove(ME, { ms: lv.ms, maxDepth: lv.depth }));
+      }, 30);
+    }
+  }
+
+  // ---------- luật thắng ----------
+  function checkOver() {
+    const m = S.moves[S.moves.length - 1];
+    if (!m) { S.over = null; return; }
+    const g = engineOf();
+    const line = g.winLineAt(m.x, m.y, m.p);
+    S.over = line ? { who: m.p === ME ? 'me' : 'opp', line } : null;
+    if (!S.over && S.moves.length >= S.size * S.size) S.over = { who: 'draw', line: null };
+  }
+
+  // ---------- vòng chơi ----------
+  function startGame() {
+    tent = null; mode = 'opp'; lastAlts = []; altIdx = 0;
+    if (S.first === 'me') computeMine(); else { render(); save(); }
+  }
+
+  function computeMine() {
+    thinking = true; render();
+    think((r) => {
+      thinking = false;
+      S.moves.push({ x: r.x, y: r.y, p: ME, why: r.why, depth: r.depth });
+      lastAlts = r.alts || [{ x: r.x, y: r.y }];
+      altIdx = 0;
+      checkOver();
+      if (navigator.vibrate) { try { navigator.vibrate(60); } catch (e) {} }
+      save(); render();
+    });
+  }
+
+  function confirmOpp() {
+    if (!tent || thinking || S.over || mode !== 'opp') return;
+    S.moves.push({ x: tent.x, y: tent.y, p: OPP });
+    tent = null;
+    checkOver();
+    if (S.over) { save(); render(); return; }
+    computeMine();
+  }
+
+  function tapCell(x, y) {
+    if (thinking || S.over) return;
+    const occupied = S.moves.some((m) => m.x === x && m.y === y);
+    if (occupied) return;
+    if (mode === 'mine') {
+      S.moves.push({ x, y, p: ME, why: 'tự chọn' });
+      mode = 'opp'; lastAlts = []; altIdx = 0;
+      checkOver(); save(); render();
+      return;
+    }
+    if (tent && tent.x === x && tent.y === y) { confirmOpp(); return; } // chạm lần 2 = xác nhận
+    tent = { x, y };
+    render();
+  }
+
+  function altMove() {
+    if (thinking || S.over || lastAlts.length < 2) return;
+    const last = S.moves[S.moves.length - 1];
+    if (!last || last.p !== ME) return;
+    altIdx = (altIdx + 1) % lastAlts.length;
+    const a = lastAlts[altIdx];
+    last.x = a.x; last.y = a.y; last.why = 'gợi ý khác';
+    checkOver(); save(); render();
+  }
+
+  function mineElsewhere() {
+    if (thinking) return;
+    const last = S.moves[S.moves.length - 1];
+    if (last && last.p === ME) S.moves.pop();
+    S.over = null; mode = 'mine'; tent = null; lastAlts = [];
+    save(); render();
+  }
+
+  function undo() {
+    if (thinking) return;
+    mode = 'opp'; tent = null; lastAlts = []; S.over = null;
+    // gỡ về trước nước đối thủ gần nhất
+    while (S.moves.length) {
+      const m = S.moves.pop();
+      if (m.p === OPP) break;
+    }
+    checkOver(); save(); render();
+    if (!S.moves.length && S.first === 'me') computeMine();
+  }
+
+  // ---------- vẽ ----------
+  const cv = $('board');
+  const ctx = cv.getContext('2d');
+  let L = null;
+  function layout() {
+    const wrap = $('boardWrap');
+    const base = Math.min(wrap.clientWidth, 680);
+    const px = zoom ? Math.round(base * 1.8) : base;
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    cv.width = Math.round(px * dpr); cv.height = Math.round(px * dpr);
+    cv.style.width = px + 'px'; cv.style.height = px + 'px';
+    const n = S.size;
+    const pad = Math.round(px * 0.055);
+    const cell = (px - pad * 2) / n;
+    L = { px, dpr, n, pad, cell, x0: pad, y0: pad };
+  }
+  const cx = (x) => L.x0 + (x + 0.5) * L.cell;
+  const cy = (y) => L.y0 + (L.n - 1 - y + 0.5) * L.cell;
+
+  function drawBoard() {
+    if (!L || L.n !== S.size) layout();
+    const { px, dpr, n, cell } = L;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const g = ctx.createLinearGradient(0, 0, px, px);
+    g.addColorStop(0, '#d9a468'); g.addColorStop(1, '#b57a3c');
+    ctx.fillStyle = g; ctx.fillRect(0, 0, px, px);
+    // lưới
+    ctx.strokeStyle = 'rgba(40,20,5,.75)'; ctx.lineWidth = 1;
+    ctx.beginPath();
+    for (let i = 0; i < n; i++) {
+      ctx.moveTo(cx(i), cy(0)); ctx.lineTo(cx(i), cy(n - 1));
+      ctx.moveTo(cx(0), cy(i)); ctx.lineTo(cx(n - 1), cy(i));
+    }
+    ctx.stroke();
+    // nhãn
+    ctx.fillStyle = '#3a2006'; ctx.font = `700 ${Math.max(8, Math.round(cell * 0.42))}px system-ui, Arial`;
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    for (let i = 0; i < n; i++) {
+      ctx.fillText(colName(i), cx(i), L.y0 + n * cell + L.pad * 0.5);
+      ctx.fillText(String(i + 1), L.x0 * 0.5, cy(i));
+    }
+    const last = S.moves[S.moves.length - 1];
+    // quân đã đi
+    S.moves.forEach((m, i) => {
+      const X = cx(m.x), Y = cy(m.y), r = cell * 0.36;
+      ctx.lineCap = 'round'; ctx.lineWidth = Math.max(2, cell * 0.12);
+      if (m.p === OPP) {
+        ctx.strokeStyle = '#e53935';
+        ctx.beginPath(); ctx.moveTo(X - r, Y - r); ctx.lineTo(X + r, Y + r); ctx.moveTo(X + r, Y - r); ctx.lineTo(X - r, Y + r); ctx.stroke();
+      } else {
+        ctx.strokeStyle = '#1e7fe0';
+        ctx.beginPath(); ctx.arc(X, Y, r, 0, Math.PI * 2); ctx.stroke();
+      }
+    });
+    // nước vừa đi của đối thủ: ô vàng nhạt
+    for (let i = S.moves.length - 1; i >= 0; i--) {
+      if (S.moves[i].p === OPP) { const m = S.moves[i]; ctx.fillStyle = 'rgba(255,220,60,.28)'; ctx.fillRect(cx(m.x) - cell / 2, cy(m.y) - cell / 2, cell, cell); break; }
+    }
+    // gợi ý của bạn: vòng xanh lá nhấp nháy
+    if (last && last.p === ME && !S.over) {
+      const X = cx(last.x), Y = cy(last.y);
+      const k = 0.5 + 0.5 * Math.sin(pulse * 5);
+      ctx.fillStyle = 'rgba(61,220,132,' + (0.18 + 0.18 * k) + ')'; ctx.fillRect(X - cell / 2, Y - cell / 2, cell, cell);
+      ctx.strokeStyle = '#3ddc84'; ctx.lineWidth = Math.max(2, cell * 0.1);
+      ctx.beginPath(); ctx.arc(X, Y, cell * (0.55 + 0.12 * k), 0, Math.PI * 2); ctx.stroke();
+    }
+    // ô đối thủ đang chọn (chưa xác nhận)
+    if (tent && mode === 'opp') {
+      const X = cx(tent.x), Y = cy(tent.y);
+      ctx.strokeStyle = 'rgba(255,255,255,.55)'; ctx.lineWidth = 1;
+      ctx.beginPath(); ctx.moveTo(X, cy(0)); ctx.lineTo(X, cy(n - 1)); ctx.moveTo(cx(0), Y); ctx.lineTo(cx(n - 1), Y); ctx.stroke();
+      ctx.strokeStyle = 'rgba(229,57,53,.9)'; ctx.lineWidth = Math.max(2, cell * 0.12);
+      const r = cell * 0.36;
+      ctx.beginPath(); ctx.moveTo(X - r, Y - r); ctx.lineTo(X + r, Y + r); ctx.moveTo(X + r, Y - r); ctx.lineTo(X - r, Y + r); ctx.stroke();
+      ctx.beginPath(); ctx.arc(X, Y, cell * 0.62, 0, Math.PI * 2); ctx.stroke();
+    }
+    if (mode === 'mine' && !S.over) { ctx.fillStyle = 'rgba(61,220,132,.07)'; ctx.fillRect(0, 0, px, px); }
+    // đường thắng
+    if (S.over && S.over.line) {
+      ctx.strokeStyle = '#ffd54a'; ctx.lineWidth = Math.max(4, cell * 0.2); ctx.lineCap = 'round';
+      const a = S.over.line[0], b = S.over.line[S.over.line.length - 1];
+      ctx.beginPath(); ctx.moveTo(cx(a[0]), cy(a[1])); ctx.lineTo(cx(b[0]), cy(b[1])); ctx.stroke();
+    }
+  }
+
+  function render() {
+    const st = $('status');
+    const last = S.moves[S.moves.length - 1];
+    let big = '', sub = '', cls = '';
+    if (S.over) {
+      if (S.over.who === 'me') { big = '🎉 BẠN THẮNG!'; cls = 'me'; sub = 'Đủ 5 quân liền. Bấm "Ván mới" để chơi tiếp.'; }
+      else if (S.over.who === 'opp') { big = 'Đối thủ thắng'; cls = 'opp'; sub = 'Nếu nhập nhầm nước, bấm "Lùi" để sửa.'; }
+      else { big = 'Hòa'; sub = 'Bàn cờ đã đầy.'; }
+    } else if (thinking) { big = '⏳ Đang tính nước đi…'; sub = 'Chờ một chút.'; }
+    else if (mode === 'mine') { big = 'Chạm ô bạn đã đánh'; sub = 'Chạm vào ô trống bạn thực sự đi (thay cho gợi ý).'; cls = 'me'; }
+    else if (last && last.p === ME && !tent) {
+      big = '👉 Bạn đánh ô ' + cellName(last.x, last.y); cls = 'me';
+      const why = last.why ? ' (' + last.why + (last.depth ? ', sâu ' + last.depth : '') + ')' : '';
+      sub = 'Đánh xong, chạm vào ô đối thủ vừa đi để nhập nước tiếp theo' + why + '.';
+    } else if (tent) { big = 'Đối thủ đánh ' + cellName(tent.x, tent.y) + '?'; cls = 'opp'; sub = 'Bấm "Xác nhận" hoặc chạm lại đúng ô đó.'; }
+    else if (!S.moves.length) { big = S.first === 'me' ? 'Đang chuẩn bị…' : 'Đối thủ đi trước'; sub = 'Chạm vào ô đối thủ vừa đánh.'; }
+    else { big = 'Chạm ô đối thủ vừa đánh'; cls = 'opp'; sub = 'Nước đối thủ ở ngoài game, nhập vào đây.'; }
+    st.innerHTML = '<div class="big ' + cls + '"></div><div class="sub"></div>';
+    st.firstChild.textContent = big; st.lastChild.textContent = sub;
+    $('bConfirm').disabled = !(tent && mode === 'opp' && !thinking && !S.over);
+    $('bAlt').disabled = !(last && last.p === ME && lastAlts.length > 1 && !thinking && !S.over);
+    $('bMine').disabled = thinking || !S.moves.length || !!S.over;
+    $('bUndo').disabled = thinking || !S.moves.length;
+    $('bZoom').textContent = zoom ? '🔍 Thu nhỏ' : '🔍 Phóng to';
+    $('legend').textContent = '✕ đỏ = đối thủ · ○ xanh = bạn · bàn ' + S.size + 'x' + S.size + ' · ' + (S.strict ? 'chặn 2 đầu không thắng' : '5 quân liền là thắng') + ' · ' + (LEVELS[S.level] || LEVELS.mid).name;
+    layout(); drawBoard();
+  }
+
+  // ---------- chạm vào bàn ----------
+  cv.addEventListener('click', (e) => {
+    const r = cv.getBoundingClientRect();
+    const x = Math.floor((e.clientX - r.left - L.x0) / L.cell);
+    const y = L.n - 1 - Math.floor((e.clientY - r.top - L.y0) / L.cell);
+    if (x < 0 || y < 0 || x >= L.n || y >= L.n) return;
+    tapCell(x, y);
+  });
+
+  // ---------- màn hình bắt đầu ----------
+  function openSetup() { $('setup').classList.remove('hidden'); }
+  function begin(first) {
+    S = newState({ first, size: Number($('selSize').value), strict: $('selRule').value === 'strict', level: $('selLevel').value });
+    $('setup').classList.add('hidden');
+    L = null; zoom = false;
+    startGame();
+  }
+  $('goMe').onclick = () => begin('me');
+  $('goOpp').onclick = () => begin('opp');
+  $('bNew').onclick = openSetup;
+  $('bConfirm').onclick = confirmOpp;
+  $('bAlt').onclick = altMove;
+  $('bMine').onclick = mineElsewhere;
+  $('bUndo').onclick = undo;
+  $('bZoom').onclick = () => { zoom = !zoom; L = null; render(); };
+  $('bResume').onclick = () => $('setup').classList.add('hidden');
+  window.addEventListener('resize', () => { if (S) { L = null; render(); } });
+
+  // nhấp nháy ô gợi ý
+  function tick(t) { pulse = t / 1000; if (S && !thinking && S.moves.length && S.moves[S.moves.length - 1].p === ME && !S.over) drawBoard(); requestAnimationFrame(tick); }
+
+  // ---------- khởi động: khôi phục ván dở ----------
+  const saved = load();
+  if (saved && saved.moves && saved.size) {
+    S = saved; $('selSize').value = String(S.size); $('selRule').value = S.strict ? 'strict' : 'free'; $('selLevel').value = S.level || 'mid';
+    $('setup').classList.add('hidden'); $('bResume').style.display = '';
+    checkOver(); render();
+    if (S.first === 'me' && !S.moves.length) computeMine();
+  } else {
+    $('bResume').style.display = 'none';
+    S = newState({ first: 'opp', size: 15, strict: false, level: 'mid' });
+    layout(); drawBoard();
+  }
+  requestAnimationFrame(tick);
+})();
+</script>
+</body>
+</html>

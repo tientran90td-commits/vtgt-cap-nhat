@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="theme-color" content="#10162a">
+<title>Caro Trợ Thủ</title>
+<style>/*CSS*/</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <h1>♟ Caro Trợ Thủ</h1>
+    <div class="hbtns"><button id="bUndo">↩ Lùi</button><button id="bNew">🔄 Ván mới</button></div>
+  </header>
+  <div id="status"></div>
+  <div id="boardWrap"><canvas id="board"></canvas></div>
+  <div id="actions">
+    <button id="bConfirm" class="primary">✔ Xác nhận</button>
+    <button id="bAlt">Gợi ý khác</button>
+    <button id="bMine">Tôi đi ô khác</button>
+    <button id="bZoom">🔍 Phóng to</button>
+  </div>
+  <div id="legend"></div>
+</div>
+
+<div id="setup">
+  <div class="card">
+    <h2>♟ Caro Trợ Thủ</h2>
+    <div class="note">Chạm vào bàn cờ để nhập nước đi của ĐỐI THỦ (ở ngoài). App tự tính và tô sáng ô BẠN nên đánh.</div>
+    <div class="row2">
+      <label>Cỡ bàn<select id="selSize"><option value="15" selected>15 x 15</option><option value="19">19 x 19</option><option value="20">20 x 20</option><option value="12">12 x 12</option><option value="10">10 x 10</option></select></label>
+      <label>Mức nghĩ<select id="selLevel"><option value="fast">Nhanh (0,7 giây)</option><option value="mid" selected>Vừa (2 giây)</option><option value="deep">Sâu (6 giây)</option></select></label>
+    </div>
+    <label>Luật thắng<select id="selRule"><option value="free" selected>5 quân liền là thắng (kể cả bị chặn 2 đầu)</option><option value="strict">5 quân liền nhưng bị chặn cả 2 đầu thì KHÔNG thắng</option></select></label>
+    <div class="note">Ai đi trước?</div>
+    <div class="row2"><button id="goMe" class="primary">Tôi đi trước</button><button id="goOpp" class="warn">Đối thủ đi trước</button></div>
+    <button id="bResume">Quay lại ván đang chơi</button>
+  </div>
+</div>
+<script id="engine">/*ENGINE*/</script>
+<script>/*APP*/</script>
+</body>
+</html>
