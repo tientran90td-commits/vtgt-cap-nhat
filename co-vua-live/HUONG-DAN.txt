@@ -183,3 +183,13 @@ CHONG AUTO-CLICK THA TIM
 - Nguoi nghi auto-click hien dau canh bao trong bang xep hang cua bang dieu khien va co dong thong bao.
 - Chi anh huong diem tha tim. Qua tang, follow, chia se va viec "tha tim xac nhan len dai" khong bi anh huong.
 - Muon chinh so: sua file src\likeguard.js (muc PRESETS).
+
+VIDEO AN MUNG KHI CO NGUOI THANG
+- Co nguoi thang van -> nhac cua video phat ngay, 4 giay sau hinh moi hien len thay cho 2 nhan vat o duoi. Het video thi tro ve nhu cu
+  (2 nhan vat quay lai) va game chay cac buoc tiep theo binh thuong. Man hinh ket qua duoc giu it nhat 13 giay de video chay het.
+- Bat/tat: Bang dieu khien > cai dat van > "Video an mung khi co nguoi thang".
+- Doi video khac: thay file public\media\celebrate.mp4 (nen dung mp4 ma H.264 + AAC, hinh vuong cho dep). Neu video dai hon, tang
+  celebrateMinSeconds trong config.js.
+- Trinh duyet co the tat tieng video cho den khi bam vao trang 1 lan. Trong OBS / TikFinity thuong van co tieng.
+- MC khen nguoi thang "ba dao, ba khi...": sua o muc Loi thoai (winGame, congrats, winForfeit, streak). Neu ban da tung sua loi thoai
+  (data\thoai.json), bam "Khoi phuc tat ca thoai goc" de nhan cau khen moi.

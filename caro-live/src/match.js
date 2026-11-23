@@ -495,7 +495,10 @@ class Match {
   finishCommon(now) {
     this.phase = 'finished';
     this.phaseStartedAt = now;
-    this.phaseEndsAt = now + this.cfg.resultSeconds * 1000;
+    let secs = this.cfg.resultSeconds;
+    // có video ăn mừng: giữ màn hình kết quả đủ lâu để video chạy hết rồi mới sang bước kế
+    if (this.cfg.celebrateOn && this.result && this.result.winner) secs = Math.max(secs, this.cfg.celebrateMinSeconds || 0);
+    this.phaseEndsAt = now + secs * 1000;
   }
 
   settleWinner(winMark, now, result) {

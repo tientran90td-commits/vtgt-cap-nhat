@@ -10,6 +10,7 @@ import { Voice } from './voice.js';
 import { Sfx } from './sfx.js';
 import { Music } from './music.js';
 import { Fx } from './fx.js';
+import { Celebrate } from './celebrate.js';
 import { avatarSrc } from './avatar.js';
 import { themeForGame, classicTheme, applyTheme } from './theme.js';
 
@@ -151,6 +152,9 @@ function handleExtras(s, first) {
   }
 }
 
+const celebrate = new Celebrate($('celebVideo'), $('sceneWrap'), $('three'));
+window.__celebrate = celebrate; // để thử nhanh trong F12
+
 // kết quả ván: pháo hoa + nhạc (chạy 1 lần cho mỗi ván, đúng lúc màn hình kết quả hiện ra)
 function resultEffects(s) {
   const key = s.gameNo + ':' + (s.result ? s.result.type : '');
@@ -161,7 +165,8 @@ function resultEffects(s) {
   if (w) {
     sfx.win();
     fx.fireworks(6500);
-    fx.showBanner('🏆 ' + w.name + ' THẮNG!', '');
+    fx.showBanner('🏆 ' + w.name + ' ĐẠI THẮNG!', 'Bá đạo! Bá khí ngút trời!');
+    if (!(s.settings && s.settings.celebrateOn === false)) celebrate.start(); // video ăn mừng (celebrate.js)
   } else {
     sfx.lose();
   }
@@ -497,7 +502,9 @@ function frame(t) {
     renderSign(state, now);
     clockTick(state, eff, now);
     processVoice();
-    music.duck(!!voice.current);
+    music.duck(!!voice.current || celebrate.active());
+    celebrate.tick();
+    if (celebrate.active() && eff !== 'finished') celebrate.stop(); // sang bước khác (ván mới...) thì dừng ăn mừng
   }
   requestAnimationFrame(frame);
 }

@@ -137,6 +137,9 @@ body.nobg, body.nobg #stage { background: transparent; }
 /* ---------- cảnh 3D ---------- */
 #sceneWrap { grid-area: scene; position: relative; min-height: 0; overflow: hidden; background: #101626; }
 #three { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+/* video ăn mừng: có tiếng ngay, tới giây thứ 4 mới hiện hình thế chỗ 2 nhân vật (celebrate.js) */
+#celebVideo { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); width: 90%; height: 90%; object-fit: cover; border-radius: 0.9rem; z-index: 3; opacity: 0; pointer-events: none; transition: opacity 0.5s ease; box-shadow: 0 0 1.4rem rgba(80, 230, 220, 0.55); background: #000; }
+#celebVideo.show { opacity: 1; }
 #feed { position: absolute; left: 0.5rem; bottom: 2.9rem; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.2rem; max-width: 62%; pointer-events: none; }
 #feed li { font-size: 0.8rem; padding: 0.15rem 0.6rem; border-radius: 1rem; background: rgba(0, 0, 0, 0.45); width: fit-content; max-width: 100%;
            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: slide 0.35s ease-out; }

@@ -22,7 +22,7 @@ const NUMBERS = {
   idleHintSeconds: [0, 120],
   clockSeconds: [0, 60],
 };
-const BOOLS = ['blockBothEnds', 'winnerStays', 'hostCanPlay', 'autoNextGame', 'showSign', 'themeAuto', 'ledOn'];
+const BOOLS = ['blockBothEnds', 'winnerStays', 'hostCanPlay', 'autoNextGame', 'showSign', 'themeAuto', 'ledOn', 'celebrateOn'];
 
 class Settings {
   constructor(cfg, file) {

@@ -31,6 +31,8 @@ module.exports = {
   // ===== LUẬT CỜ =====
   boardSize: 8, // cờ vua 8 x 8 (cột a-h, hàng 1-8)
   likeGuard: 'normal', // chống auto-click thả tim: off = tắt | loose = lỏng | normal = vừa | strict = chặt (xem src/likeguard.js)
+  celebrateOn: true, // có người thắng -> phát video ăn mừng (public/media/celebrate.mp4): có tiếng ngay, 4 giây sau mới hiện hình thế chỗ 2 nhân vật
+  celebrateMinSeconds: Number(process.env.CARO_CELEB_MIN) || (fast ? 0 : 13), // màn hình kết quả giữ ít nhất bấy nhiêu giây để video chạy hết (video dài khoảng 10,4 giây)
   themeAuto: true, // mỗi ván đổi màu bàn cờ, màu phòng, tóc/áo 2 nhân vật (chống nhàm chán)
   showCellLabels: true, // ghi ký hiệu (a1, e4...) mờ mờ trong từng ô để người xem biết gõ gì
 

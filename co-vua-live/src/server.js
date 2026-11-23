@@ -24,6 +24,7 @@ const MIME = {
   '.jpg': 'image/jpeg',
   '.svg': 'image/svg+xml',
   '.ico': 'image/x-icon',
+  '.mp4': 'video/mp4',
 };
 
 const log = (...a) => console.log(new Date().toLocaleTimeString('vi-VN'), ...a);
@@ -116,6 +117,36 @@ const server = http.createServer((req, res) => {
   if (!file.startsWith(PUBLIC)) {
     res.writeHead(403);
     return res.end('Forbidden');
+  }
+  if (path.extname(file).toLowerCase() === '.mp4') {
+    // video: phát theo từng đoạn (Range) để trình duyệt / OBS tua và phát mượt
+    fs.stat(file, (err, st) => {
+      if (err || !st.isFile()) {
+        res.writeHead(404);
+        return res.end('Not found');
+      }
+      const m = /^bytes=(\d*)-(\d*)$/.exec(req.headers.range || '');
+      let start = 0;
+      let end = st.size - 1;
+      if (m && (m[1] || m[2])) {
+        if (m[1]) start = Number(m[1]);
+        if (m[2]) end = m[1] ? Math.min(Number(m[2]), st.size - 1) : st.size - 1;
+        if (!m[1]) start = Math.max(0, st.size - Number(m[2]));
+      }
+      if (start > end || start >= st.size) {
+        res.writeHead(416, { 'Content-Range': 'bytes */' + st.size });
+        return res.end();
+      }
+      const partial = !!m;
+      res.writeHead(partial ? 206 : 200, {
+        'Content-Type': 'video/mp4',
+        'Accept-Ranges': 'bytes',
+        'Content-Length': end - start + 1,
+        ...(partial ? { 'Content-Range': `bytes ${start}-${end}/${st.size}` } : {}),
+      });
+      fs.createReadStream(file, { start, end }).pipe(res);
+    });
+    return;
   }
   fs.readFile(file, (err, buf) => {
     if (err) {
