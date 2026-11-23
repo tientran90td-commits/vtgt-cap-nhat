@@ -20,3 +20,8 @@ APK được GitHub tự dựng mỗi khi có thay đổi (xem tab **Actions**).
 - `.github/workflows/build-apk.yml` – tự dựng APK.
 
 Bộ não: chấm điểm theo các cửa sổ 5 ô, alpha-beta tăng dần độ sâu theo thời gian, tìm chuỗi "liên tiếp tạo 4" (VCF) để thấy sớm đường thắng ép buộc và chặn đường thắng ép buộc của đối thủ. Không có chương trình nào thắng chắc 100%, nhưng bản này mạnh hơn người chơi thông thường.
+
+## Engine Rapfi
+Khi luật là "5 quân liền là thắng", app dùng Rapfi (mã nguồn mở, GPL-3) nếu bản dựng có đính kèm; chân dưới bàn cờ ghi "bộ não: Rapfi".
+Nếu Rapfi không tải được hoặc quá giờ, app tự chuyển sang bộ não nội bộ. Luật "chặn 2 đầu không thắng" luôn dùng bộ não nội bộ.
+Xem `THIRD_PARTY.md`.

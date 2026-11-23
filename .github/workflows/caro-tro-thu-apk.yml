@@ -8,10 +8,6 @@ on:
       - '.github/workflows/caro-tro-thu-apk.yml'
   workflow_dispatch:
 
-defaults:
-  run:
-    working-directory: caro-tro-thu
-
 permissions:
   contents: write
 
@@ -21,6 +17,30 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # ---- Engine Rapfi (WebAssembly). Lỗi ở đây KHÔNG làm hỏng APK: app tự dùng bộ não nội bộ. ----
+      - name: Cài Emscripten
+        id: emsdk
+        continue-on-error: true
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: '3.1.74'
+          actions-cache-folder: emsdk-cache
+
+      - name: Dựng + kiểm tra Rapfi
+        id: rapfi
+        continue-on-error: true
+        shell: bash
+        run: bash caro-tro-thu/build/build_rapfi.sh 2>&1 | tee rapfi-build.log
+
+      - name: Lưu nhật ký dựng Rapfi
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: rapfi-build-log
+          path: rapfi-build.log
+          if-no-files-found: ignore
+
+      # ---- APK ----
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -34,16 +54,20 @@ jobs:
         run: yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
 
       - name: Dựng APK
+        working-directory: caro-tro-thu
         run: gradle assembleDebug --no-daemon --stacktrace
 
       - name: Đổi tên file
-        run: cp app/build/outputs/apk/debug/app-debug.apk CaroTroThu.apk
+        run: cp caro-tro-thu/app/build/outputs/apk/debug/app-debug.apk CaroTroThu.apk
 
       - name: Đăng lên Releases (link tải cố định)
         uses: softprops/action-gh-release@v2
         with:
           tag_name: caro-tro-thu-apk
           name: Caro Trợ Thủ - APK mới nhất
-          body: Tải file CaroTroThu.apk bên dưới, mở trên điện thoại Android và cài đặt (cho phép cài từ nguồn không rõ nếu máy hỏi).
-          files: caro-tro-thu/CaroTroThu.apk
+          body: |
+            Tải file CaroTroThu.apk bên dưới, mở trên điện thoại Android và cài đặt (cho phép cài từ nguồn không rõ nếu máy hỏi).
+            Engine Rapfi trong bản này: ${{ steps.rapfi.outcome == 'success' && 'CÓ (bộ não mạnh)' || 'KHÔNG (lỗi khi dựng, đang dùng bộ não nội bộ)' }}
+            Mã nguồn / giấy phép Rapfi: xem caro-tro-thu/THIRD_PARTY.md
+          files: CaroTroThu.apk
           make_latest: false

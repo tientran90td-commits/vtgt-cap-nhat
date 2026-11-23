@@ -46,14 +46,36 @@
       return new Worker(url);
     } catch (e) { return null; }
   }
+  // Ưu tiên Rapfi (engine mã nguồn mở rất mạnh) khi luật là "5 quân liền thắng"; lỗi/quá giờ thì dùng bộ não nội bộ.
+  let engineName = 'nội bộ';
   function think(cb) {
+    const lv = LEVELS[S.level] || LEVELS.mid;
+    if (window.RapfiBridge && RapfiBridge.usable(S.strict)) {
+      const my = ++reqId;
+      const snap = S.moves.map((m) => ({ x: m.x, y: m.y, p: m.p }));
+      RapfiBridge.think({ size: S.size, moves: snap, me: ME, ms: lv.ms }, (err, r) => {
+        if (my !== reqId) return;
+        if (err || !r) { engineName = 'nội bộ'; thinkJs(cb); return; }
+        engineName = 'Rapfi';
+        const g = engineOf();
+        const alts = [{ x: r.x, y: r.y }];
+        for (const [c] of g.candidates(ME, 6)) { const ax = c % S.size, ay = (c / S.size) | 0; if (!(ax === r.x && ay === r.y) && alts.length < 4) alts.push({ x: ax, y: ay }); }
+        r.alts = alts;
+        cb(r);
+      });
+      return;
+    }
+    engineName = 'nội bộ';
+    thinkJs(cb);
+  }
+  function thinkJs(cb) {
     const lv = LEVELS[S.level] || LEVELS.mid;
     const payload = { id: ++reqId, size: S.size, strict: S.strict, moves: S.moves.map((m) => [m.x, m.y, m.p]), p: ME, ms: lv.ms, depth: lv.depth };
     if (worker === null) worker = makeWorker() || false;
     if (worker) {
       const my = payload.id;
       worker.onmessage = (e) => { if (e.data.id === my) cb(e.data); };
-      worker.onerror = () => { worker = false; setTimeout(() => think(cb), 0); };
+      worker.onerror = () => { worker = false; setTimeout(() => thinkJs(cb), 0); };
       worker.postMessage(payload);
     } else {
       setTimeout(() => {
@@ -233,6 +255,14 @@
     }
   }
 
+  function engineBadge() {
+    if (S.strict) return 'nội bộ (luật chặn 2 đầu)';
+    const st = window.RapfiBridge ? RapfiBridge.state : 'off';
+    if (st === 'loading') return 'nội bộ (Rapfi đang tải…)';
+    if (st === 'ready') return 'Rapfi';
+    return 'nội bộ';
+  }
+
   function render() {
     const st = $('status');
     const last = S.moves[S.moves.length - 1];
@@ -257,7 +287,7 @@
     $('bMine').disabled = thinking || !S.moves.length || !!S.over;
     $('bUndo').disabled = thinking || !S.moves.length;
     $('bZoom').textContent = zoom ? '🔍 Thu nhỏ' : '🔍 Phóng to';
-    $('legend').textContent = '✕ đỏ = đối thủ · ○ xanh = bạn · bàn ' + S.size + 'x' + S.size + ' · ' + (S.strict ? 'chặn 2 đầu không thắng' : '5 quân liền là thắng') + ' · ' + (LEVELS[S.level] || LEVELS.mid).name;
+    $('legend').textContent = '✕ đỏ = đối thủ · ○ xanh = bạn · bàn ' + S.size + 'x' + S.size + ' · ' + (S.strict ? 'chặn 2 đầu không thắng' : '5 quân liền là thắng') + ' · ' + (LEVELS[S.level] || LEVELS.mid).name + ' · bộ não: ' + engineBadge();
     layout(); drawBoard();
   }
 
@@ -305,4 +335,5 @@
     layout(); drawBoard();
   }
   requestAnimationFrame(tick);
+  if (window.RapfiBridge) RapfiBridge.init(() => { if (S) render(); });
 })();

@@ -2,14 +2,36 @@ package com.caro.helper;
 
 import android.app.Activity;
 import android.graphics.Color;
+import android.net.Uri;
 import android.os.Bundle;
 import android.view.WindowManager;
+import android.webkit.WebResourceRequest;
+import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
+import android.webkit.WebViewClient;
 
-/** Vỏ app: mở trang assets/index.html (toàn bộ bộ não + giao diện nằm trong file này, chạy offline). */
+import java.io.InputStream;
+import java.util.HashMap;
+import java.util.Map;
+
+/**
+ * Vỏ app: mở trang assets/index.html qua địa chỉ ảo https://appassets.androidplatform.net/ (không cần mạng).
+ * Dùng địa chỉ https (thay vì file://) để chạy được engine Rapfi (WebAssembly) nằm trong assets/rapfi/.
+ */
 public class MainActivity extends Activity {
+    private static final String HOST = "appassets.androidplatform.net";
     private WebView web;
+
+    private static String mimeOf(String path) {
+        String p = path.toLowerCase();
+        if (p.endsWith(".html")) return "text/html";
+        if (p.endsWith(".js")) return "text/javascript";
+        if (p.endsWith(".wasm")) return "application/wasm";
+        if (p.endsWith(".css")) return "text/css";
+        if (p.endsWith(".json")) return "application/json";
+        return "application/octet-stream";
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -22,8 +44,26 @@ public class MainActivity extends Activity {
         WebSettings s = web.getSettings();
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
-        s.setAllowFileAccess(true);
-        web.loadUrl("file:///android_asset/index.html");
+        s.setAllowFileAccess(false);
+        web.setWebViewClient(new WebViewClient() {
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                Uri u = request.getUrl();
+                if (u == null || !HOST.equals(u.getHost())) return super.shouldInterceptRequest(view, request);
+                String path = u.getPath();
+                if (path == null || path.equals("/")) path = "/index.html";
+                path = path.substring(1);
+                Map<String, String> headers = new HashMap<>();
+                headers.put("Access-Control-Allow-Origin", "*");
+                try {
+                    InputStream in = getAssets().open(path);
+                    return new WebResourceResponse(mimeOf(path), null, 200, "OK", headers, in);
+                } catch (Exception e) {
+                    return new WebResourceResponse("text/plain", "utf-8", 404, "Not Found", headers, new java.io.ByteArrayInputStream(new byte[0]));
+                }
+            }
+        });
+        web.loadUrl("https://" + HOST + "/index.html");
         setContentView(web);
     }
 
