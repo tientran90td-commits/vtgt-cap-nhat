@@ -157,9 +157,9 @@ CO VUA LIVE v1.0 (BAN CHINH THUC) - HUONG DAN NHANH (Vietnamese, khong dau de tr
    - Khan gia go  !diem  (hoac !top, !hang) trong binh luan: man hinh hien hang + diem cua ho, va con thieu bao nhieu diem de vao top 2.
      Cau nay chi hien chu, khong doc thanh tieng.
    - Cach tinh diem (binh luan, tim, qua, follow, chia se) sua trong config.js muc points.
-     Thu tu diem: QUA > FOLLOW (100) > CHIA SE (60) > THA TIM (1 diem/tim, toi da 120 diem moi vong).
+     Thu tu diem: QUA > FOLLOW (100) > CHIA SE (60) > THA TIM (1 diem/tim). Mac dinh KHONG gioi han diem (likeCapPerRound, giftCapPerRound, likeMaxPerEvent = 0).
      Qua cang dat cang nhieu diem (Hoa hong ~175, qua 30 kim cuong ~340, qua 1000 kim cuong ~1700), nhung tang cham dan
-     de nguoi tha tim chay (tha tim + follow + chia se + binh luan ~ 280-350 diem) van canh tranh duoc voi nguoi tang qua nho.
+     de nguoi tang qua nho khong ap dao han. Muon gioi han thi dat so lon hon 0 cho cac muc cap.
      Muon nghieng ve ben nao thi doi giftBase / giftPerDiamond / likeCapPerRound trong config.js.
 
 19) DOI MAU BAN CO + NHAN VAT MOI VAN

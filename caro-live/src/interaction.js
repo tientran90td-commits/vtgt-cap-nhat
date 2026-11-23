@@ -9,8 +9,8 @@ class Interaction {
     // giá trị mặc định (phòng khi config.js cũ thiếu mục mới)
     this.cfg = Object.assign(
       {
-        comment: 1, commentCooldownSeconds: 3, like: 1, likeMaxPerEvent: 15, likeCapPerRound: 120,
-        share: 60, follow: 100, giftBase: 150, giftPerDiamond: 25, giftPower: 0.6, giftCapPerRound: 4000,
+        comment: 1, commentCooldownSeconds: 3, like: 1, likeMaxPerEvent: 0, likeCapPerRound: 0,
+        share: 60, follow: 100, giftBase: 150, giftPerDiamond: 25, giftPower: 0.6, giftCapPerRound: 0,
       },
       pointsCfg || {}
     );
@@ -52,10 +52,11 @@ class Interaction {
     return this.cfg.comment;
   }
 
-  /** Thả tim: ít điểm nhất, và có trần mỗi vòng để người bấm tim liên tục không áp đảo. */
+  /** Thả tim: ít điểm nhất. Trần (likeMaxPerEvent / likeCapPerRound) mặc định 0 = không giới hạn. */
   addLike(user, count = 1) {
     const u = this.touch(user);
-    const n = Math.max(0, Math.min(Number(count) || 0, this.cfg.likeMaxPerEvent));
+    let n = Math.max(0, Number(count) || 0);
+    if (this.cfg.likeMaxPerEvent > 0) n = Math.min(n, this.cfg.likeMaxPerEvent); // 0 = không giới hạn
     let p = n * this.cfg.like;
     if (this.cfg.likeCapPerRound > 0) p = Math.max(0, Math.min(p, this.cfg.likeCapPerRound - u.likePts));
     u.likePts += p;

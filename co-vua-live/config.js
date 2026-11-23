@@ -91,12 +91,12 @@ module.exports = {
 
   // ===== ĐIỂM TƯƠNG TÁC (dùng để chọn người chơi) =====
   points: {
-    // Thứ tự điểm: QUÀ > FOLLOW > CHIA SẺ > THẢ TIM. Quà càng đắt càng nhiều điểm (nhưng tăng chậm dần để người thả tim chay vẫn có cơ hội).
+    // Thứ tự điểm: QUÀ > FOLLOW > CHIA SẺ > THẢ TIM. Quà càng đắt càng nhiều điểm (tăng chậm dần theo giá trị quà). Mặc định KHÔNG giới hạn điểm (các số cap = 0).
     comment: 1, // mỗi bình luận
     commentCooldownSeconds: 3, // chống spam: bình luận cách nhau ít nhất bấy nhiêu giây mới tính điểm
     like: 1, // mỗi lượt thả tim
-    likeMaxPerEvent: 15, // tối đa mỗi lần bấm tim liên tục
-    likeCapPerRound: 120, // tối đa bấy nhiêu điểm từ thả tim trong 1 vòng (0 = không giới hạn)
+    likeMaxPerEvent: 0, // tối đa mỗi lần bấm tim liên tục (0 = không giới hạn)
+    likeCapPerRound: 0, // tối đa bấy nhiêu điểm từ thả tim trong 1 vòng (0 = không giới hạn)
     share: 60, // chia sẻ LIVE (tính 1 lần mỗi vòng)
     follow: 100, // follow (tính 1 lần mỗi vòng)
     // Điểm của 1 món quà = giftBase + giftPerDiamond x (kim cương của món)^giftPower
@@ -104,6 +104,6 @@ module.exports = {
     giftBase: 150,
     giftPerDiamond: 25,
     giftPower: 0.6,
-    giftCapPerRound: 4000, // tối đa bấy nhiêu điểm từ quà trong 1 vòng (0 = không giới hạn)
+    giftCapPerRound: 0, // tối đa bấy nhiêu điểm từ quà trong 1 vòng (0 = không giới hạn)
   },
 };
