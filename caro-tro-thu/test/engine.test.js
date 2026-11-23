@@ -81,5 +81,23 @@ const summarize = (a) => a.reduce((o, r) => ((o[r] = (o[r] || 0) + 1), o), {});
 console.log('vs greedy', summarize(results.greedy), ' vs random', summarize(results.random));
 ok(results.greedy.filter((r) => r === 'win').length >= results.greedy.length - 1, 'thắng bot tham lam');
 ok(results.random.every((r) => r === 'win'), 'thắng bot ngẫu nhiên');
+
+// 5) chặn "ba mở" của đối thủ (không để thành tứ mở) + tự tạo ba mở ép thắng
+{
+  const col = (c) => c.charCodeAt(0) - 65;
+  const L = (t) => t.split(' ').map((s) => [col(s[0]), Number(s.slice(1, -1)) - 1, s.endsWith('x') ? 2 : 1]);
+  const e = fromMoves(15, false, L('H8x A1o H9x A3o H10x'));
+  const m = e.bestMove(1, { ms: 700, maxDepth: 6 });
+  ok(m.x === 7 && (m.y === 6 || m.y === 10 || m.y === 5 || m.y === 11), 'chặn ba mở dọc: ' + JSON.stringify(m));
+  // ba chéo/tách: X F5 F7 F8 (thiếu F6) cần chặn trước khi thành tứ mở
+  const e2 = fromMoves(15, false, L('F5x A1o F7x A3o F8x'));
+  const m2 = e2.bestMove(1, { ms: 700, maxDepth: 6 });
+  ok(m2.x === 5 && [3, 5, 6, 8].includes(m2.y), 'chặn ba tách: ' + JSON.stringify(m2));
+  // phía mình có 2 ba mở cắt nhau: phải tìm được nước ép thắng
+  const e3 = fromMoves(15, false, L('H8o A1x I8o A3x J8o A5x H9o A7x H10o A9x'));
+  const t0 = Date.now(); const m3 = e3.bestMove(1, { ms: 1000, maxDepth: 6 });
+  ok(e3.winningCells(1).length === 0 && m3.why.indexOf('ép thắng') >= 0, 'ép thắng bằng ba: ' + JSON.stringify(m3));
+  ok(Date.now() - t0 < 2500, 'không quá giờ');
+}
 console.log(`engine tests: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

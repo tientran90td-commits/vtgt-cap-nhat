@@ -257,6 +257,122 @@
       return -1;
     }
 
+    // ---------- chuỗi ép thắng có cả "ba" (VCT): tạo 4 hoặc tạo ba mở liên tiếp ----------
+    /** p có nước đặt xuống tạo "tứ mở" (từ 2 ô thắng trở lên) không */
+    hasOpenFourMove(p) {
+      const o = 3 - p;
+      const n = this.n;
+      const seen = new Set();
+      for (let w = 0; w < this.win.length; w++) {
+        if (this.cnt[p][w] !== 3 || this.cnt[o][w] !== 0) continue;
+        for (const c of this.win[w]) {
+          if (this.b[c] !== 0 || seen.has(c)) continue;
+          seen.add(c);
+          this.place(c % n, (c / n) | 0, p);
+          const k = this.winningCells(p).length;
+          this.undo();
+          if (k >= 2) return true;
+        }
+      }
+      return false;
+    }
+
+    /** các ô mà bên o (đang bị p đe dọa tạo tứ mở) có thể đi: chặn hẳn đe dọa hoặc phản công bằng tứ */
+    blockers(p) {
+      const o = 3 - p;
+      const n = this.n;
+      const cand = new Set();
+      for (let w = 0; w < this.win.length; w++) {
+        if (this.cnt[p][w] !== 3 || this.cnt[o][w] !== 0) continue;
+        for (const c of this.win[w]) if (this.b[c] === 0) cand.add(c);
+      }
+      for (const [c] of this.candidates(o, 10)) cand.add(c);
+      const out = [];
+      for (const c of cand) {
+        this.place(c % n, (c / n) | 0, o);
+        const stops = this.winningCells(p).length === 0 && !this.hasOpenFourMove(p);
+        const counter = this.winningCells(o).length > 0;
+        this.undo();
+        if (stops || counter) out.push(c);
+      }
+      return out;
+    }
+
+    /** p vừa đi (đe dọa); tới lượt o. Trả true nếu o không thoát được. */
+    oTurn(p, depth) {
+      if (this.aborted) return false;
+      if ((++this.nodes & 127) === 0 && Date.now() > this.deadline) {
+        this.aborted = true;
+        return false;
+      }
+      const o = 3 - p;
+      const n = this.n;
+      const pw = this.winningCells(p);
+      if (pw.length >= 2) return true;
+      let replies;
+      if (pw.length === 1) replies = [pw[0]];
+      else {
+        if (depth <= 0 || !this.hasOpenFourMove(p)) return false;
+        replies = this.blockers(p);
+      }
+      for (const r of replies) {
+        const rx = r % n;
+        const ry = (r / n) | 0;
+        this.place(rx, ry, o);
+        let ok;
+        if (this.isWinAt(rx, ry, o)) ok = false;
+        else if (this.winningCells(p).length) ok = true;
+        else {
+          const ow = this.winningCells(o);
+          if (ow.length >= 2) ok = false;
+          else if (ow.length === 1) {
+            const b = ow[0];
+            this.place(b % n, (b / n) | 0, p);
+            ok = this.isWinAt(b % n, (b / n) | 0, p) ? true : this.oTurn(p, depth - 1);
+            this.undo();
+          } else ok = this.atk(p, depth) !== -1;
+        }
+        this.undo();
+        if (this.aborted) return false;
+        if (!ok) return false;
+      }
+      return true;
+    }
+
+    /** p tới lượt: có chuỗi (tạo 4 hoặc ba mở) ép thắng không. Trả ô đi đầu tiên hoặc -1. */
+    atk(p, depth) {
+      if (depth <= 0 || this.aborted) return -1;
+      if ((++this.nodes & 127) === 0 && Date.now() > this.deadline) {
+        this.aborted = true;
+        return -1;
+      }
+      const o = 3 - p;
+      const n = this.n;
+      const wins = this.winningCells(p);
+      if (wins.length) return wins[0];
+      if (this.winningCells(o).length) return -1;
+      const fours = [];
+      const tried = new Set();
+      for (let w = 0; w < this.win.length; w++) {
+        if (this.cnt[p][w] !== 3 || this.cnt[o][w] !== 0) continue;
+        for (const c of this.win[w]) if (this.b[c] === 0 && !tried.has(c)) (tried.add(c), fours.push(c));
+      }
+      fours.sort((a, b) => this.cellScore(b, p) - this.cellScore(a, p));
+      const threes = [];
+      for (const [c] of this.candidates(p, 9)) if (!tried.has(c)) threes.push(c);
+      for (const c of fours.concat(threes)) {
+        const x = c % n;
+        const y = (c / n) | 0;
+        this.place(x, y, p);
+        let ok = false;
+        if (this.winningCells(p).length || this.hasOpenFourMove(p)) ok = this.oTurn(p, depth - 1);
+        this.undo();
+        if (this.aborted) return -1;
+        if (ok) return c;
+      }
+      return -1;
+    }
+
     // ---------- alpha-beta ----------
     evalFor(p) {
       return this.score[p] - this.score[3 - p] * 1.05;
@@ -316,25 +432,37 @@
       const v = this.vcf(p, 14);
       this.aborted = false;
       if (v !== -1) return mk(v, 'ép thắng');
+      this.deadline = Date.now() + Math.max(250, ms * 0.3);
+      const vt = this.atk(p, 8);
+      this.aborted = false;
+      if (vt !== -1) return mk(vt, 'ép thắng');
       // 4) alpha-beta tăng dần độ sâu
       this.deadline = Date.now() + ms;
       let root = this.candidates(p, 14);
-      // nếu đối thủ có đường ép thắng (VCF) thì ưu tiên các nước phá được nó
-      this.deadline = Date.now() + Math.max(200, ms * 0.3);
-      const oppForce = this.vcf(o, 12) !== -1;
-      this.aborted = false;
-      if (oppForce) {
-        const safe = [];
-        for (const [c, sc] of root) {
-          this.place(c % n, (c / n) | 0, p);
-          this.deadline = Date.now() + Math.max(120, ms * 0.1);
-          const still = this.winningCells(p).length ? false : this.vcf(o, 12) !== -1;
-          this.aborted = false;
-          this.undo();
-          if (!still) safe.push([c, sc + 1e5]);
-        }
-        if (safe.length) root = safe.concat(root.filter(([c]) => !safe.some(([s]) => s === c)));
+      // phòng thủ: tránh mọi nước để đối thủ có đường ép thắng (tạo 4 liên tiếp hoặc ba mở liên tiếp)
+      const per = Math.max(60, ms * 0.04);
+      const forcedBy = (o2) => {
+        this.deadline = Date.now() + per;
+        this.aborted = false;
+        let f = this.vcf(o2, 12) !== -1;
+        if (!f && !this.aborted) f = this.atk(o2, 6) !== -1;
+        const bad = f && !this.aborted;
+        this.aborted = false;
+        return bad;
+      };
+      const oppForce = forcedBy(o);
+      const tLimit = Date.now() + ms * 0.45;
+      const pool = oppForce ? this.candidates(p, 26) : root;
+      const safe = [];
+      for (const [c, sc] of pool) {
+        if (Date.now() > tLimit) break;
+        this.place(c % n, (c / n) | 0, p);
+        const still = this.winningCells(p).length ? false : forcedBy(o);
+        this.undo();
+        if (!still) safe.push([c, sc + 1e5]);
       }
+      if (safe.length && safe.length < pool.length) root = safe.concat(root.filter(([c]) => !safe.some(([s2]) => s2 === c)));
+      else if (safe.length) root = safe;
       this.deadline = Date.now() + ms;
       this.aborted = false;
       let bestC = root[0][0];
