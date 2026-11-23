@@ -67,8 +67,8 @@ export class Director {
     const { X, O } = this.scene.chars;
     if (s.phase === 'lobby' || (s.phase === 'confirm' && s.confirm)) {
       const pv = s.phase === 'lobby' ? s.lobby.preview : s.confirm.slots;
-      X.setTag(pv[0] ? pv[0].name : 'Chờ người chơi…', true, pv[0] ? pv[0].avatar : '');
-      O.setTag(pv[1] ? pv[1].name : 'Chờ người chơi…', true, pv[1] ? pv[1].avatar : '');
+      X.setTag(pv[0] ? pv[0].name : 'Chờ đạo hữu…', true, pv[0] ? pv[0].avatar : '');
+      O.setTag(pv[1] ? pv[1].name : 'Chờ đạo hữu…', true, pv[1] ? pv[1].avatar : '');
     } else {
       X.setTag(s.players.X ? s.players.X.name : '…', false, s.players.X ? s.players.X.avatar : '');
       O.setTag(s.players.O ? s.players.O.name : '…', false, s.players.O ? s.players.O.avatar : '');

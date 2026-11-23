@@ -5,7 +5,7 @@
 import * as THREE from './vendor/three.module.js';
 import { Character } from './character.js';
 import { makePieceMesh, PIECE_COLOR } from './pieces.js';
-import { layout, paintBoardBase, paintWood } from './board.js';
+import { layout, paintBoardBase, paintWood, currentSkin, drawLed } from './board.js';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
 const BOARD_P = 1.8; // cạnh tấm bàn cờ (đơn vị 3D)
@@ -301,10 +301,38 @@ export class Scene3D {
     this.frameMat.color.set(r.frame3d);
     paintWood(this.tableCanvas.getContext('2d'), 512, 512, 5, r.table[0], r.table[1]);
     this.tableTex.needsUpdate = true;
-    paintBoardBase(this.boardCanvas.getContext('2d'), this.boardCanvas.width, this.size);
+    this.layout = paintBoardBase(this.boardCanvas.getContext('2d'), this.boardCanvas.width, this.size);
     this.boardTex.needsUpdate = true;
+    // chụp nền tĩnh để mỗi nhịp chỉ cần chép lại rồi vẽ đèn LED lên (xem tickLed)
+    if (!this.boardBase) this.boardBase = document.createElement('canvas');
+    this.boardBase.width = this.boardCanvas.width;
+    this.boardBase.height = this.boardCanvas.height;
+    this.boardBase.getContext('2d').drawImage(this.boardCanvas, 0, 0);
+    this.ledBusy = false;
     this.chars.X.recolor(t.X);
     this.chars.O.recolor(t.O);
+  }
+
+  /** Đèn LED chạy trên mặt bàn 3D (chỉ khi dùng kiểu bàn hoa văn). Cập nhật ~15 lần/giây cho nhẹ máy. */
+  tickLed(time, on) {
+    const skin = currentSkin();
+    if (!this.boardBase) return;
+    if (!skin || !on) {
+      if (this.ledBusy) {
+        const c = this.boardCanvas.getContext('2d');
+        c.drawImage(this.boardBase, 0, 0);
+        this.boardTex.needsUpdate = true;
+        this.ledBusy = false;
+      }
+      return;
+    }
+    if (time - (this.ledLast || 0) < 1 / 15) return;
+    this.ledLast = time;
+    const c = this.boardCanvas.getContext('2d');
+    c.drawImage(this.boardBase, 0, 0);
+    drawLed(c, this.layout, skin, time);
+    this.boardTex.needsUpdate = true;
+    this.ledBusy = true;
   }
 
   cellToWorld(x, y) {

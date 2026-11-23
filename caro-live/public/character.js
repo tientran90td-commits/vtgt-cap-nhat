@@ -1,6 +1,6 @@
 /*
  * NHÂN VẬT 3D NGỒI Ở BÀN CỜ (tự dựng bằng hình khối, không cần file mô hình ngoài).
- * - Ghế X (đỏ): bạn nam áo hoodie, khăn đỏ.   - Ghế O (xanh): bạn nữ áo dài, tai mèo, ruy băng xanh.
+ * - Ghế X (đỏ): đạo hữu nam, đạo bào + kim quan.   - Ghế O (xanh): tiên tử, búi tóc đôi + lụa phi đới.
  * - Cánh tay dùng IK 2 đoạn: tay thật sự với tới ô cờ cần đặt.
  * - Có các chế độ: idle (chờ), think (suy nghĩ: tay chống cằm, gõ bàn, bóng suy nghĩ),
  *   place (nghĩ ra ý -> nhấc quân -> đặt xuống -> rút tay), win (nhảy mừng), lose (gục xuống), shrug (hòa).
@@ -15,7 +15,7 @@ const UP = V(0, 1, 0);
 const damp = (cur, goal, k, dt) => cur + (goal - cur) * (1 - Math.exp(-k * dt));
 const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.62, metalness: 0, ...o });
 
-const THOUGHTS = ['Hmm…', 'Đánh đâu nhỉ?', '🤔', 'Chặn nó đã!', 'Nước này hay…', 'Tính kỹ nào…', '…', 'Ăn rồi nhé!'];
+const THOUGHTS = ['Hmm…', 'Bố trận chốn nào?', '🤔', 'Phá chiêu này!', 'Diệu thủ…', 'Suy diễn thiên cơ…', '…', 'Đạo hữu, đỡ chiêu!'];
 
 /** IK 2 đoạn: trả về vị trí khuỷu + cổ tay. */
 function solveArm(S, T, L1, L2, pole, outElbow, outWrist) {
@@ -321,31 +321,33 @@ export class Character {
     torso.scale.set(1.16, 1, 0.82);
     hips.add(torso);
 
+    const gold = toon(0xffd54a);
+    const jade = toon(0x7fe3c0);
+    const gauze = toon(0xffffff, { side: THREE.DoubleSide });
     if (boy) {
-      // mũ hoodie sau gáy, dây rút, túi, khăn đỏ
-      const hood = outlined(new THREE.Mesh(new THREE.SphereGeometry(0.3, 20, 14), clothDark), 0.01);
-      hood.scale.set(1.25, 0.7, 0.8);
-      hood.position.set(0, 1.3, -0.2);
-      hips.add(hood);
-      for (const s of [-1, 1]) {
-        const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.4, 8), toon(0xf2f2f2));
-        cord.position.set(s * 0.09, 1.08, 0.3);
-        hips.add(cord);
-        const tip = new THREE.Mesh(new THREE.SphereGeometry(0.03, 8, 8), accentMat);
-        tip.position.set(s * 0.09, 0.87, 0.3);
-        hips.add(tip);
+      // TIÊN HIỆP (nam): đạo bào cổ chéo, đai lưng + ngọc bội, phi phong phía sau
+      for (const sg of [-1, 1]) {
+        const lapel = outlined(new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.72, 0.02), gauze), 0.006);
+        lapel.position.set(sg * 0.13, 0.98, 0.31);
+        lapel.rotation.z = sg * 0.5;
+        hips.add(lapel);
       }
-      const pocket = outlined(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.2, 0.05), clothDark), 0.008);
-      pocket.position.set(0, 0.36, 0.3);
-      hips.add(pocket);
-      const scarf = outlined(new THREE.Mesh(new THREE.TorusGeometry(0.25, 0.08, 12, 28), accentMat), 0.01);
-      scarf.rotation.x = Math.PI / 2;
-      scarf.position.set(0, 1.3, 0.0);
-      hips.add(scarf);
-      const tail = outlined(new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.55, 0.05), accentMat), 0.008);
-      tail.position.set(0.14, 1.0, 0.33);
-      tail.rotation.z = 0.1;
-      hips.add(tail);
+      const sash = outlined(new THREE.Mesh(new THREE.TorusGeometry(0.345, 0.05, 10, 30), accentMat), 0.008);
+      sash.rotation.x = Math.PI / 2;
+      sash.scale.set(1.18, 0.84, 1);
+      sash.position.set(0, 0.46, 0);
+      hips.add(sash);
+      const pend = outlined(new THREE.Mesh(new THREE.TorusGeometry(0.06, 0.02, 8, 18), jade), 0.006);
+      pend.position.set(0.1, 0.3, 0.32);
+      hips.add(pend);
+      const tassel = new THREE.Mesh(new THREE.ConeGeometry(0.035, 0.22, 8), accentMat);
+      tassel.position.set(0.1, 0.14, 0.32);
+      tassel.rotation.z = Math.PI;
+      hips.add(tassel);
+      const cape = outlined(new THREE.Mesh(new THREE.CylinderGeometry(0.44, 0.58, 1.05, 28, 1, true, Math.PI - 1.3, 2.6), gauze), 0.008);
+      cape.scale.set(1.12, 1, 0.9);
+      cape.position.set(0, 0.7, -0.04);
+      hips.add(cape);
     } else {
       // áo dài: cổ đứng, viền chéo, nơ ruy băng
       const collar = outlined(new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.18, 0.14, 24, 1, true), toon(0xffffff, { side: THREE.DoubleSide })), 0.008);
@@ -376,6 +378,26 @@ export class Character {
       const knot = new THREE.Mesh(new THREE.SphereGeometry(0.05, 12, 10), accentMat);
       knot.position.set(0, 1.2, 0.32);
       hips.add(knot);
+      // TIÊN HIỆP (nữ): lụa phi đới vòng vai, đai lưng, ngọc bội
+      const shawl = outlined(new THREE.Mesh(new THREE.TorusGeometry(0.44, 0.04, 10, 32), accentMat), 0.008);
+      shawl.rotation.x = Math.PI / 2;
+      shawl.scale.set(1.08, 0.78, 1);
+      shawl.position.set(0, 1.14, 0);
+      hips.add(shawl);
+      for (const sg of [-1, 1]) {
+        const rib = outlined(new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.8, 0.012), accentMat), 0.006);
+        rib.position.set(sg * 0.3, 0.72, 0.31);
+        rib.rotation.z = sg * -0.08;
+        hips.add(rib);
+      }
+      const sashG = outlined(new THREE.Mesh(new THREE.TorusGeometry(0.34, 0.045, 10, 30), accentMat), 0.008);
+      sashG.rotation.x = Math.PI / 2;
+      sashG.scale.set(1.18, 0.84, 1);
+      sashG.position.set(0, 0.5, 0);
+      hips.add(sashG);
+      const pendG = outlined(new THREE.Mesh(new THREE.TorusGeometry(0.055, 0.02, 8, 18), jade), 0.006);
+      pendG.position.set(-0.1, 0.34, 0.32);
+      hips.add(pendG);
     }
 
     // ---- vai
@@ -438,35 +460,52 @@ export class Character {
     }
     this.tails = [];
     if (boy) {
-      // tóc dựng gai
-      for (let i = 0; i < 7; i++) {
-        const a = (i / 6 - 0.5) * 2.4;
-        const sp = outlined(new THREE.Mesh(new THREE.ConeGeometry(0.12, 0.38 + (i % 2) * 0.1, 7), hairMat), 0.009);
-        sp.position.set(Math.sin(a) * 0.36, 1.0 + Math.cos(a) * 0.04, -0.06 - Math.abs(a) * 0.06);
-        sp.rotation.z = -a * 0.75;
-        sp.rotation.x = -0.28;
-        head.add(sp);
+      // búi tóc cao + kim quan + trâm ngọc + tóc dài buông sau lưng
+      const bun = outlined(new THREE.Mesh(new THREE.SphereGeometry(0.17, 20, 16), hairMat), 0.009);
+      bun.position.set(0, 1.13, -0.04);
+      head.add(bun);
+      const crown = outlined(new THREE.Mesh(new THREE.CylinderGeometry(0.115, 0.14, 0.1, 18), gold), 0.007);
+      crown.position.set(0, 1.0, -0.04);
+      head.add(crown);
+      const pin = new THREE.Mesh(new THREE.CylinderGeometry(0.014, 0.014, 0.62, 8), jade);
+      pin.rotation.z = Math.PI / 2;
+      pin.position.set(0, 1.13, -0.04);
+      head.add(pin);
+      for (const sg of [-1, 1]) {
+        const knobP = new THREE.Mesh(new THREE.SphereGeometry(0.035, 10, 8), gold);
+        knobP.position.set(sg * 0.31, 1.13, -0.04);
+        head.add(knobP);
+        const ribbon = outlined(new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.62, 8), accentMat), 0.006);
+        ribbon.position.set(sg * 0.22, 0.2, -0.42);
+        ribbon.rotation.set(0.15, 0, Math.PI + sg * 0.1);
+        head.add(ribbon);
       }
-      for (const s of [-1, 1]) {
-        const side = outlined(new THREE.Mesh(new THREE.ConeGeometry(0.09, 0.42, 6), hairMat), 0.008);
-        side.position.set(s * 0.48, 0.5, 0.12);
-        side.rotation.set(0, 0, Math.PI + s * -0.1);
-        head.add(side);
-      }
+      const longHair = outlined(new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.12, 1.0, 16), hairMat), 0.01);
+      longHair.scale.set(1.15, 1, 0.55);
+      longHair.position.set(0, -0.12, -0.36);
+      head.add(longHair);
     } else {
-      // tai mèo (có phần lót hồng)
-      for (const s of [-1, 1]) {
-        const ear = outlined(new THREE.Mesh(new THREE.ConeGeometry(0.19, 0.38, 4), hairMat), 0.01);
-        ear.position.set(s * 0.34, 1.07, 0.0);
-        ear.rotation.z = s * -0.3;
-        ear.rotation.y = Math.PI / 4;
-        head.add(ear);
-        const inner = new THREE.Mesh(new THREE.ConeGeometry(0.11, 0.26, 4), toon(0xff9db4));
-        inner.position.set(s * 0.335, 1.04, 0.05);
-        inner.rotation.z = s * -0.3;
-        inner.rotation.y = Math.PI / 4;
-        head.add(inner);
+      // hai búi tóc + trâm vàng + hoa điền giữa trán
+      for (const s2 of [-1, 1]) {
+        const bunG = outlined(new THREE.Mesh(new THREE.SphereGeometry(0.15, 18, 14), hairMat), 0.009);
+        bunG.position.set(s2 * 0.34, 1.02, -0.02);
+        head.add(bunG);
+        const pinG = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, 0.42, 8), gold);
+        pinG.position.set(s2 * 0.34, 1.07, -0.02);
+        pinG.rotation.z = s2 * 0.9;
+        head.add(pinG);
+        const flower = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), accentMat);
+        flower.position.set(s2 * 0.34, 1.0, 0.11);
+        head.add(flower);
       }
+      const crownG = outlined(new THREE.Mesh(new THREE.TorusGeometry(0.5, 0.018, 8, 40, Math.PI * 0.9), gold), 0.005);
+      crownG.position.set(0, 0.5, 0.0);
+      crownG.rotation.set(Math.PI / 2 - 0.5, 0, Math.PI * 0.05);
+      head.add(crownG);
+      const mark = new THREE.Mesh(new THREE.OctahedronGeometry(0.035), toon(0xff5a5a));
+      mark.scale.set(0.8, 1.2, 0.5);
+      mark.position.set(0, FY + 0.27, surfaceZ(faceGeo, 0, 0.27) + 0.02);
+      head.add(mark);
       // sợi tóc ahoge
       const curve = new THREE.CatmullRomCurve3([V(0, 1.0, 0.06), V(0.03, 1.18, 0.1), V(0.15, 1.33, 0.1), V(0.3, 1.31, 0.04)]);
       const ahoge = outlined(new THREE.Mesh(new THREE.TubeGeometry(curve, 14, 0.022, 8, false), hairMat), 0.006);
@@ -573,9 +612,8 @@ export class Character {
       const upper = outlined(new THREE.Mesh(new THREE.CylinderGeometry(0.135, 0.12, 1, 20), clothMat), 0.01);
       const fore = outlined(new THREE.Mesh(new THREE.CylinderGeometry(0.118, 0.095, 1, 20), clothMat), 0.01);
       const joint = outlined(new THREE.Mesh(new THREE.SphereGeometry(0.128, 16, 14), clothMat), 0.01);
-      const cuff = boy
-        ? outlined(new THREE.Mesh(new THREE.CylinderGeometry(0.108, 0.108, 0.07, 18), accentMat), 0.008)
-        : outlined(new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.11, 0.26, 20, 1, true), toon(0xffffff, { side: THREE.DoubleSide })), 0.008);
+      // tay áo rộng kiểu tiên hiệp (loe dần về cổ tay)
+      const cuff = outlined(new THREE.Mesh(new THREE.CylinderGeometry(boy ? 0.23 : 0.2, 0.11, boy ? 0.3 : 0.26, 20, 1, true), toon(0xffffff, { side: THREE.DoubleSide })), 0.008);
       const hand = outlined(new THREE.Mesh(new THREE.SphereGeometry(0.115, 18, 16), skin), 0.01);
       hand.scale.set(1, 0.85, 1.2);
       for (const m of [upper, fore, joint, cuff, hand]) {
@@ -614,7 +652,7 @@ export class Character {
     this.root.traverse((o) => {
       if (o.isMesh && o.material !== hairShine) o.castShadow = true;
     });
-    this.setTag('Chờ người chơi…');
+    this.setTag('Chờ đạo hữu…');
     this.drawBubble('Hmm…');
   }
 

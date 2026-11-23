@@ -7,6 +7,7 @@ import { Scene3D, NullScene } from './scene3d.js';
 import { Director } from './director.js';
 import { BoardView } from './board.js';
 import { themeForGame, classicTheme, applyTheme } from './theme.js';
+import { pickSkin } from './board-skins.js';
 import { Voice } from './voice.js';
 import { Sfx } from './sfx.js';
 import { Music } from './music.js';
@@ -42,7 +43,7 @@ const voice = new Voice({
       return;
     }
     el.className = item.role;
-    el.querySelector('b').textContent = item.role === 'ref' ? '⚖ Trọng tài:' : '🎙 Điều phối:';
+    el.querySelector('b').textContent = item.role === 'ref' ? '⚖ Trọng tài:' : '🎙 Tại hạ (điều phối):';
     el.querySelector('span').textContent = item.text;
   },
 });
@@ -197,7 +198,7 @@ function renderRank(s) {
   if (!s.top.length) {
     const li = document.createElement('li');
     li.className = 'hint';
-    li.textContent = 'Bình luận / thả tim / tặng quà để lên top!';
+    li.textContent = 'Bình luận / thả tim / tặng quà để lên bảng tu vi!';
     ol.appendChild(li);
     return;
   }
@@ -259,7 +260,7 @@ function renderPlayers(s, eff, now) {
     const card = cards[mark];
     const person = lobby ? (mark === 'X' ? pv[0] : pv[1]) : s.players[mark];
     setAvatar(card, person);
-    setText(card.querySelector('.nm'), person ? person.name : 'Chờ người chơi…');
+    setText(card.querySelector('.nm'), person ? person.name : 'Chờ đạo hữu…');
     let sub = '';
     if (confirming) sub = person ? (person.champion ? 'Nhà vô địch • giữ bàn' : person.done ? '❤ Đã thả tim • sẵn sàng!' : 'Hãy THẢ TIM để xác nhận') : '';
     else if (lobby) sub = person ? (person.champion ? `Nhà vô địch • thắng ${s.champion ? s.champion.streak : 1} ván` : 'Đang dẫn đầu tương tác') : 'Hãy tương tác để lên bàn';
@@ -290,15 +291,15 @@ function renderHint(s, eff, now) {
   const el = $('hint');
   let html = '';
   if (eff === 'lobby') html = `Luật: <b>${s.rules}</b>`;
-  else if (eff === 'confirm') html = 'Hai người chơi hãy <b>thả tim ❤</b> để xác nhận';
-  else if (eff === 'coin') html = 'Trọng tài đang <b>tung đồng xu</b>…';
+  else if (eff === 'confirm') html = 'Hai vị đạo hữu hãy <b>thả tim ❤</b> để xác nhận lên đài';
+  else if (eff === 'coin') html = 'Trọng tài đang <b>tung đồng xu</b> định tiên cơ…';
   else if (eff === 'playing') {
     const p = s.players[s.turn];
     const name = p ? p.name : '';
-    if (director.busy || !p) html = `<b>${escapeHtml(name || '…')}</b> đang đặt cờ…`;
+    if (director.busy || !p) html = `<b>${escapeHtml(name || '…')}</b> đang bố trận…`;
     else {
       const left = Math.max(0, Math.ceil((s.turnEndsAt - now) / 1000));
-      html = `Lượt của <b>${escapeHtml(name)}</b> • còn <b>${left}s</b> • gõ tọa độ như <b>j9</b>, <b>k6</b>`;
+      html = `Lượt của đạo hữu <b>${escapeHtml(name)}</b> • còn <b>${left}s</b> • gõ tọa độ như <b>j9</b>, <b>k6</b>`;
     }
   } else if (eff === 'finished' && s.result) html = escapeHtml(s.result.text);
   if (el.dataset.h !== html) {
@@ -461,14 +462,19 @@ function processVoice() {
 // ---------------------------------------------------------------- giao diện đổi theo ván (theme.js)
 // ?theme=0..7 trên địa chỉ trang = ép 1 kiểu. Bảng điều khiển có ô tick 'Mỗi ván đổi màu bàn cờ, phòng, nhân vật'.
 const forcedTheme = params.has('theme') && Number.isFinite(Number(params.get('theme'))) ? Number(params.get('theme')) : null;
+// ?skin=0..8 (hoặc tên kiểu, hoặc wood) trên địa chỉ trang = ép 1 kiểu bàn cờ hoa văn + đèn LED (xem board-skins.js).
+const forcedSkin = params.has('skin') ? params.get('skin') : null;
 let themeKey = null;
 function themeTick(s) {
   if (!s || s.gameNo === undefined) return;
   const auto = s.settings ? s.settings.themeAuto !== false : true;
-  const key = forcedTheme !== null ? 'f' + forcedTheme : auto ? 'a' + s.gameNo : 'c';
+  const skinSetting = forcedSkin !== null ? forcedSkin : s.settings && s.settings.boardSkin ? s.settings.boardSkin : 'auto';
+  const skin = pickSkin(skinSetting, s.gameNo);
+  const key = (forcedTheme !== null ? 'f' + forcedTheme : auto ? 'a' + s.gameNo : 'c') + '|' + (skin ? skin.id : 'wood');
   if (key === themeKey) return;
   themeKey = key;
   const t = forcedTheme !== null ? themeForGame(0, forcedTheme) : auto ? themeForGame(s.gameNo) : classicTheme();
+  t.skin = skin;
   applyTheme(t, boardView, scene);
 }
 
@@ -480,6 +486,9 @@ function frame(t) {
   const time = t / 1000;
   director.update(dt, time);
   themeTick(state);
+  const ledOn = !(state && state.settings && state.settings.ledOn === false);
+  boardView.ledOn = ledOn;
+  if (scene.tickLed) scene.tickLed(time, ledOn);
   boardView.draw(director.view, time);
   scene.render();
   if (state) {

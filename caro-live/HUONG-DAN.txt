@@ -161,3 +161,15 @@ CAP NHAT TRUC TIEP (khong can tai lai ban zip)
    - Giu nguyen: cai dat, thong ke (thu muc data), ID TikTok (ten-tiktok.txt). File bi thay se duoc sao luu o data/backup-ban-<so>/
      (neu ban tu sua config.js, ban cu nam trong thu muc sao luu do).
    - Dang LIVE thi nen cap nhat luc nghi giua ca vi game se tat/mo lai.
+
+KIEU BAN CO + DEN LED (moi)
+- Bang dieu khien > muc cai dat van > "Kieu ban co": Tu doi moi van, hoac chon co dinh
+  Rong vang, Thanh Long, Bach Ho, Chu Tuoc, Huyen Vu, Cong nghe, Neon tim, Thien ha, hoac Ban go cu.
+- Tick/bo tick "Den LED chay o duong ke ban co" de bat/tat den LED.
+- Quan X (do) va O (xanh) luon co vien sang va nen toi nen de nhin. Them kieu moi: sua file public\board-skins.js.
+- Muon ep 1 kieu ngay tren link: live.html?skin=rong-vang (hoac ?skin=0..7).
+
+LOI THOAI + NHAN VAT TIEN HIEP
+- Dieu phoi vien/trong tai goi nguoi choi la "dao huu", tu xung "tai ha". Sua cau o muc "Loi thoai" cua bang dieu khien.
+- Neu ban DA TUNG sua loi thoai (file data\thoai.json), cau cu cua ban van duoc giu: bam nut "Khoi phuc tat ca thoai goc" o muc Loi thoai de lay cau tien hiep moi.
+- Hai nhan vat mac dao bao / tien phuc (kim quan, tram ngoc, tay ao rong, lua phi doi).

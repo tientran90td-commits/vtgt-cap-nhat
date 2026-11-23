@@ -83,7 +83,7 @@ class Hub {
     if (gift.announce !== false) {
       const n = Number(gift.count) || 1;
       const pt = pts ? ` (+${pts} điểm)` : '';
-      this.match.feed(`🎁 ${user.name} tặng ${gift.name}${n > 1 ? ' x' + n : ''}${pt}`, 'gift');
+      this.match.feed(`🎁 Đạo hữu ${user.name} ban tặng ${gift.name}${n > 1 ? ' x' + n : ''}${pt}`, 'gift');
       const cue = this.commentator.giftThanks(user, gift, now);
       if (cue && gift.key) {
         if (this.giftCues.size > 60) this.giftCues.clear();
@@ -101,7 +101,7 @@ class Hub {
   onShare(user, now = Date.now()) {
     const p = this.interaction.addShare(user);
     if (p) {
-      this.match.feed(`🔁 ${user.name} chia sẻ LIVE (+${p} điểm)`, 'gift');
+      this.match.feed(`🔁 Đạo hữu ${user.name} chia sẻ LIVE (+${p} điểm)`, 'gift');
       this.commentator.shareThanks(user, now);
     }
   }
@@ -109,7 +109,7 @@ class Hub {
   onFollow(user, now = Date.now()) {
     const p = this.interaction.addFollow(user);
     if (p) {
-      this.match.feed(`➕ ${user.name} đã follow (+${p} điểm)`, 'gift');
+      this.match.feed(`➕ Đạo hữu ${user.name} đã follow (+${p} điểm)`, 'gift');
       this.commentator.followThanks(user, now);
     }
   }

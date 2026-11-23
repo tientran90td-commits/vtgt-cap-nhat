@@ -99,7 +99,7 @@ class Commentator {
       this.say('lobbyEmpty', {}, { at: now });
       return;
     }
-    const names = preview.map((u) => this.nm(u, 'một bạn ẩn danh'));
+    const names = preview.map((u) => this.nm(u, 'vô danh'));
     this.say('lobbyWarn', { ten: names.join(' và '), ten1: names[0], ten2: names[1] || '' }, { at: now });
   }
 
@@ -107,13 +107,13 @@ class Commentator {
     if (champion) {
       this.say(
         'pickedChamp',
-        { ten1: this.nm(champion, 'nhà vô địch'), ten2: this.nm(chosen[0], 'người chơi mới') },
+        { ten1: this.nm(champion, 'thủ lôi'), ten2: this.nm(chosen[0], 'tân khách') },
         { at: now }
       );
     } else {
       this.say(
         'pickedPair',
-        { ten1: this.nm(chosen[0], 'người chơi một'), ten2: this.nm(chosen[1], 'người chơi hai') },
+        { ten1: this.nm(chosen[0], 'số một'), ten2: this.nm(chosen[1], 'số hai') },
         { at: now }
       );
     }
@@ -128,13 +128,13 @@ class Commentator {
     this.say('coinToss', {}, { at: now + 1200 });
     this.say(
       'coinResult',
-      { ten1: this.nm(xUser, 'người chơi X'), ten2: this.nm(oUser, 'người chơi O') },
+      { ten1: this.nm(xUser, 'quân X'), ten2: this.nm(oUser, 'quân O') },
       { at: now + flipMs, prio: 3 }
     );
   }
 
   start(xUser, now) {
-    this.say('startGame', { ten: this.nm(xUser, 'người chơi X') }, { at: now });
+    this.say('startGame', { ten: this.nm(xUser, 'quân X') }, { at: now });
   }
 
   move(user, mark, x, y, nextUser, n, now) {
@@ -149,20 +149,20 @@ class Commentator {
   }
 
   occupied(user, x, y, now) {
-    this.say('occupied', { ten: this.nm(user, 'bạn'), oco: spellCell(x, y) }, { at: now, prio: 1 });
+    this.say('occupied', { ten: this.nm(user, 'vô danh'), oco: spellCell(x, y) }, { at: now, prio: 1 });
   }
 
   timeoutAuto(user, x, y, n, now) {
-    this.say('timeoutAuto', { ten: this.nm(user, 'Người chơi'), oco: spellCell(x, y) }, { at: now, gate: { k: 'move', n } });
+    this.say('timeoutAuto', { ten: this.nm(user, 'vô danh'), oco: spellCell(x, y) }, { at: now, gate: { k: 'move', n } });
   }
 
   warn10(user, now) {
-    this.say('warn10', { ten: this.nm(user, 'Người chơi') }, { at: now, prio: 1 });
+    this.say('warn10', { ten: this.nm(user, 'vô danh') }, { at: now, prio: 1 });
   }
 
   win(winner, loser, info, now) {
-    const w = this.nm(winner, 'người thắng');
-    const l = this.nm(loser, 'người thua');
+    const w = this.nm(winner, 'vô danh');
+    const l = this.nm(loser, 'vô danh');
     const gate = { k: 'result' };
     if (info.type === 'forfeit') {
       this.say('winForfeit', { ten: w, thua: l, lydo: info.why }, { at: now, gate, prio: 3 });
@@ -208,7 +208,7 @@ class Commentator {
     if (this.inMatch() || this.level() < 1) return null;
     if (this.lastGreetAt != null && now - this.lastGreetAt < 15000) return null;
     this.lastGreetAt = now;
-    return this.say('greet', { ten: this.nm(user, 'bạn mới') }, { at: now + 800, prio: 1 });
+    return this.say('greet', { ten: this.nm(user, 'mới đến') }, { at: now + 800, prio: 1 });
   }
 
   /** Giải thích cách chơi lúc chờ. */
@@ -232,7 +232,7 @@ class Commentator {
     if (!big && this.recentThanks(now) >= 3) return null; // quá nhiều quà nhỏ cùng lúc: bỏ bớt
     const delay = (this.cfg.voice && this.cfg.voice.thanksDelayMs) || 2500;
     const vars = {
-      ten: this.nm(user, 'một bạn ẩn danh'),
+      ten: this.nm(user, 'vô danh'),
       qua: this.namer.sayText(gift.name, 'món quà'),
       so: gift.count || 1,
     };
@@ -260,7 +260,7 @@ class Commentator {
 
   followThanks(user, now) {
     if (this.recentThanks(now) >= 3 || !this.thanksGap(false, now)) return;
-    const cue = this.say('followThanks', { ten: this.nm(user, 'một bạn ẩn danh') }, { at: now + 1500 });
+    const cue = this.say('followThanks', { ten: this.nm(user, 'vô danh') }, { at: now + 1500 });
     if (cue) this.thanksLog.push(now);
   }
 
@@ -276,18 +276,18 @@ class Commentator {
   }
 
   extraTime(user, giay, now) {
-    this.say('extraTime', { ten: this.nm(user, 'Bạn'), giay }, { at: now, prio: 1 });
+    this.say('extraTime', { ten: this.nm(user, 'vô danh'), giay }, { at: now, prio: 1 });
   }
 
   // ----- xác nhận thả tim -----
   confirmAsk(users, giay, now) {
-    const names = users.map((u) => this.nm(u, 'một bạn'));
+    const names = users.map((u) => this.nm(u, 'vô danh'));
     if (names.length >= 2) this.say('confirmAsk', { ten1: names[0], ten2: names[1], giay }, { at: now });
     else if (names.length === 1) this.say('confirmAskOne', { ten: names[0], giay }, { at: now });
   }
 
   confirmOk(user, now) {
-    this.say('confirmOk', { ten: this.nm(user, 'Bạn') }, { at: now, prio: 1 });
+    this.say('confirmOk', { ten: this.nm(user, 'vô danh') }, { at: now, prio: 1 });
   }
 
   confirmWarn(users, giay, now) {
@@ -296,13 +296,13 @@ class Commentator {
   }
 
   confirmFail(user, replacement, now) {
-    if (replacement) this.say('confirmFail', { ten: this.nm(user, 'Bạn'), ten2: this.nm(replacement, 'một bạn khác') }, { at: now });
-    else this.say('confirmFailNone', { ten: this.nm(user, 'Bạn') }, { at: now });
+    if (replacement) this.say('confirmFail', { ten: this.nm(user, 'vô danh'), ten2: this.nm(replacement, 'vô danh') }, { at: now });
+    else this.say('confirmFailNone', { ten: this.nm(user, 'vô danh') }, { at: now });
   }
 
   shareThanks(user, now) {
     if (this.recentThanks(now) >= 3 || !this.thanksGap(false, now)) return;
-    const cue = this.say('shareThanks', { ten: this.nm(user, 'một bạn ẩn danh') }, { at: now + 1500 });
+    const cue = this.say('shareThanks', { ten: this.nm(user, 'vô danh') }, { at: now + 1500 });
     if (cue) this.thanksLog.push(now);
   }
 }

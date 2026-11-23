@@ -22,7 +22,7 @@ const NUMBERS = {
   idleHintSeconds: [0, 120],
   clockSeconds: [0, 60],
 };
-const BOOLS = ['blockBothEnds', 'winnerStays', 'hostCanPlay', 'autoNextGame', 'showSign', 'themeAuto'];
+const BOOLS = ['blockBothEnds', 'winnerStays', 'hostCanPlay', 'autoNextGame', 'showSign', 'themeAuto', 'ledOn'];
 
 class Settings {
   constructor(cfg, file) {
@@ -55,6 +55,10 @@ class Settings {
         c[k] = v;
         changed.push(k);
       }
+    }
+    if (typeof patch.boardSkin === 'string' && /^(auto|wood|[a-z0-9-]{1,20})$/.test(patch.boardSkin) && c.boardSkin !== patch.boardSkin) {
+      c.boardSkin = patch.boardSkin;
+      changed.push('boardSkin');
     }
     for (const k of BOOLS) {
       if (patch[k] === undefined) continue;
@@ -123,6 +127,7 @@ class Settings {
     const out = { voice: { ...c.voice }, sfx: { ...(c.sfx || { on: true, volume: 0.7 }) }, music: { ...(c.music || { on: true, volume: 0.3 }) } };
     for (const k of Object.keys(NUMBERS)) out[k] = c[k];
     for (const k of BOOLS) out[k] = c[k];
+    out.boardSkin = c.boardSkin || 'auto';
     return out;
   }
 

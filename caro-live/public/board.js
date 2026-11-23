@@ -4,6 +4,8 @@
  * Quy ước: x = cột (A=0), y = hàng (hàng 1 = 0). Hàng 15 nằm trên cùng.
  */
 
+import { paintSkinBase, drawLed } from './board-skins.js';
+
 export const COLORS = { X: '#ff4d4f', O: '#2f9bff', gold: '#ffd54a' };
 
 export function layout(px, size) {
@@ -24,12 +26,18 @@ function rng(seed) {
 }
 
 // Bảng màu bàn cờ hiện tại (theme.js đổi qua setBoardPalette mỗi ván)
-const PAL = { wood: ['#cf955a', '#a8692f'], label: '#2a1608' };
+const PAL = { wood: ['#cf955a', '#a8692f'], label: '#2a1608', skin: null };
 export function setBoardPalette(p) {
   if (!p) return;
   PAL.wood = p.wood.slice();
   PAL.label = p.label;
+  PAL.skin = p.skin || null; // kiểu bàn cờ hoa văn + LED (board-skins.js); null = bàn gỗ
 }
+/** Kiểu bàn cờ đang dùng (null = bàn gỗ). Cảnh 3D dùng để vẽ đèn LED lên mặt bàn. */
+export function currentSkin() {
+  return PAL.skin;
+}
+export { drawLed };
 
 export function paintWood(ctx, w, h, seed = 7, light = '#cf955a', dark = '#a8692f') {
   const g = ctx.createLinearGradient(0, 0, w, h);
@@ -57,6 +65,10 @@ export function paintWood(ctx, w, h, seed = 7, light = '#cf955a', dark = '#a8692
 /** Nền bàn cờ: gỗ + lưới + nhãn cột A-O, hàng 1-15 (chưa có quân). */
 export function paintBoardBase(ctx, px, size) {
   const L = layout(px, size);
+  if (PAL.skin) {
+    paintSkinBase(ctx, px, size, L, PAL.skin);
+    return L;
+  }
   paintWood(ctx, px, px, 11, PAL.wood[0], PAL.wood[1]);
   const gw = L.cell * size;
   // khung lưới hơi sáng hơn
@@ -95,6 +107,20 @@ export function cellCenter(L, x, y) {
   return { cx: L.gx0 + (x + 0.5) * L.cell, cy: L.gy0 + (L.size - 1 - y + 0.5) * L.cell };
 }
 
+function strokeMark(ctx, mark, cx, cy, r) {
+  ctx.beginPath();
+  if (mark === 'X') {
+    const d = r * 0.78;
+    ctx.moveTo(cx - d, cy - d);
+    ctx.lineTo(cx + d, cy + d);
+    ctx.moveTo(cx + d, cy - d);
+    ctx.lineTo(cx - d, cy + d);
+  } else {
+    ctx.arc(cx, cy, r * 0.78, 0, Math.PI * 2);
+  }
+  ctx.stroke();
+}
+
 function drawMark(ctx, mark, cx, cy, r) {
   ctx.save();
   ctx.lineCap = 'round';
@@ -102,6 +128,15 @@ function drawMark(ctx, mark, cx, cy, r) {
   ctx.shadowBlur = r * 0.35;
   ctx.shadowOffsetY = r * 0.12;
   ctx.lineWidth = r * 0.34;
+  if (PAL.skin) {
+    // viền sáng mỏng quanh quân để nổi trên mọi nền hoa văn
+    ctx.shadowColor = 'transparent';
+    ctx.strokeStyle = 'rgba(255,255,255,0.92)';
+    ctx.lineWidth = r * 0.34 + r * 0.2;
+    strokeMark(ctx, mark, cx, cy, r);
+    ctx.shadowColor = 'rgba(0,0,0,0.35)';
+    ctx.lineWidth = r * 0.34;
+  }
   if (mark === 'X') {
     ctx.strokeStyle = COLORS.X;
     const d = r * 0.78;
@@ -128,6 +163,7 @@ export class BoardView {
     this.px = 0;
     this.base = null;
     this.L = null;
+    this.ledOn = true; // đèn LED chạy ở đường kẻ (chỉ có khi dùng kiểu bàn cờ hoa văn)
   }
 
   resize(cssPx) {
@@ -157,6 +193,7 @@ export class BoardView {
     const ctx = this.ctx;
     const L = this.L;
     ctx.drawImage(this.base, 0, 0);
+    if (PAL.skin && this.ledOn) drawLed(ctx, L, PAL.skin, t);
 
     // ô nước đi gần nhất
     if (view.last) {

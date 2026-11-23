@@ -146,7 +146,7 @@ class Match {
     };
     const pending = this.confirm.slots.filter((x) => !x.done).map((x) => x.user);
     const names = c.list.map((u) => u.name).join(' và ');
-    this.feed(`❤ ${names}: hãy THẢ TIM để xác nhận tham gia (${secs}s)`, 'info');
+    this.feed(`❤ ${names}: mời đạo hữu THẢ TIM để xác nhận lên đài (${secs}s)`, 'info');
     this.voice.confirmAsk(pending, secs, now);
     this.checkConfirmed(now);
   }
@@ -157,7 +157,7 @@ class Match {
     const slot = this.confirm.slots.find((x) => x.user.id === user.id);
     if (!slot || slot.done) return;
     slot.done = true;
-    this.feed(`❤ ${slot.user.name} đã thả tim, sẵn sàng!`, 'gift');
+    this.feed(`❤ Đạo hữu ${slot.user.name} đã thả tim, sẵn sàng!`, 'gift');
     if (this.confirm.slots.every((x) => x.done)) this.checkConfirmed(now);
     else this.voice.confirmOk(slot.user, now);
   }
@@ -186,7 +186,7 @@ class Match {
         filter: (u) => this.eligible(u) && !this.confirmFailed.has(u.id) && !used.has(u.id),
       })[0];
       if (!rep) {
-        this.feed(`⏰ ${f.user.name} không thả tim, không còn ai thay thế. Chọn lại người chơi!`, 'warn');
+        this.feed(`⏰ Đạo hữu ${f.user.name} không thả tim, không còn ai thế chỗ. Chọn lại người lên đài!`, 'warn');
         this.voice.confirmFail(f.user, null, now);
         this.confirm = null;
         this.enterLobby(now);
@@ -196,7 +196,7 @@ class Match {
       const old = f.user;
       f.user = rep;
       f.done = this.isHost(rep);
-      this.feed(`⏰ ${old.name} không thả tim. Mời ${rep.name} thay thế, hãy thả tim!`, 'warn');
+      this.feed(`⏰ Đạo hữu ${old.name} không thả tim. Mời đạo hữu ${rep.name} thế chỗ, xin thả tim!`, 'warn');
       this.voice.confirmFail(old, rep, now);
     }
     cf.round += 1;
@@ -249,7 +249,7 @@ class Match {
     this.phase = 'coin';
     this.phaseStartedAt = now;
     this.phaseEndsAt = now + this.cfg.coinSeconds * 1000;
-    this.feed(`🪙 Tung đồng xu: ${this.players.X.name} đi trước (X đỏ)`, 'info');
+    this.feed(`🪙 Tung đồng xu: đạo hữu ${this.players.X.name} đi trước (X đỏ)`, 'info');
     this.voice.coin(this.players.X, this.players.O, now, COIN_FLIP_MS);
   }
 
@@ -259,7 +259,7 @@ class Match {
     this.timeouts = { X: 0, O: 0 };
     this.extraUsed = { X: 0, O: 0 };
     this.beginTurn('X', now);
-    this.feed(`▶ Bắt đầu! Gõ tọa độ như j9, k6 để đánh cờ`, 'info');
+    this.feed(`▶ Khai cục! Gõ tọa độ như j9, k6 để xuất chiêu`, 'info');
     this.voice.start(this.players.X, now);
   }
 
@@ -288,7 +288,7 @@ class Match {
     }
     this.extraUsed[mark] += 1;
     this.addTime(secs, now);
-    this.feed(`⏳ ${player.name} xin thêm ${secs} giây`, 'info', mark);
+    this.feed(`⏳ Đạo hữu ${player.name} xin thêm ${secs} giây`, 'info', mark);
     this.voice.extraTime(player, secs, now);
   }
 
@@ -302,7 +302,7 @@ class Match {
     if (this.phase !== 'playing') return { ok: false, msg: 'Chưa trong ván đấu.' };
     const n = Math.max(1, Math.min(120, Math.round(Number(secs) || 15)));
     this.addTime(n, now);
-    this.feed(`⏳ Chủ phòng cộng thêm ${n} giây cho ${this.players[this.turn].name}`, 'info', this.turn);
+    this.feed(`⏳ Chủ phòng ban thêm ${n} giây cho đạo hữu ${this.players[this.turn].name}`, 'info', this.turn);
     return { ok: true };
   }
 
@@ -341,7 +341,7 @@ class Match {
     this.lastCommentAt[mark] = now; // người chơi vẫn đang tương tác (bình luận hiện được)
 
     if (cmd === 'surrender') {
-      this.finishForfeit(mark, 'đã đầu hàng', now);
+      this.finishForfeit(mark, 'đã chủ động nhận thua', now);
       return;
     }
     if (cmd === 'extend') {
@@ -396,7 +396,7 @@ class Match {
     }
     const r = this.game.place(x, y, mark);
     this.timeouts[mark] = 0;
-    this.feed(`${player.name} đánh ${labelOf(x, y)}`, 'move', mark);
+    this.feed(`${player.name} xuất chiêu ${labelOf(x, y)}`, 'move', mark);
     this.afterMove(mark, x, y, r, now);
   }
 
@@ -420,7 +420,7 @@ class Match {
     const player = this.players[mark];
     this.timeouts[mark] += 1;
     if (this.timeouts[mark] >= this.cfg.maxTimeouts) {
-      this.finishForfeit(mark, 'hết giờ quá nhiều lần và bị xử thua', now);
+      this.finishForfeit(mark, 'hết thời gian quá nhiều lần nên bị xử thua', now);
       return;
     }
     const cell = this.game.nearbyEmptyCell();
@@ -430,7 +430,7 @@ class Match {
     }
     const r = this.game.place(cell.x, cell.y, mark);
     this.feed(
-      `⏰ ${player.name} hết giờ! Tự động đánh ${labelOf(cell.x, cell.y)} (${this.timeouts[mark]}/${this.cfg.maxTimeouts})`,
+      `⏰ ${player.name} hết giờ! Thiên đạo đánh thay ${labelOf(cell.x, cell.y)} (${this.timeouts[mark]}/${this.cfg.maxTimeouts})`,
       'warn',
       mark
     );
@@ -458,7 +458,7 @@ class Match {
     this.champion = null;
     this.excludeNext.clear();
     this.enterLobby(now);
-    this.feed(`🎯 Chủ phòng chọn ${list[0].name} và ${list[1].name} đấu với nhau`, 'info');
+    this.feed(`🎯 Chủ phòng chỉ định đạo hữu ${list[0].name} và ${list[1].name} tỷ thí`, 'info');
     if (opt.confirmLike && this.cfg.confirmSeconds > 0) this.startConfirm({ list }, now);
     else this.startCoin({ list }, now);
     return { ok: true };
@@ -525,7 +525,7 @@ class Match {
   }
 
   finishWin(mark, line, now) {
-    this.result = { type: 'win', winner: mark, text: `🏆 ${this.players[mark].name} thắng!`, note: '', line };
+    this.result = { type: 'win', winner: mark, text: `🏆 Đạo hữu ${this.players[mark].name} đại thắng!`, note: '', line };
     const s = this.settleWinner(mark, now, this.result);
     this.feed(this.result.text, 'win', mark);
     this.voice.win(s.winner, s.loser, { type: 'win', streak: s.streak, steppedDown: s.steppedDown }, now);
@@ -537,7 +537,7 @@ class Match {
     this.result = {
       type: 'forfeit',
       winner: winMark,
-      text: `🏆 ${this.players[winMark].name} thắng! (${this.players[loserMark].name} ${why})`,
+      text: `🏆 Đạo hữu ${this.players[winMark].name} đắc thắng! (${this.players[loserMark].name} ${why})`,
       note: '',
       line: null,
     };
@@ -553,7 +553,7 @@ class Match {
   }
 
   finishDraw(now) {
-    this.result = { type: 'draw', winner: null, text: '🤝 Hòa! Bàn cờ đã đầy', note: '', line: null };
+    this.result = { type: 'draw', winner: null, text: '🤝 Hòa cục! Bàn cờ đã kín quân', note: '', line: null };
     this.champion = null;
     this.excludeNext = new Set([this.players.X.id, this.players.O.id]);
     this.feed(this.result.text, 'win');
@@ -565,7 +565,7 @@ class Match {
     this.champion = null;
     this.excludeNext.clear();
     this.gameNo += 1;
-    this.feed('♻ Chủ phòng đã làm mới trận đấu', 'info');
+    this.feed('♻ Chủ phòng đã khai mở lại trận pháp', 'info');
     this.voice.hostReset(now);
     this.enterLobby(now);
   }
@@ -625,17 +625,17 @@ class Match {
     if (!p) return;
     this.hinted = true;
     this.signPulseUntil = now + 12000; // biển báo ở góc màn hình nhấp nháy (không nói thành tiếng)
-    this.feed(`💬 ${p.name}: bình luận không hiện? Thêm @ hoặc @@ trước tọa độ (vd @@j9)`, 'warn', this.turn);
+    this.feed(`💬 Đạo hữu ${p.name}: bình luận không hiện? Thêm @ hoặc @@ trước tọa độ (vd @@j9)`, 'warn', this.turn);
   }
 
   /** Nội dung biển báo nhỏ ở góc màn hình live. */
   signView(now) {
     if (this.cfg.showSign === false) return null;
-    if (this.phase === 'confirm') return { lines: ['❤ Thả tim để xác nhận tham gia'], pulse: false };
+    if (this.phase === 'confirm') return { lines: ['❤ Thả tim để xác nhận lên đài'], pulse: false };
     if (this.phase !== 'playing') return null;
-    const lines = ['⌨ Gõ tọa độ: j9 · k6 · ca 6', '👻 Bình luận không hiện? Thêm @ hoặc @@ trước (vd @@j9)'];
-    if ((Number(this.cfg.extraTimesPerGame) || 0) > 0) lines.push('⏳ Gõ !them để xin thêm giờ');
-    lines.push('📊 Gõ !diem để xem hạng của bạn');
+    const lines = ['⌨ Xuất chiêu bằng tọa độ: j9 · k6 · ca 6', '👻 Bình luận không hiện? Thêm @ hoặc @@ trước (vd @@j9)'];
+    if ((Number(this.cfg.extraTimesPerGame) || 0) > 0) lines.push('⏳ Gõ !them để xin thêm thời gian');
+    lines.push('📊 Gõ !diem để xem tu vi (điểm) của đạo hữu');
     return { lines, pulse: now < (this.signPulseUntil || 0) };
   }
 

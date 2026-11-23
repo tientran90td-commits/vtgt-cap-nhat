@@ -81,6 +81,8 @@ module.exports = {
   // Ghi sẵn các điều cần thiết (gõ tọa độ, nếu bình luận bị ẩn thì thêm @, xin thêm giờ...). Không đọc thành tiếng.
   showSign: true,
   themeAuto: true, // mỗi ván đổi màu bàn cờ, màu phòng, tóc/áo 2 nhân vật
+  boardSkin: 'auto', // kiểu bàn cờ: 'auto' = mỗi ván 1 kiểu | 'wood' = bàn gỗ | rong-vang, thanh-long, bach-ho, chu-tuoc, huyen-vu, cong-nghe, neon-tim, thien-ha
+  ledOn: true, // đèn LED chạy ở đường kẻ bàn cờ
   // Đến lượt mà người chơi chưa bình luận gì sau bấy nhiêu giây -> biển báo nhấp nháy để gây chú ý (0 = tắt).
   idleHintSeconds: fast ? 0 : 12,
 

@@ -52,24 +52,24 @@ export const THEMES = [
 
 // hair = màu tóc, hairLight = màu bóng tóc, cloth = áo, accent = khăn / nơ / điểm nhấn
 export const BOYS = [
-  { hair: 0x232c4a, hairLight: 0x7f93d8, cloth: 0x9aa3b8, accent: 0xff3b3f },
-  { hair: 0x4a2f1b, hairLight: 0xb98a5a, cloth: 0x6fae8a, accent: 0xffd23f },
-  { hair: 0xcfd3dc, hairLight: 0xffffff, cloth: 0x3a3f52, accent: 0x33d1ff },
-  { hair: 0x8f2a2a, hairLight: 0xe66a5a, cloth: 0xe9ecf3, accent: 0x2ecc71 },
-  { hair: 0x15151c, hairLight: 0x6a6f9a, cloth: 0xf0a35a, accent: 0x6a5acd },
-  { hair: 0x1f5a4a, hairLight: 0x5fd0a8, cloth: 0xb7c4d6, accent: 0xff6b9a },
-  { hair: 0xd9b24a, hairLight: 0xfff0a0, cloth: 0x3b5ba6, accent: 0xff7a3d },
-  { hair: 0x4a2f7a, hairLight: 0xa88be0, cloth: 0x8d96a8, accent: 0xffd166 },
+  { hair: 0x14161f, hairLight: 0x6a78b8, cloth: 0xeef2f8, accent: 0x35c6a0 },
+  { hair: 0xdfe6f0, hairLight: 0xffffff, cloth: 0x9fc5e8, accent: 0xffd166 },
+  { hair: 0x1a1224, hairLight: 0x8a6ad0, cloth: 0x6e5ab0, accent: 0xf2d675 },
+  { hair: 0x2a2f3a, hairLight: 0x8fa0c8, cloth: 0x2f6f6a, accent: 0xe8f0ff },
+  { hair: 0x3a1e14, hairLight: 0xb98a5a, cloth: 0xe8d9b0, accent: 0xb03a2e },
+  { hair: 0x0e1a2e, hairLight: 0x5a90d8, cloth: 0xc8d6ea, accent: 0x4ad1c8 },
+  { hair: 0xc9ced8, hairLight: 0xffffff, cloth: 0x30364a, accent: 0xffd23f },
+  { hair: 0x2a1a3a, hairLight: 0xa88be0, cloth: 0xf4e9ff, accent: 0x9a7ae0 },
 ];
 export const GIRLS = [
-  { hair: 0x1b1b2c, hairLight: 0x8a8fc8, cloth: 0xf1f3fa, accent: 0x2f9bff },
-  { hair: 0xe0709a, hairLight: 0xffb3cf, cloth: 0xfdf1f5, accent: 0xb066ff },
-  { hair: 0xe8c45a, hairLight: 0xfff0a8, cloth: 0x7fb6e8, accent: 0xff5d8f },
-  { hair: 0x9fb4d6, hairLight: 0xe6f0ff, cloth: 0xe8ecf7, accent: 0xff6b6b },
-  { hair: 0x5a3320, hairLight: 0xb9835a, cloth: 0xd9525c, accent: 0xffe08a },
-  { hair: 0x3fb59a, hairLight: 0xa8f0da, cloth: 0xf2f7f4, accent: 0xf28cb1 },
-  { hair: 0x6a3fa0, hairLight: 0xc2a0f0, cloth: 0xd9c9f0, accent: 0x4ad1c8 },
-  { hair: 0xd2691e, hairLight: 0xffb36b, cloth: 0xfff3e0, accent: 0x3b6fe0 },
+  { hair: 0x1b1b2c, hairLight: 0x8a8fc8, cloth: 0xf6f8fc, accent: 0x6fc3ff },
+  { hair: 0xe0709a, hairLight: 0xffb3cf, cloth: 0xffeef3, accent: 0xb066ff },
+  { hair: 0xe8c45a, hairLight: 0xfff0a8, cloth: 0xbfe0f5, accent: 0xff7fa8 },
+  { hair: 0xcfdcf0, hairLight: 0xffffff, cloth: 0xe3ecfa, accent: 0xffb3b3 },
+  { hair: 0x4a2a1a, hairLight: 0xb9835a, cloth: 0xffd9c9, accent: 0xffe08a },
+  { hair: 0x2fa58a, hairLight: 0xa8f0da, cloth: 0xe6faf3, accent: 0xf28cb1 },
+  { hair: 0x6a3fa0, hairLight: 0xc2a0f0, cloth: 0xe3d3f7, accent: 0x4ad1c8 },
+  { hair: 0xd2691e, hairLight: 0xffb36b, cloth: 0xfff3e0, accent: 0x7fb0ff },
 ];
 
 const SHIFT = Math.floor(Math.random() * 8); // lệch ngẫu nhiên mỗi lần mở trang
@@ -93,7 +93,7 @@ export function classicTheme() {
 
 /** Áp dụng lên bàn cờ 2D (boardView) và cảnh 3D (scene). */
 export function applyTheme(theme, boardView, scene) {
-  setBoardPalette(theme.board);
+  setBoardPalette({ ...theme.board, skin: theme.skin || null });
   if (boardView && boardView.setTheme) boardView.setTheme();
   if (scene && scene.setTheme) scene.setTheme(theme);
 }
