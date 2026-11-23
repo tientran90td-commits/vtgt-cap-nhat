@@ -175,9 +175,11 @@
     // lưới
     ctx.strokeStyle = 'rgba(40,20,5,.75)'; ctx.lineWidth = 1;
     ctx.beginPath();
-    for (let i = 0; i < n; i++) {
-      ctx.moveTo(cx(i), cy(0)); ctx.lineTo(cx(i), cy(n - 1));
-      ctx.moveTo(cx(0), cy(i)); ctx.lineTo(cx(n - 1), cy(i));
+    // đường kẻ nằm ở BIÊN các ô; quân đứng giữa ô
+    for (let i = 0; i <= n; i++) {
+      const gx = L.x0 + i * cell, gy = L.y0 + i * cell, e = L.x0 + n * cell;
+      ctx.moveTo(gx, L.y0); ctx.lineTo(gx, e);
+      ctx.moveTo(L.x0, gy); ctx.lineTo(e, gy);
     }
     ctx.stroke();
     // nhãn
