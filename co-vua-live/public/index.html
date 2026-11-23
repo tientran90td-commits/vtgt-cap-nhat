@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cờ vua LIVE - Bảng điều khiển</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="panel.css">
+</head>
+<body>
+  <header class="bar">
+    <h1>♞ Cờ vua LIVE <small>Bảng điều khiển</small></h1>
+    <div class="chips">
+      <span id="chipWs" class="chip off">● Mất kết nối game</span>
+      <span id="chipTt" class="chip">TikTok: …</span>
+      <span id="chipPhase" class="chip">…</span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <!-- CỘT TRÁI -->
+    <section class="col">
+      <div class="card hero">
+        <h2>📺 Màn hình để phát LIVE</h2>
+        <p class="hint">Bấm nút dưới đây: một <b>tab mới</b> sẽ tự mở ra với màn hình sạch (không nút bấm). Dùng tab đó làm nguồn hình cho phần mềm phát (OBS, TikTok LIVE Studio…).</p>
+        <div class="btnrow">
+          <button id="btnPortrait" class="big primary">📱 MỞ MÀN HÌNH LIVE DỌC (9:16)</button>
+          <button id="btnLandscape" class="big">🖥️ Mở màn hình ngang (16:9)</button>
+        </div>
+        <div class="btnrow small">
+          <button id="copyPortrait">Chép link dọc</button>
+          <button id="copyLandscape">Chép link ngang</button>
+          <span id="popupWarn" class="warn hidden">Trình duyệt chặn cửa sổ mới — hãy cho phép “pop-up” cho trang này rồi bấm lại.</span>
+        </div>
+        <p class="hint tiny">Mẹo: trong tab live bấm <kbd>F</kbd> để toàn màn hình, <kbd>M</kbd> tắt/bật giọng đọc.</p>
+      </div>
+
+      <div class="card">
+        <h2>🎮 Điều khiển ván đấu</h2>
+        <div class="btnrow">
+          <button id="btnStart">▶ Bắt đầu ngay</button>
+          <button id="btnSkip">⏭ Đánh thay lượt</button>
+          <button id="btnAddTime">⏳ Thêm giờ lượt này</button>
+          <button id="btnConfirm">❤ Bỏ qua xác nhận tim</button>
+          <button id="btnForfeitX">🏳 Xử thua TRẮNG</button>
+          <button id="btnForfeitO">🏳 Xử thua ĐEN</button>
+          <button id="btnReset" class="danger">⟲ Ván mới</button>
+        </div>
+        <label class="demo">
+          <input type="checkbox" id="demoToggle">
+          <span><b>🧪 CHẠY DEMO</b> — khán giả ảo tự bình luận, thả tim, tặng quà (để xem thử không cần LIVE thật)</span>
+        </label>
+        <div id="status" class="status"></div>
+      </div>
+
+      <div class="card">
+        <h2>👥 Tất cả người xem <small id="vwCount" class="ok"></small></h2>
+        <p class="hint tiny">Bấm vào tên để chọn đúng 2 người, rồi bấm "Cho 2 người đấu" để họ solo với nhau (tung đồng xu chọn bên đi trước).</p>
+        <input id="vwSearch" type="text" class="vwsearch" placeholder="Tìm theo tên…" maxlength="40">
+        <ul id="vwList" class="vwlist"></ul>
+        <div id="vwPick" class="status">Chưa chọn ai.</div>
+        <label class="chk"><input type="checkbox" id="vwLike"> Bắt 2 người thả tim xác nhận trước khi vào ván</label>
+        <div class="btnrow">
+          <button id="vwGo" class="big primary">⚔ Cho 2 người đấu</button>
+          <button id="vwClear">Bỏ chọn</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🔥 Top tương tác</h2>
+        <ol id="topList" class="toplist"></ol>
+      </div>
+
+      <div class="card">
+        <h2>💬 Bình luận gần đây</h2>
+        <ul id="chatList" class="chatlist"></ul>
+      </div>
+
+      <div class="card">
+        <h2>🧰 Gõ thử (không cần LIVE)</h2>
+        <div class="row">
+          <label>Giả làm
+            <select id="tWho">
+              <option value="viewer">Khán giả</option>
+              <option value="X">Người chơi TRẮNG</option>
+              <option value="O">Người chơi ĐEN</option>
+              <option value="host">Chủ phòng</option>
+            </select>
+          </label>
+          <input id="tText" type="text" placeholder="gõ bình luận, ví dụ j9 hoặc đi k6 nhé" maxlength="80">
+          <button id="tSend">Gửi</button>
+        </div>
+        <div class="btnrow small">
+          <button id="tLike">👍 Thả tim</button>
+          <button class="tGift" data-g="Hoa hồng" data-d="1">🌹 Hoa hồng 1💎</button>
+          <button class="tGift" data-g="Sư tử" data-d="29">🦁 Sư tử 29💎</button>
+          <button class="tGift" data-g="Vũ trụ" data-d="500">🚀 Quà 500💎</button>
+        </div>
+        <p id="tHint" class="hint tiny"></p>
+      </div>
+    </section>
+
+    <!-- CỘT PHẢI -->
+    <section class="col">
+      <div class="card" id="updCard">
+        <h2>⬆️ Cập nhật phần mềm <small id="updVer" class="ok"></small></h2>
+        <p class="hint tiny" id="updMsg">Bấm "Kiểm tra" để xem có bản mới trên GitHub không. Cài đặt, thống kê và ID TikTok của bạn được giữ nguyên.</p>
+        <div class="btnrow">
+          <button id="updCheck">🔎 Kiểm tra bản mới</button>
+          <button id="updGo" class="primary hidden">⬆ Cập nhật ngay</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>👀 Xem trước (dọc)</h2>
+        <div class="preview"><iframe id="previewFrame" title="xem trước" loading="lazy"></iframe></div>
+      </div>
+
+      <div class="card">
+        <h2>⚙️ Cài đặt ván đấu <small id="saved" class="ok"></small></h2>
+        <div class="form" id="setForm">
+          <label>Giây chờ chọn người chơi (ván đầu) <input type="number" data-k="lobbySeconds" min="5" max="300"></label>
+          <label>Giây chờ chọn người chơi (các ván sau) <input type="number" data-k="nextLobbySeconds" min="3" max="300"></label>
+          <label class="chk"><input type="checkbox" data-k="autoNextGame"> Hết ván tự sang ván kế tiếp (rút ngắn thời gian chờ)</label>
+          <label>Giây tung đồng xu <input type="number" data-k="coinSeconds" min="4" max="20"></label>
+          <label>Giây mỗi lượt đi <input type="number" data-k="turnSeconds" min="8" max="180"></label>
+          <label>Xin thêm giờ: số giây được cộng <input type="number" data-k="extraTimeSeconds" min="5" max="120"></label>
+          <label>Xin thêm giờ: số lần mỗi người/ván (0 = tắt) <input type="number" data-k="extraTimesPerGame" min="0" max="5"></label>
+          <label>Giây hiện kết quả <input type="number" data-k="resultSeconds" min="5" max="60"></label>
+          <label>Hết giờ tối đa (xử thua) <input type="number" data-k="maxTimeouts" min="1" max="5"></label>
+          <label>Số ván thắng liên tiếp tối đa <input type="number" data-k="maxWinStreak" min="1" max="20"></label>
+          <label>Điểm tối thiểu để được chơi <input type="number" data-k="minPointsToPlay" min="0"></label>
+          <label>Nhắc follow/chia sẻ mỗi … giây (0 = tắt) <input type="number" data-k="reminderSeconds" min="0" max="1800"></label>
+          <label>Giây để 2 người được chọn THẢ TIM xác nhận (0 = tắt) <input type="number" data-k="confirmSeconds" min="0" max="120"></label>
+          <label>Người chơi im lặng sau … giây thì biển báo nhấp nháy (0 = tắt) <input type="number" data-k="idleHintSeconds" min="0" max="120"></label>
+          <label>Tiếng tích tắc khi còn … giây (0 = tắt) <input type="number" data-k="clockSeconds" min="0" max="60"></label>
+          <label class="chk"><input type="checkbox" data-k="showSign"> Hiện biển báo nhỏ ở góc màn hình live</label>
+          <label class="chk"><input type="checkbox" data-k="themeAuto"> Mỗi ván đổi màu bàn cờ, màu phòng, tóc và áo nhân vật</label>
+          <label class="chk"><input type="checkbox" data-k="showCellLabels"> Ghi ký hiệu (a1, e4...) mờ trong từng ô cờ</label>
+          <label class="chk"><input type="checkbox" data-k="winnerStays"> Người thắng ở lại đấu tiếp</label>
+          <label class="chk"><input type="checkbox" data-k="hostCanPlay"> Chủ phòng được chơi</label>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>🔊 Giọng đọc</h2>
+        <div class="form">
+          <label class="chk"><input type="checkbox" id="vOn"> Bật giọng đọc</label>
+          <label>Mức độ nói
+            <select id="vTalk">
+              <option value="quiet">Ít - gần như im lặng cả lúc chờ (chỉ kết quả, thắng/thua, quà lớn)</option>
+              <option value="normal">Vừa - lúc chờ thì chào, giải thích, cảm ơn; trong trận im lặng</option>
+              <option value="lively">Nhiều - trong trận còn đọc từng nước đi, cảnh báo giờ</option>
+            </select>
+          </label>
+          <label class="chk"><input type="checkbox" id="vMoves"> Đọc từng nước đi (chỉ khi mức Nhiều)</label>
+          <label>Âm lượng <input type="range" id="vVol" min="0" max="1" step="0.05"></label>
+          <label>Giọng điều phối viên <select id="vMc"></select></label>
+          <label>Giọng trọng tài <select id="vRef"></select></label>
+          <label>Quà từ bao nhiêu 💎 thì cảm ơn to <input type="number" id="vBig" min="1"></label>
+        </div>
+        <div class="btnrow small">
+          <button id="vTestMc">▶ Thử giọng điều phối</button>
+          <button id="vTestRef">▶ Thử giọng trọng tài</button>
+        </div>
+        <div class="sg">🎛️ Chỉnh giọng cho hợp hơn</div>
+        <div class="form">
+          <label>Điều phối: tốc độ <b id="mcRateV"></b> <input type="range" id="mcRate" min="0.6" max="1.5" step="0.02"></label>
+          <label>Điều phối: cao độ <b id="mcPitchV"></b> <input type="range" id="mcPitch" min="0.5" max="1.8" step="0.02"></label>
+          <label>Trọng tài: tốc độ <b id="refRateV"></b> <input type="range" id="refRate" min="0.6" max="1.5" step="0.02"></label>
+          <label>Trọng tài: cao độ <b id="refPitchV"></b> <input type="range" id="refPitch" min="0.5" max="1.8" step="0.02"></label>
+        </div>
+        <div class="btnrow small">
+          <span class="hint tiny">Điều phối:</span>
+          <button class="preset" data-r="mc" data-rate="1.08" data-pitch="1.15">Tươi vui</button>
+          <button class="preset" data-r="mc" data-rate="0.98" data-pitch="1.0">Dịu dàng</button>
+          <button class="preset" data-r="mc" data-rate="1.18" data-pitch="1.25">Năng động</button>
+        </div>
+        <div class="btnrow small">
+          <span class="hint tiny">Trọng tài:</span>
+          <button class="preset" data-r="ref" data-rate="0.95" data-pitch="0.8">Trầm nghiêm</button>
+          <button class="preset" data-r="ref" data-rate="1.0" data-pitch="0.95">Rõ ràng</button>
+          <button class="preset" data-r="ref" data-rate="1.1" data-pitch="1.05">Hào hứng</button>
+          <button id="vAuto">↩ Về tự động</button>
+        </div>
+        <p class="hint tiny">Giọng hay nhất: dùng <b>Microsoft Edge</b> trên Windows (có giọng HoaiMy nữ, NamMinh nam). Trên điện thoại Android, cài thêm “Google tiếng Việt” trong cài đặt Chuyển văn bản thành giọng nói.</p>
+        <p id="vNote" class="hint tiny"></p>
+        <p class="hint tiny">Giọng đọc phát ra từ <b>tab màn hình live</b>. Tab đó cần được bấm 1 lần (hoặc mở bằng file .bat) để có tiếng.</p>
+      </div>
+
+      <div class="card">
+        <h2>🎆 Âm thanh &amp; hiệu ứng</h2>
+        <div class="form">
+          <label class="chk"><input type="checkbox" id="sOn"> Bật âm thanh hiệu ứng</label>
+          <label>Âm lượng hiệu ứng <input type="range" id="sVol" min="0" max="1" step="0.05"></label>
+          <label class="chk"><input type="checkbox" id="mOn"> 🎵 Bật nhạc nền</label>
+          <label>Âm lượng nhạc nền <input type="range" id="mVol" min="0" max="1" step="0.05"></label>
+        </div>
+        <div class="btnrow small">
+          <button class="sfxTest" data-s="place">♟ Tiếng đi quân</button>
+          <button class="sfxTest" data-s="four">⚠ Tiếng chiếu</button>
+          <button class="sfxTest" data-s="win">🏆 Thắng + pháo hoa</button>
+          <button class="sfxTest" data-s="chime">🎁 Cảm ơn quà</button>
+        </div>
+        <p class="hint tiny">Tiếng hiệu ứng phát từ <b>tab màn hình live</b> (như giọng đọc). Pháo hoa, biểu ngữ “CHIẾU / ĂN QUÂN” và khung nhắc follow/chia sẻ hiện ngay trên màn hình live. Nhạc nền tự hạ nhỏ khi điều phối viên đang nói; muốn dùng nhạc riêng thì bỏ file mp3 vào thư mục <b>public\music</b> (nên dùng nhạc không bản quyền). Sửa nội dung nhắc ở mục “Sửa thoại” → nhóm “Nhắc nhở”.</p>
+      </div>
+
+      <div class="card">
+        <h2>🎙️ Sửa thoại <small>(điều phối viên &amp; trọng tài)</small></h2>
+        <p class="hint">Mỗi ô là một câu thoại. Muốn nhiều cách nói khác nhau thì <b>xuống dòng</b> — game sẽ chọn ngẫu nhiên 1 dòng. Bấm vào ô màu xanh để chèn tên/biến vào chỗ con trỏ.</p>
+        <div class="btnrow small"><button id="scriptAll" class="danger">Khôi phục tất cả thoại gốc</button></div>
+        <div id="scriptList"></div>
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="toast hidden"></div>
+  <script type="module" src="panel.js"></script>
+  <script type="module" src="update-panel.js"></script>
+</body>
+</html>

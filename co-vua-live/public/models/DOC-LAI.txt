@@ -1,0 +1,6 @@
+Dat 2 file model 3D vao thu muc nay:
+  nam.glb  = nhan vat nam (nguoi choi X)
+  nu.glb   = nhan vat nu  (nguoi choi O)
+Co file thi game tu dung model that; khong co thi dung nhan vat dung san.
+Model phai la nguoi co khung xuong (Mixamo / Ready Player Me), huong mat ve phia truoc.
+Xem muc 9 trong HUONG-DAN.txt.

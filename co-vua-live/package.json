@@ -1,0 +1,19 @@
+{
+  "name": "covua-live-tiktok",
+  "version": "1.0.0",
+  "description": "Game Cờ vua cho TikTok LIVE: người xem bình luận nước đi (e4, Nf3, mã f3) để đi cờ",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "demo": "node src/server.js --demo"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "dependencies": {
+    "chess.js": "^1.4.0",
+    "tiktok-live-connector": "^2.5.0",
+    "ws": "^8.18.0"
+  },
+  "updateFolder": "co-vua-live"
+}

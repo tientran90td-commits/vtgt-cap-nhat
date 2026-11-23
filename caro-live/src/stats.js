@@ -1,0 +1,68 @@
+'use strict';
+/*
+ * THÀNH TÍCH: số ván thắng của từng người, lưu vào data/thanh-tich.json
+ * (tắt game bật lại vẫn còn). Xóa file đó nếu muốn làm lại từ đầu.
+ */
+const fs = require('fs');
+const path = require('path');
+
+class Stats {
+  constructor(file) {
+    this.file = file;
+    this.data = {};
+    this.timer = null;
+    this.load();
+    process.on('exit', () => this.saveNow());
+  }
+
+  load() {
+    try {
+      this.data = JSON.parse(fs.readFileSync(this.file, 'utf8')) || {};
+    } catch (e) {
+      this.data = {};
+    }
+  }
+
+  entry(user) {
+    if (!this.data[user.id]) this.data[user.id] = { name: user.name, wins: 0, games: 0 };
+    this.data[user.id].name = user.name || this.data[user.id].name;
+    return this.data[user.id];
+  }
+
+  recordGame(user) {
+    this.entry(user).games += 1;
+    this.save();
+  }
+
+  recordWin(user) {
+    this.entry(user).wins += 1;
+    this.save();
+  }
+
+  top(n = 5) {
+    return Object.values(this.data)
+      .filter((e) => e.wins > 0)
+      .sort((a, b) => b.wins - a.wins || a.games - b.games)
+      .slice(0, n)
+      .map((e) => ({ name: e.name, wins: e.wins }));
+  }
+
+  save() {
+    if (this.timer) return;
+    this.timer = setTimeout(() => {
+      this.timer = null;
+      this.saveNow();
+    }, 2000);
+  }
+
+  saveNow() {
+    try {
+      fs.mkdirSync(path.dirname(this.file), { recursive: true });
+      fs.writeFileSync(this.file, JSON.stringify(this.data, null, 2));
+    } catch (e) {
+      /* không sao */
+    }
+  }
+}
+
+module.exports = { Stats };

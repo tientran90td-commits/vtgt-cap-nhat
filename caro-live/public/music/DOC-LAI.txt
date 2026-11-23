@@ -1,0 +1,3 @@
+Muon dung nhac rieng: bo file .mp3 / .ogg / .wav / .m4a vao thu muc nay (nen dung nhac khong ban quyen,
+vi TikTok co the tat tieng/chan live neu dung nhac co ban quyen).
+Co file -> game phat ngau nhien cac bai nay. Khong co file -> game tu phat nhac nen nhe tu tao.

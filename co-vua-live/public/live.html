@@ -1,0 +1,89 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Cờ vua LIVE - màn hình phát</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="live.css">
+</head>
+<body>
+  <!--
+    MÀN HÌNH LIVE SẠCH: không có nút bấm hay bảng điều khiển, dùng làm nguồn hình để phát.
+    Địa chỉ:  /live.html?layout=portrait  (dọc 9:16)   |   /live.html?layout=landscape  (ngang 16:9)
+    Thêm &bg=none để nền trong suốt, &mute=1 để tắt giọng đọc (dùng cho khung xem trước).
+    Phím tắt: F = toàn màn hình, P = dọc, L = ngang, M = tắt/bật giọng.
+  -->
+  <div id="stage" data-layout="portrait">
+    <header id="top">
+      <div id="title">♞ CỜ VUA LIVE <span id="hostName"></span></div>
+      <div id="hint"></div>
+    </header>
+
+    <section id="players">
+      <div class="pcard x" id="pX">
+        <div class="av"><img alt=""><span></span></div>
+        <div class="info"><div class="nm"></div><div class="sub"></div></div>
+        <div class="mk">⚪</div>
+        <div class="bar"><i></i></div>
+      </div>
+      <div id="vs">VS</div>
+      <div class="pcard o" id="pO">
+        <div class="av"><img alt=""><span></span></div>
+        <div class="info"><div class="nm"></div><div class="sub"></div></div>
+        <div class="mk">⚫</div>
+        <div class="bar"><i></i></div>
+      </div>
+    </section>
+
+    <section id="boardWrap">
+      <div id="boardBox">
+        <canvas id="board"></canvas>
+        <div id="overlay" class="hidden">
+          <div id="ovLobby" class="ov hidden">
+            <div class="big">ĐANG CHỌN NGƯỜI CHƠI</div>
+            <div class="mid">Bình luận • Thả tim • Tặng quà<br>để giành suất lên bàn</div>
+            <div id="ovCount" class="count">25</div>
+          </div>
+          <div id="ovConfirm" class="ov hidden">
+            <div class="big">XÁC NHẬN THAM GIA</div>
+            <div class="mid">Người được chọn hãy <b>THẢ TIM ❤</b><br>để vào ván đấu</div>
+            <ul id="cfList"></ul>
+            <div id="cfCount" class="count">20</div>
+          </div>
+          <div id="ovCoin" class="ov hidden">
+            <div class="big">TUNG ĐỒNG XU</div>
+            <div id="coinScene"><div id="coin">
+              <div class="face head"><b>NGỬA</b><span id="coinHead"></span></div>
+              <div class="face tail"><b>SẤP</b><span id="coinTail"></span></div>
+            </div></div>
+            <div id="coinResult" class="mid"></div>
+          </div>
+          <div id="ovResult" class="ov hidden">
+            <div class="trophy">🏆</div>
+            <div id="resText" class="big"></div>
+            <div id="resNote" class="mid"></div>
+            <div id="resNext" class="small"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section id="sceneWrap">
+      <canvas id="three"></canvas>
+      <section id="rank">
+        <div id="rankHead"><b>🔥 TOP TƯƠNG TÁC</b><span id="rankNote"></span></div>
+        <ol id="rankList"></ol>
+      </section>
+      <ul id="feed"></ul>
+      <div id="sign" class="hidden"><b>💡 Cần biết</b><ul id="signList"></ul></div>
+      <div id="caption" class="hidden"><b></b><span></span></div>
+      <div id="promo" class="hidden"><i></i><span></span></div>
+      <button id="unlock" class="hidden" type="button">🔊 Bấm vào đây để bật giọng đọc</button>
+    </section>
+    <canvas id="fx"></canvas>
+  <div id="banner" class="hidden"></div>
+  </div>
+  <script type="module" src="live.js"></script>
+</body>
+</html>

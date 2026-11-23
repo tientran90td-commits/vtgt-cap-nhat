@@ -1,0 +1,163 @@
+CARO LIVE v1.0 (BAN CHINH THUC) - HUONG DAN NHANH (Vietnamese, khong dau de tranh loi font)
+====================================================================
+
+1) CAI DAT (chi lam 1 lan)
+   - CACH NHANH: bam dup  CAI-MOI-TRUONG.bat  -> tu tai va cai Node.js + thu vien game ve may (can Internet, neu Windows hoi quyen thi bam Yes).
+     Cac file CHAY-*.bat cung tu goi file nay neu may chua co Node.js.
+   - Cach thu cong (neu cach nhanh loi):
+   - Cai Node.js ban LTS (>= 20) tu https://nodejs.org  (cu bam Next den het).
+   - Giai nen thu muc game ra o dia, vi du D:\caro-live.
+
+2) CHAY THU (khong can LIVE that)
+   - Bam dup file  CHAY-THU-DEMO.bat
+   - Trinh duyet Edge tu mo bang dieu khien. Khan gia ao se tu binh luan, tha tim, tang qua.
+
+3) CHAY THAT
+   - Bam dup  CHAY-GAME.bat, nhap ID TikTok cua ban (khong co @). Tai khoan phai DANG LIVE.
+   - Ban co the gioi han toc do tot hon bang cach dan khoa Euler vao file euler-api-key.txt (khong bat buoc).
+
+4) BANG DIEU KHIEN (http://localhost:3000)
+   - Nut "MO MAN HINH LIVE DOC" se mo 1 TAB MOI sach se (9:16). Dung tab do lam nguon hinh.
+     + OBS: Them nguon "Window Capture"/"Browser Source" voi dia chi http://localhost:3000/live.html?layout=portrait
+     + TikTok LIVE Studio: them nguon "Window/Screen capture" chon cua so tab do.
+   - Giong doc phat ra tu TAB MAN HINH LIVE. Hay bam vao tab do 1 lan (hoac mo bang file .bat, da co san co cho phep).
+     De thu tren may tinh/OBS, thu am thanh may (Desktop Audio) de khan gia nghe thay.
+   - Dung Microsoft Edge de co giong doc tieng Viet tu nhien (HoaiMy, NamMinh).
+   - "Chay DEMO": bat/tat khan gia ao ngay tren bang dieu khien.
+   - "Sua thoai": sua cau noi cua Dieu phoi vien va Trong tai. Xuong dong = nhieu cach noi (chon ngau nhien).
+     Bam o xanh {ten}, {qua}... de chen ten/qua. Co muc "Cam on khi nhan qua", "Cam on follow", "Cam on chia se".
+   - "Go thu": gia lam khan gia/nguoi choi de thu binh luan, tha tim, tang qua.
+
+5) CACH DOC TEN SAI
+   - Mo data\cach-doc-ten.json, them dong:  "ten that": "cach doc dung"
+     vi du  "vnpsolar": "ve en pe so la"
+
+6) LUAT
+   - Du 5 quan lien tiep la THANG, ke ca bi chan ca 2 dau (muon luat chat: Bang dieu khien -> Cai dat -> tick 'Bi chan 2 dau thi KHONG tinh thang'). Binh luan toa do: j9, k6, "j 9", "9j", "di k6 nhe".
+   - Chu phong go  !reset  de lam moi. Nguoi choi go  !dauhang  de dau hang.
+
+7) LUU Y
+   - Muon phat len TikTok tu may tinh can phan mem LIVE (OBS / TikTok LIVE Studio) va tai khoan du dieu kien.
+   - Neu loi ket noi: kiem tra ID, tai khoan dang LIVE, mang.
+
+8) CHAY THU TREN TERMUX (dien thoai Android)
+   - Cai Termux tu F-Droid. Mo Termux, go:   termux-setup-storage
+   - Chep file caro-live.zip vao bo nho may, roi go:
+        cd ~ && unzip /sdcard/Download/caro-live.zip && cd caro-live
+        bash chay-termux.sh --demo        (thu khan gia ao)
+        bash chay-termux.sh               (that, hoi ID TikTok)
+   - Mo Chrome tren cung dien thoai: http://localhost:3000  -> bam "Mo man hinh live doc" (tab moi).
+   - Giong doc tren Android Chrome dung giong Google tieng Viet (can bam vao trang 1 lan de co tieng).
+   - Sau nay chuyen sang PC: giai nen cung thu muc, chay CHAY-GAME.bat.
+
+9) NHAN VAT 3D GIONG NGUOI THAT (tuy chon)
+   - Game da san sang nap model .glb co khung xuong. Dat file vao thu muc  public\models\
+       nam.glb = nhan vat nam (X)     nu.glb = nhan vat nu (O)
+     Khong co file -> game dung nhan vat dung san.
+   - Cach tao model tu 2 anh tham chieu: dung trang web "anh -> 3D" co tu dong gan xuong (vi du Tripo, Meshy):
+       1. Tai anh nhan vat len, tao model 3D, bat "auto rig" (gan xuong nguoi), tai ve dang .glb
+       2. Neu trang khong gan xuong: tai len mixamo.com de tu dong gan xuong, tai ve roi doi sang .glb
+   - Thu nhanh: mo  http://localhost:3000/live.html?nam=models/ten-file.glb  de thu 1 model.
+   - Dang cai tren man hinh:  ?model=0  tat model that, dung nhan vat dung san.
+
+10) HIEU UNG, NHAC FOLLOW, CHINH GIONG (moi)
+   - Tieng dat quan, "4 QUAN LIEN" (co chu noi bat), phao hoa + nhac khi co nguoi thang, tieng dem nguoc, chuong cam on qua.
+     Bat/tat + chinh am luong trong the "Am thanh & hieu ung" o bang dieu khien. Co nut nghe thu.
+   - Nhac follow / chia se: cu moi 150 giay (doi trong "Cai dat van dau", ghi 0 de tat) hien khung tren man hinh + dieu phoi doc.
+     Sua cau nhac o muc "Sua thoai" -> nhom "Nhac nho". Follow/chia se duoc cong diem tuong tac (cai trong config.js muc points).
+   - Chinh giong: the "Giong doc" co thanh toc do / cao do cho Dieu phoi va Trong tai, kem nut mau (Tuoi vui, Diu dang, Nang dong / Tram nghiem, Ro rang, Hao hung).
+     Giong tu nhien nhat: Microsoft Edge tren Windows (HoaiMy, NamMinh).
+
+11) ANH DAI DIEN + NHAC NEN (moi)
+   - Anh dai dien TikTok cua nguoi choi hien trong bang ten tren dau nhan vat 3D (vien do cho X, xanh cho O) va o the nguoi choi.
+     Che do demo dung anh chu cai tu tao. Neu TikTok khong tra anh thi hien huy hieu X / O nhu cu.
+   - Nhac nen: bat/tat + chinh am luong trong the "Am thanh & hieu ung". Tu ha nho khi dieu phoi vien / trong tai dang noi.
+     Mac dinh game tu tao nhac nhe. Muon dung nhac rieng: bo file mp3/ogg/wav/m4a vao thu muc  public\music  (nen dung nhac khong ban quyen,
+     vi TikTok co the tat tieng hoac chan live neu dung nhac co ban quyen).
+
+12) DUNG TIKFINITY LAM NGUON SU KIEN (tuy chon, chi tren may tinh Windows)
+   - TikFinity Desktop (tikfinity.zerody.one) tu ket noi TikTok LIVE roi phat su kien qua cong 21213 tren chinh may do.
+   - Cach dung: mo TikFinity Desktop -> ket noi tai khoan dang LIVE -> bam dup  CHAY-TIKFINITY.bat
+     (khong can nhap ID TikTok, khong can API key). Bang dieu khien se hien "Da noi TikFinity".
+   - QUAN TRONG: phai dung ung dung TikFinity DESKTOP (tai ve cai tren Windows), KHONG phai ban web tikfinity.zerody.one mo bang trinh duyet.
+     Chi ban Desktop moi mo cong 21213 cho game doc. Ban web co dong chu 'Phim tat ban phim khong co san trong trinh duyet'.
+     Dang dung ban web thi dong tab di (tranh bao 'Duplicate execution'), mo ung dung Desktop, dang nhap va bam TRUC TIEP.
+   - Cua so den cua game se ghi 'TikFinity gui su kien ...' khi co binh luan / tim / qua; o trang thai tren bang dieu khien
+     hien 'da nhan N su kien'. Neu N khong tang khi ban tang qua thi TikFinity chua gui gi cho game.
+   - Neu khong noi duoc: kiem tra TikFinity dang chay cung may va cong la 21213 (neu khac, sua tikfinityUrl trong config.js).
+   - Cach cu (CHAY-GAME.bat) van dung duoc; chon cach nao on dinh hon voi ban.
+
+13) THA TIM XAC NHAN + NHAC KHI BINH LUAN BI AN
+   - Sau khi chon duoc nguoi choi, 2 nguoi do phai THA TIM trong 20 giay de xac nhan se choi (man hinh hien dem nguoc).
+     Ai khong tha tim se mat suat (bi tru het diem) va nguoi xep ke tiep duoc moi thay. Het nguoi thay thi chon lai tu dau.
+     Nguoi dang giu ban (thang lien tiep) khong can tha tim lai. Chu phong bam nut 'Bo qua xac nhan tim' de vao van ngay.
+     Doi so giay (0 = tat) trong Bang dieu khien -> Cai dat -> 'Giay de 2 nguoi duoc chon THA TIM xac nhan'.
+   - BIEN BAO NHO o goc man hinh live (KHONG doc thanh tieng) ghi san: cach go toa do, 'Neu binh luan khong hien len, them 1 hoac 2 dau @
+     o truoc toa do' (TikTok hay an binh luan bi nghi spam), va go !them de xin them gio. Khi vao luot ma nguoi choi im lang qua 12 giay,
+     bien bao se nhap nhay de goi chu y. Game doc duoc ca  @j9  va  @@j9  nhu nuoc di binh thuong.
+     Chinh trong Bang dieu khien -> Cai dat: 'Nguoi choi im lang sau ... giay thi bien bao nhap nhay' (0 = tat), tick/bo tick 'Hien bien bao nho'.
+   - TIENG TICH TAC: khi nguoi choi con 15 giay, dong ho keu tich-tac (5 giay cuoi to hon). Doi so giay (0 = tat) o muc 'Tieng tich tac khi con ... giay'.
+   - Cac cau thoai moi nam trong Bang dieu khien -> Loi thoai (nhom 'Nhac nho' va 'Xac nhan tha tim'), sua duoc.
+
+14) TU SANG VAN KE TIEP + TU KHOI DONG LAI
+   - Het van, game tu hien ket qua roi tu sang van moi: nguoi thang o lai, cac ban tich diem trong luc xem duoc xep hang san,
+     nen vong cho chon nguoi choi chi con 10 giay (Bang dieu khien -> Cai dat -> 'Giay cho ... (cac van sau)'). Bo tick
+     'Het van tu sang van ke tiep' neu muon cho lau nhu van dau. Khong can bam gi them de choi tiep.
+   - Neu game bi loi dung dot ngot, file CHAY-*.bat tu khoi dong lai sau 5 giay (toi da 10 lan lien tiep).
+   - Mat ket noi TikTok / TikFinity thi game tu noi lai, khong can tat mo.
+
+15) GIONG DOC: CHUA VAO TRAN NOI NHIEU, TRONG TRAN NOI IT NHAT
+   - Luc CHUA VAO TRAN (cho nguoi choi, xac nhan tha tim, tung xu, het van): MC chao nguoi moi vao (khi ho binh luan lan dau),
+     giai thich cach choi o dau moi vong cho, cam on nguoi tang qua / follow / chia se.
+   - Luc DANG DANH CO: gan nhu im lang, chi doc ket qua thang/thua/hoa. Qua tang trong tran duoc don lai, cam on ngay sau tran.
+   - Bang dieu khien -> Giong doc -> 'Muc do noi':
+       It   : gan nhu im lang ca luc cho (chi ket qua tung xu, thang/thua, cam on qua LON sau tran).
+       Vua  (mac dinh): nhu mo ta o tren.
+       Nhieu: them doc tung nuoc di, canh bao het gio trong tran.
+   - Cac cau van hien chu tren man hinh (khung thong bao) du khong doc thanh tieng.
+   - Sua loi chao / giai thich: Bang dieu khien -> Loi thoai (nhom 'Mo dau': 'Giai thich cach choi', 'Chao nguoi moi vao').
+
+16) THEM GIO CHO NGUOI CHOI + DOC BINH LUAN THONG MINH
+   - Moi luot gio la 45 giay (doi o Bang dieu khien -> Cai dat -> 'Giay moi luot di').
+   - Nguoi choi den luot co the go  !them  hoac  them gio  de xin them 20 giay (1 lan moi van; doi so giay / so lan o Cai dat, dat 0 = tat).
+     Chu phong co nut 'Them gio luot nay' (+15 giay) tren Bang dieu khien.
+   - Game hieu nhieu cach go nuoc di, khong chi j9:
+       j9  J 9  9j  j-9  j/9  @@j9  |  ca 6 (K6)  di 9 (J9)  xe 3 (C3)  |  j chin  k sau  K muoi mot
+       hang 9 cot j  |  cot k dong 6  |  'minh di hang 5 cot h nha'  |  'danh j 9 nhe'
+   - Go tach 2 binh luan: 'j' roi trong 12 giay go '9' -> game ghep thanh J9 (chi ap dung khi dang den luot ban).
+   - Neu go thieu (chi 'j' hoac chi '9') man hinh nhac: go ca cot va hang trong 1 binh luan, vi du j9.
+
+17) TU CHON 2 NGUOI XEM CHO DAU VOI NHAU (SOLO)
+   - Bang dieu khien co the 'Tat ca nguoi xem': liet ke moi nguoi da binh luan / tha tim / tang qua / follow / chia se
+     (xep theo diem tuong tac, co o tim ten). Nguoi chi vao xem im lang thi chua hien vi TikTok khong bao cho game.
+   - Bam vao ten de chon dung 2 nguoi (so 1, 2 hien ben trai), roi bam 'Cho 2 nguoi dau'. Game tung dong xu chon ben di truoc va vao van ngay.
+     Muon doi nguoi: bam lai vao ten da chon de bo chon, hoac 'Bo chon'.
+   - Mac dinh KHONG bat tha tim xac nhan (vi ban da chon). Tick 'Bat 2 nguoi tha tim xac nhan...' neu muon ho phai tha tim truoc.
+   - Dang co van ma bam 'Cho 2 nguoi dau' thi game hoi lai, dong y thi van cu bi dung. Sau van solo, game tro lai tu chon nhu binh thuong.
+
+18) BANG TOP TUONG TAC O GOC PHAI MAN HINH + GO !diem XEM HANG
+   - Diem tinh tu luc van truoc BAT DAU (luc tung dong xu, diem cua moi nguoi duoc xoa ve 0). Trong luc dang choi, khan gia
+     binh luan / tha tim / tang qua / follow / chia se de tich diem. Het van, 2 nguoi diem cao nhat (top 1 va top 2) duoc chon dau van ke tiep
+     (neu nguoi thang o lai thi chi chon 1 nguoi). Bat dau van moi thi diem lai ve 0.
+   - Bang 'TOP TUONG TAC' nam o GOC PHAI man hinh live (de khong bi o binh luan cua TikTok o ben trai che), hien 6 nguoi dau, co ten + diem; 2 o dau duoc to vang (nguoi se duoc chon). Nguoi dang dau co dau kiem.
+   - Khan gia go  !diem  (hoac !top, !hang) trong binh luan: man hinh hien hang + diem cua ho, va con thieu bao nhieu diem de vao top 2.
+     Cau nay chi hien chu, khong doc thanh tieng.
+   - Cach tinh diem (binh luan, tim, qua, follow, chia se) sua trong config.js muc points.
+     Thu tu diem: QUA > FOLLOW (100) > CHIA SE (60) > THA TIM (1 diem/tim, toi da 120 diem moi vong).
+     Qua cang dat cang nhieu diem (Hoa hong ~175, qua 30 kim cuong ~340, qua 1000 kim cuong ~1700), nhung tang cham dan
+     de nguoi tha tim chay (tha tim + follow + chia se + binh luan ~ 280-350 diem) van canh tranh duoc voi nguoi tang qua nho.
+     Muon nghieng ve ben nao thi doi giftBase / giftPerDiamond / likeCapPerRound trong config.js.
+
+19) DOI MAU BAN CO + NHAN VAT MOI VAN
+   - Moi van moi, game tu doi mau ban co (8 kieu: go, tre, ngoc, bien, hong, tim, xam, cam), mau phong 3D, mau toc va ao cua 2 nhan vat
+     (8 dang nam, 8 dang nu). 2 van lien nhau luon khac nhau. Quan X do, O xanh van giu nguyen cho de nhin.
+   - Tat: Bang dieu khien -> Cai dat -> bo tick 'Moi van doi mau ban co, mau phong, toc va ao nhan vat' (khi do dung kieu go co dien).
+   - Xem thu 1 kieu: them  &theme=3  (0..7) vao dia chi man hinh live, vi du  http://localhost:3000/live.html?layout=portrait&theme=3
+   - Muon them mau rieng: sua file public\theme.js (danh sach THEMES, BOYS, GIRLS). Chi doi mau, khong doi hinh dang nhan vat.
+
+CAP NHAT TRUC TIEP (khong can tai lai ban zip)
+   - Tren bang dieu khien co the "Cap nhat phan mem": bam "Kiem tra ban moi", neu co thi bam "Cap nhat ngay".
+   - Tool tu tai ban moi tu GitHub, thay file, roi tu mo lai (khoang 10 giay). Can mo game bang CHAY-GAME.bat (hoac chay-termux.sh) de no tu mo lai.
+   - Giu nguyen: cai dat, thong ke (thu muc data), ID TikTok (ten-tiktok.txt). File bi thay se duoc sao luu o data/backup-ban-<so>/
+     (neu ban tu sua config.js, ban cu nam trong thu muc sao luu do).
+   - Dang LIVE thi nen cap nhat luc nghi giua ca vi game se tat/mo lai.

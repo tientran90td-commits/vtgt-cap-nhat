@@ -1,0 +1,182 @@
+/* MÀN HÌNH LIVE: khung cố định tỉ lệ 9:16 (dọc) hoặc 16:9 (ngang), tự co theo cửa sổ.
+   Mọi kích thước dùng đơn vị rem; live.js đặt cỡ chữ gốc theo chiều cao khung. */
+:root {
+  --x: #ff4d4f;
+  --o: #2f9bff;
+  --gold: #ffd54a;
+  --panel: rgba(255, 255, 255, 0.08);
+}
+* { box-sizing: border-box; }
+html, body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: #05070d;
+  font-family: "Segoe UI", system-ui, -apple-system, Roboto, Arial, sans-serif;
+  color: #fff;
+  user-select: none;
+}
+body.nobg, body.nobg #stage { background: transparent; }
+.hidden { display: none !important; }
+
+#stage {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  background: radial-gradient(ellipse at 50% 20%, #1b2440 0%, #0c1120 70%);
+  display: grid;
+  overflow: hidden;
+}
+
+/* ---------- DỌC 9:16 : 40rem x 71.1rem ---------- */
+#stage[data-layout="portrait"] {
+  grid-template-columns: 1fr;
+  grid-template-rows: auto auto auto minmax(0, 1fr);
+  grid-template-areas: "top" "players" "board" "scene";
+}
+#stage[data-layout="portrait"] #boardBox { width: 36rem; height: 36rem; }
+#stage[data-layout="portrait"] #boardWrap { padding: 0.2rem 0 0.4rem; }
+
+/* ---------- NGANG 16:9 : 71.1rem x 40rem ---------- */
+#stage[data-layout="landscape"] {
+  grid-template-columns: 40rem minmax(0, 1fr);
+  grid-template-rows: auto auto minmax(0, 1fr);
+  grid-template-areas: "board top" "board players" "board scene";
+}
+#stage[data-layout="landscape"] #boardBox { width: 40rem; height: 40rem; }
+#stage[data-layout="landscape"] #boardWrap { padding: 0; }
+
+#top { grid-area: top; padding: 0.55rem 1rem 0.2rem; text-align: center; }
+#title { font-size: 1.55rem; font-weight: 900; letter-spacing: 0.06em; text-shadow: 0 2px 8px rgba(0, 0, 0, 0.6); }
+#title #hostName { font-size: 0.9rem; font-weight: 700; color: #9fb0d6; letter-spacing: 0; margin-left: 0.4rem; }
+#hint { font-size: 0.95rem; color: #cdd8f5; margin-top: 0.1rem; min-height: 1.3rem; }
+#hint b { color: var(--gold); }
+
+/* ---------- 2 người chơi ---------- */
+#players { grid-area: players; display: flex; align-items: center; gap: 0.4rem; padding: 0.3rem 0.8rem; }
+#vs { font-weight: 900; color: #8fa0c8; font-size: 0.95rem; }
+.pcard {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem 0.55rem;
+  border-radius: 0.9rem;
+  background: var(--panel);
+  border: 0.13rem solid transparent;
+  transition: border-color 0.25s, box-shadow 0.25s, background 0.25s;
+}
+.pcard.x.active { border-color: var(--x); box-shadow: 0 0 1.1rem rgba(255, 77, 79, 0.55); background: rgba(255, 77, 79, 0.14); }
+.pcard.o.active { border-color: var(--o); box-shadow: 0 0 1.1rem rgba(47, 155, 255, 0.55); background: rgba(47, 155, 255, 0.14); }
+.pcard.winner { border-color: var(--gold); box-shadow: 0 0 1.4rem rgba(255, 213, 74, 0.8); }
+.av { position: relative; width: 2.7rem; height: 2.7rem; border-radius: 50%; overflow: hidden; background: #2b3556; flex: none;
+      display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.2rem; }
+.av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.info { min-width: 0; flex: 1; }
+.nm { font-weight: 800; font-size: 1.02rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.sub { font-size: 0.74rem; color: #aab6d8; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.mk { font-size: 1.5rem; font-weight: 900; flex: none; }
+.pcard.x .mk { color: var(--x); }
+.pcard.o .mk { color: var(--o); }
+.bar { position: absolute; left: 0.6rem; right: 0.6rem; bottom: 0.18rem; height: 0.26rem; border-radius: 1rem; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+.bar i { display: block; height: 100%; width: 0; background: var(--gold); transition: width 0.25s linear; }
+.pcard.x .bar i { background: var(--x); }
+.pcard.o .bar i { background: var(--o); }
+.pcard.urgent .bar i { background: #ff9f1a; }
+
+/* ---------- bảng top tương tác: góc phải khung cảnh 3D (tránh vùng bình luận TikTok ở bên trái) ---------- */
+#rank { position: absolute; right: 0.35rem; top: 0.4rem; z-index: 6; width: 10.4rem; padding: 0.25rem 0.3rem 0.3rem; border-radius: 0.6rem;
+        background: rgba(8, 12, 26, 0.62); border: 0.08rem solid rgba(255, 179, 107, 0.5); pointer-events: none; }
+#rankHead { display: flex; flex-direction: column; margin-bottom: 0.2rem; }
+#rankHead b { font-size: 0.74rem; color: #ffb36b; white-space: nowrap; }
+#rankNote { font-size: 0.56rem; color: #b9c6ea; line-height: 1.15; }
+#rankList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.12rem; }
+#rankList li { display: flex; align-items: center; gap: 0.2rem; padding: 0.08rem 0.25rem; border-radius: 0.35rem; background: rgba(255, 255, 255, 0.08); font-size: 0.7rem; min-width: 0; }
+#rankList li.pick { background: rgba(255, 213, 74, 0.25); outline: 0.06rem solid var(--gold); }
+#rankList li.empty { opacity: 0.3; }
+#rankList li.hint { justify-content: center; text-align: center; font-size: 0.62rem; white-space: normal; }
+#rankList .no { flex: none; width: 1.1rem; text-align: center; font-weight: 800; }
+#rankList .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#rankList .pts { flex: none; color: var(--gold); font-weight: 800; }
+#rankList .tg { flex: none; font-size: 0.6rem; }
+
+/* ---------- bàn cờ 2D + lớp phủ ---------- */
+#boardWrap { grid-area: board; display: flex; justify-content: center; align-items: center; min-height: 0; }
+#boardBox { position: relative; border-radius: 0.4rem; overflow: hidden; box-shadow: 0 0.4rem 1.6rem rgba(0, 0, 0, 0.55); }
+#board { display: block; }
+#overlay { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; background: rgba(8, 12, 26, 0.74); text-align: center; }
+.ov { padding: 1rem; display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+.big { font-size: 2rem; font-weight: 900; line-height: 1.15; text-shadow: 0 0.15rem 0.6rem rgba(0, 0, 0, 0.7); }
+.mid { font-size: 1.15rem; color: #d7e0fb; line-height: 1.35; }
+.small { font-size: 0.9rem; color: #aab6d8; }
+.count { font-size: 5.2rem; font-weight: 900; color: var(--gold); text-shadow: 0 0 1.5rem rgba(255, 213, 74, 0.7); line-height: 1; }
+.count.wait { font-size: 1.6rem; color: #cdd8f5; text-shadow: none; }
+.mid b { color: #ff7a9c; }
+#cfList { list-style: none; margin: 0.2rem 0; padding: 0; display: flex; flex-direction: column; gap: 0.35rem; font-size: 1.2rem; font-weight: 800; }
+#cfList li { padding: 0.25rem 0.9rem; border-radius: 2rem; background: rgba(255, 255, 255, 0.1); border: 0.12rem solid rgba(255, 255, 255, 0.18); }
+#cfList li.done { background: rgba(60, 200, 120, 0.25); border-color: rgba(90, 230, 150, 0.8); }
+#cfList li.wait { animation: cfPulse 1s ease-in-out infinite; }
+@keyframes cfPulse { 50% { border-color: #ff7a9c; background: rgba(255, 90, 130, 0.2); } }
+#count.cf, #cfCount { font-size: 3.6rem; }
+#promo.hint { background: linear-gradient(90deg, rgba(255, 150, 40, 0.94), rgba(255, 90, 90, 0.94)); }
+.trophy { font-size: 4rem; filter: drop-shadow(0 0 1rem rgba(255, 213, 74, 0.8)); animation: bob 1s ease-in-out infinite; }
+@keyframes bob { 50% { transform: translateY(-0.5rem) scale(1.06); } }
+
+#coinScene { perspective: 40rem; height: 8.5rem; display: flex; align-items: center; justify-content: center; }
+#coin { position: relative; width: 7.5rem; height: 7.5rem; transform-style: preserve-3d; transition: transform 3s cubic-bezier(0.15, 0.7, 0.2, 1); }
+.face { position: absolute; inset: 0; border-radius: 50%; backface-visibility: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center;
+        font-size: 0.8rem; text-align: center; padding: 0.7rem; border: 0.35rem solid #b8860b;
+        background: radial-gradient(circle at 35% 30%, #fff2a8, #f2b90f 60%, #c18a00); color: #5a3a00; box-shadow: inset 0 0 1rem rgba(120, 70, 0, 0.5); }
+.face b { font-size: 1.1rem; }
+.face span { font-weight: 800; overflow: hidden; text-overflow: ellipsis; max-width: 100%; white-space: nowrap; }
+.face.tail { transform: rotateY(180deg); }
+
+/* ---------- cảnh 3D ---------- */
+#sceneWrap { grid-area: scene; position: relative; min-height: 0; overflow: hidden; background: #101626; }
+#three { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#feed { position: absolute; left: 0.5rem; bottom: 2.9rem; margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 0.2rem; max-width: 62%; pointer-events: none; }
+#feed li { font-size: 0.8rem; padding: 0.15rem 0.6rem; border-radius: 1rem; background: rgba(0, 0, 0, 0.45); width: fit-content; max-width: 100%;
+           white-space: nowrap; overflow: hidden; text-overflow: ellipsis; animation: slide 0.35s ease-out; }
+#feed li.gift { background: rgba(255, 140, 40, 0.55); }
+#feed li.win { background: rgba(255, 213, 74, 0.5); color: #fff; font-weight: 800; }
+#feed li.warn { background: rgba(255, 90, 90, 0.5); }
+#feed li.move.X { border-left: 0.25rem solid var(--x); }
+#feed li.move.O { border-left: 0.25rem solid var(--o); }
+@keyframes slide { from { transform: translateX(-1rem); opacity: 0; } }
+#caption { position: absolute; left: 50%; bottom: 0.45rem; transform: translateX(-50%); max-width: 94%; padding: 0.3rem 0.9rem; border-radius: 1.1rem;
+           background: rgba(0, 0, 0, 0.62); font-size: 0.95rem; line-height: 1.3; text-align: center; }
+#caption b { margin-right: 0.4rem; }
+#caption.mc b { color: #ff9ec7; }
+#caption.ref b { color: #7fd0ff; }
+#unlock { position: absolute; left: 50%; top: 0.6rem; transform: translateX(-50%); padding: 0.45rem 1rem; border: 0; border-radius: 2rem; background: var(--gold);
+          color: #3a2a00; font-size: 0.95rem; font-weight: 800; cursor: pointer; }
+
+/* ---- hiệu ứng: pháo hoa, biểu ngữ, khung nhắc ---- */
+#fx { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; }
+#banner { position: absolute; left: 50%; top: 38%; transform: translate(-50%, -50%) scale(1); z-index: 21; pointer-events: none;
+  padding: 0.5rem 1.6rem; border-radius: 2rem; font-weight: 900; font-size: 2.1rem; letter-spacing: 0.04em; white-space: nowrap; color: #fff;
+  background: linear-gradient(90deg, #ff7a18, #ff3b5c); box-shadow: 0 0 2rem rgba(255, 90, 60, 0.8); text-shadow: 0 0.1rem 0.3rem rgba(0, 0, 0, 0.5); }
+#banner.hidden { display: none; }
+#banner.show { animation: bannerPop 2.1s ease-out both; }
+#banner.show.open { background: linear-gradient(90deg, #ff2e63, #b300ff); box-shadow: 0 0 2.4rem rgba(255, 46, 99, 0.9); }
+@keyframes bannerPop { 0% { transform: translate(-50%, -50%) scale(0.3); opacity: 0; } 14% { transform: translate(-50%, -50%) scale(1.15); opacity: 1; }
+  24% { transform: translate(-50%, -50%) scale(1); } 85% { opacity: 1; } 100% { transform: translate(-50%, -62%) scale(1); opacity: 0; } }
+#sign { position: absolute; left: 0.45rem; top: 0.45rem; z-index: 7; max-width: 58%; padding: 0.3rem 0.5rem 0.35rem; border-radius: 0.5rem;
+        background: rgba(12, 16, 32, 0.78); border: 0.1rem solid rgba(255, 190, 70, 0.75); color: #fff3d6; font-size: 0.62rem; line-height: 1.3; pointer-events: none; }
+#sign.hidden { display: none; }
+#sign b { display: block; font-size: 0.68rem; color: #ffc860; margin-bottom: 0.1rem; }
+#sign ul { margin: 0; padding: 0; list-style: none; }
+#sign li { margin: 0.05rem 0; }
+#sign.pulse { animation: signPulse 0.9s ease-in-out infinite; border-color: #ff6a4a; }
+@keyframes signPulse { 50% { transform: scale(1.07); background: rgba(90, 30, 20, 0.9); } }
+#promo { position: absolute; left: 50%; bottom: 3.6rem; transform: translateX(-50%); z-index: 8; width: 92%; max-width: 92%; display: flex; gap: 0.6rem; align-items: center;
+  padding: 0.45rem 0.9rem; border-radius: 1.2rem; background: linear-gradient(90deg, rgba(255, 59, 92, 0.92), rgba(255, 140, 40, 0.92)); color: #fff; font-weight: 700; font-size: 0.85rem;
+  box-shadow: 0 0.3rem 1.2rem rgba(0, 0, 0, 0.45); pointer-events: none; }
+#promo.share { background: linear-gradient(90deg, rgba(47, 155, 255, 0.92), rgba(120, 90, 255, 0.92)); }
+#promo i { font-style: normal; font-size: 1.3rem; }
+#promo.hidden { display: none; }
+#promo.show { animation: promoIn 0.45s ease-out both; }
+@keyframes promoIn { from { transform: translate(-50%, 1.2rem); opacity: 0; } to { transform: translate(-50%, 0); opacity: 1; } }
