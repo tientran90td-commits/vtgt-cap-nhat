@@ -204,3 +204,10 @@ CANH GIOI (RANK) VA KHUNG AVATAR
   Nguyen Anh tim hong xoay + nhap nhay; Hoa Than cau vong xoay nhanh + vuong mien. Khung hien o the nguoi choi va bang canh gioi.
 - Thang vao ngay len cap: co dong thong bao, banner "DOT PHA" va MC chuc mung (sua cau o muc Loi thoai > rankUp).
 - Rank lay tu so van thang da co san: nguoi da thang nhieu van tu truoc se duoc len rank ngay.
+
+TIM KHONG LEN DIEM (da sua)
+- Truoc day neu TikTok gui su kien tim chi co ma so ma thieu @ten, game tinh thanh 1 nguoi khac -> diem tim khong len va tha tim
+  xac nhan khong nhan. Gio game tu noi lai (hoc ma so <-> @ten tu binh luan/qua/follow) va gop diem lai cho dung nguoi.
+- Tim ma TikTok KHONG gui kem ten nguoi tha thi khong the tinh diem; moi phut game se bao 1 dong "luot tim khong ro nguoi tha".
+- Neu thay nguoi tha tim lien tuc bi dau ⚠ (nghi auto-click) trong bang dieu khien thi do la bo chong auto-click dang giam diem:
+  doi "Chong auto-click tim" sang "Long" hoac "Tat" de thu.

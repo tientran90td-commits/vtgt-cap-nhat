@@ -28,6 +28,7 @@ class Interaction {
       u = {
         id: user.id,
         uniqueId: user.uniqueId || '',
+        rawId: user.rawId || '',
         name: user.name || user.uniqueId || 'Ẩn danh',
         avatar: user.avatar || '',
         points: 0,
@@ -46,8 +47,33 @@ class Interaction {
       if (user.name) u.name = user.name;
       if (user.avatar) u.avatar = user.avatar;
       if (user.uniqueId) u.uniqueId = user.uniqueId;
+      if (user.rawId) u.rawId = user.rawId;
     }
     return u;
+  }
+
+  /** Gộp "người trùng" (tạo ra do chỉ có mã số) vào người thật: cộng dồn điểm rồi xóa bản trùng. */
+  mergeUser(fromId, toId) {
+    if (!fromId || fromId === toId) return;
+    const g = this.users.get(fromId);
+    if (!g) return;
+    const t = this.users.get(toId);
+    if (t) {
+      t.points += g.points;
+      t.diamonds += g.diamonds;
+      t.likePts += g.likePts;
+      t.giftPts += g.giftPts;
+      t.likeFrac += g.likeFrac;
+      t.shared = t.shared || g.shared;
+      t.followed = t.followed || g.followed;
+      this.users.delete(fromId);
+    } else {
+      this.users.delete(fromId);
+      g.id = toId;
+      g.uniqueId = toId;
+      this.users.set(toId, g);
+    }
+    if (this.guard && this.guard.st) this.guard.st.delete(fromId);
   }
 
   addComment(user, now = Date.now()) {

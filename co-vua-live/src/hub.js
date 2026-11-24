@@ -76,6 +76,11 @@ class Hub {
     if (this.chatLog.length > 14) this.chatLog.shift();
   }
 
+  /** Tim đến nhưng TikTok không cho biết ai thả: đếm lại, cứ 1 phút báo 1 lần trong dòng tin để chủ phòng biết. */
+  onLikeIgnored() {
+    this.likeIgnored = (this.likeIgnored || 0) + 1;
+  }
+
   onLike(user, count, now = Date.now()) {
     this.interaction.addLike(user, count, now);
     if (this.interaction.lastLike.newly) this.match.feed(`⚠ ${user.name} thả tim dồn dập bất thường (nghi auto-click): điểm tim đang bị giảm`, 'warn');
@@ -213,6 +218,11 @@ class Hub {
 
   tick(now = Date.now()) {
     this.match.tick(now);
+    if (this.likeIgnored && now - (this.likeIgnoredAt || 0) > 60000) {
+      this.match.feed(`ℹ ${this.likeIgnored} lượt tim trong 1 phút qua không rõ người thả (TikTok không gửi tên) nên không tính điểm được`, 'info');
+      this.likeIgnored = 0;
+      this.likeIgnoredAt = now;
+    }
     this.commentator.flushDeferred(now);
     const kind = this.reminder.tick(now, this.match.phase);
     if (kind) {

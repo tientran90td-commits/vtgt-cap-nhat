@@ -155,7 +155,7 @@ class Match {
   /** Người được chọn thả tim -> ghi nhận. */
   onLike(user, now = Date.now()) {
     if (this.phase !== 'confirm' || !this.confirm) return;
-    const slot = this.confirm.slots.find((x) => x.user.id === user.id);
+    const slot = this.confirm.slots.find((x) => x.user.id === user.id || (user.rawId && x.user.rawId && x.user.rawId === user.rawId));
     if (!slot || slot.done) return;
     slot.done = true;
     this.feed(`❤ Đạo hữu ${slot.user.name} đã thả tim, sẵn sàng!`, 'gift');

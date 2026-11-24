@@ -19,6 +19,7 @@ function pickUser(u) {
     '';
   return {
     id,
+    rawId, // mã số TikTok (có thể khác id chữ): dùng để nối cùng 1 người giữa các loại sự kiện
     uniqueId: uniqueId || id,
     name: String(u.nickname || uniqueId || id).trim(),
     avatar,
@@ -28,6 +29,28 @@ function pickUser(u) {
 /** Tạo các hàm xử lý sự kiện (tách riêng để dễ kiểm tra). */
 function makeHandlers(hub) {
   const groups = new Map(); // theo dõi chuỗi quà liên tiếp để không cộng trùng
+  const alias = new Map(); // mã số TikTok -> id chữ của cùng người (học từ mọi loại sự kiện)
+
+  /**
+   * Nhận diện người dùng. Sự kiện tim của TikTok đôi khi chỉ có mã số mà thiếu tên đăng nhập (@id),
+   * trong khi bình luận lại có @id -> trước đây bị tính thành 2 người khác nhau (điểm tim không lên, thả tim xác nhận không nhận).
+   * Ở đây nối lại: học (mã số -> @id) từ mọi sự kiện, và gộp điểm của "người trùng" đã lỡ tạo ra.
+   */
+  function who(raw) {
+    const u = pickUser(raw);
+    if (!u) return null;
+    const hasName = !!String((raw && (raw.uniqueId || raw.displayId)) || '').trim();
+    if (u.rawId) {
+      if (hasName) {
+        alias.set(u.rawId, u.id);
+        if (u.rawId !== u.id && hub.interaction && hub.interaction.mergeUser) hub.interaction.mergeUser(u.rawId, u.id);
+      } else if (alias.has(u.rawId)) {
+        u.id = alias.get(u.rawId);
+        u.uniqueId = u.id;
+      }
+    }
+    return u;
+  }
 
   function prune(now) {
     if (groups.size < 200) return;
@@ -36,21 +59,24 @@ function makeHandlers(hub) {
 
   return {
     chat(data) {
-      const user = pickUser(data && data.user);
+      const user = who(data && data.user);
       const text = data && (data.comment != null ? data.comment : data.content);
       if (!user || !text) return;
       hub.onComment(user, String(text));
     },
 
     like(data) {
-      const user = pickUser(data && data.user);
-      if (!user) return;
+      const user = who(data && data.user);
+      if (!user) {
+        if (hub.onLikeIgnored) hub.onLikeIgnored(); // tim không rõ người thả (TikTok không gửi tên)
+        return;
+      }
       const n = Number(data.likeCount != null ? data.likeCount : data.count) || 1;
       hub.onLike(user, n);
     },
 
     gift(data) {
-      const user = pickUser(data && data.user);
+      const user = who(data && data.user);
       if (!user) return;
       const g = data.gift || data.giftDetails || {};
       const diamonds = Number(data.diamondCount != null ? data.diamondCount : g.diamondCount) || 1;
@@ -75,12 +101,12 @@ function makeHandlers(hub) {
     },
 
     share(data) {
-      const user = pickUser(data && data.user);
+      const user = who(data && data.user);
       if (user) hub.onShare(user);
     },
 
     follow(data) {
-      const user = pickUser(data && data.user);
+      const user = who(data && data.user);
       if (user) hub.onFollow(user);
     },
   };
