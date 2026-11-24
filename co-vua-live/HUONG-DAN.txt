@@ -202,3 +202,9 @@ TIM KHONG LEN DIEM (da sua)
 - Tim ma TikTok KHONG gui kem ten nguoi tha thi khong the tinh diem; moi phut game se bao 1 dong "luot tim khong ro nguoi tha".
 - Neu thay nguoi tha tim lien tuc bi dau ⚠ (nghi auto-click) trong bang dieu khien thi do la bo chong auto-click dang giam diem:
   doi "Chong auto-click tim" sang "Long" hoac "Tat" de thu.
+
+THONG BAO CUA CHU PHONG (ADMIN)
+- Bang dieu khien > the "Thong bao cho nguoi xem": go noi dung, chon thoi gian hien (mac dinh tu tinh theo do dai chu), bam "Phat thong bao"
+  (hoac bam Enter). Man hinh LIVE hien bang THONG BAO nho mau vang o goc tren trai va MC doc to noi dung. Het gio tu tat; bam "Tat" de tat som.
+- Co 4 o nho luu 4 thong bao gan nhat de bam gui lai nhanh. Toi da 220 chu.
+- Loi doc luon duoc doc du de "Muc noi" cua MC dang de thap.

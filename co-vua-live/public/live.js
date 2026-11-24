@@ -11,6 +11,7 @@ import { Sfx } from './sfx.js';
 import { Music } from './music.js';
 import { Fx } from './fx.js';
 import { Celebrate } from './celebrate.js';
+import { Announcer } from './announce.js';
 import { avatarSrc } from './avatar.js';
 import { themeForGame, classicTheme, applyTheme } from './theme.js';
 
@@ -38,6 +39,10 @@ const voice = new Voice({
   onCaption(item) {
     const el = $('caption');
     if (!item) {
+      el.classList.add('hidden');
+      return;
+    }
+    if (item.noCaption) {
       el.classList.add('hidden');
       return;
     }
@@ -129,10 +134,13 @@ director.onReset = () => {
 };
 
 // ---------------------------------------------------------------- hiệu ứng theo dữ liệu từ máy chủ
+const announcer = new Announcer($('announce'), $('sceneWrap'));
 let promoId = null;
 let lastFeedId = 0;
 let fxKey = null;
 function handleExtras(s, first) {
+  // thông báo của chủ phòng (bảng nhỏ + lời đọc)
+  if (announcer.update(s.announce, first)) sfx.chime();
   // nhắc follow / chia sẻ
   if (s.promo && s.promo.id !== promoId) {
     promoId = s.promo.id;

@@ -120,6 +120,19 @@ class Hub {
     }
   }
 
+  /** Thông báo của chủ phòng: hiện bảng nhỏ trên màn hình live + MC đọc lên. */
+  announce(text, seconds, now = Date.now()) {
+    const t = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 220);
+    if (!t) return { ok: false, msg: 'Chưa gõ nội dung thông báo.' };
+    let secs = Number(seconds);
+    if (!(secs > 0)) secs = Math.min(30, Math.max(8, 5 + t.length * 0.1)); // tự tính theo độ dài chữ
+    secs = Math.min(120, Math.max(3, secs));
+    this.announcement = { id: now, text: t, until: now + secs * 1000 };
+    const cue = this.match.voice.push('mc', 'Thông báo từ chủ phòng. ' + t, { at: now, prio: 3 });
+    if (cue) cue.noCaption = true;
+    return { ok: true };
+  }
+
   setConnection(status, text) {
     this.match.connection = { status, text };
   }
@@ -156,6 +169,11 @@ class Hub {
         const ok = this.script.set(String(msg.key), { text: msg.text, enabled: msg.enabled });
         return done(ok ? { ok: true } : { ok: false, msg: 'Không tìm thấy câu thoại này.' });
       }
+      case 'announce':
+        return done(this.announce(msg.text, msg.seconds, now));
+      case 'announceClear':
+        this.announcement = null;
+        return done({ ok: true });
       case 'scriptReset':
         if (msg.key === '*') this.script.resetAll();
         else this.script.reset(String(msg.key));
@@ -232,6 +250,7 @@ class Hub {
     const s = this.match.getState(now);
     s.recent = this.chatLog;
     s.notice = this.notice;
+    s.announce = this.announcement && now < this.announcement.until ? { id: this.announcement.id, text: this.announcement.text, until: this.announcement.until } : null;
     s.promo = this.promo && now < this.promo.until ? this.promo : null;
     s.demo = !!this.demo;
     s.script = this.script.list();

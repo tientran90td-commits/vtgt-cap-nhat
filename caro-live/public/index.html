@@ -53,6 +53,26 @@
         <div id="status" class="status"></div>
       </div>
 
+      <div class="card" id="annCard">
+        <h2>📢 Thông báo cho người xem</h2>
+        <p class="hint tiny">Gõ nội dung rồi bấm phát: màn hình LIVE hiện bảng thông báo nhỏ và MC đọc to lên.</p>
+        <textarea id="annText" rows="2" maxlength="220" placeholder="Ví dụ: Chào mừng các bạn mới! Thả tim để lên bảng tu vi nhé"></textarea>
+        <div class="row">
+          <label>Hiện
+            <select id="annSecs">
+              <option value="0">Tự tính theo độ dài</option>
+              <option value="8">8 giây</option>
+              <option value="15">15 giây</option>
+              <option value="30">30 giây</option>
+              <option value="60">1 phút</option>
+            </select>
+          </label>
+          <button id="annSend">📢 Phát thông báo</button>
+          <button id="annClear" class="danger">Tắt</button>
+        </div>
+        <div id="annRecent" class="btnrow small"></div>
+      </div>
+
       <div class="card">
         <h2>👥 Tất cả người xem <small id="vwCount" class="ok"></small></h2>
         <p class="hint tiny">Bấm vào tên để chọn đúng 2 người, rồi bấm "Cho 2 người đấu" để họ solo với nhau (tung đồng xu chọn bên đi trước).</p>
@@ -237,5 +257,6 @@
   <div id="toast" class="toast hidden"></div>
   <script type="module" src="panel.js"></script>
   <script type="module" src="update-panel.js"></script>
+  <script type="module" src="announce-panel.js"></script>
 </body>
 </html>

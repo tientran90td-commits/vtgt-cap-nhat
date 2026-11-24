@@ -16,6 +16,7 @@ import { Celebrate } from './celebrate.js';
 import { fourInRow } from './threat.js';
 import { avatarSrc } from './avatar.js';
 import { setFrame, renderRankBoard } from './rank.js';
+import { Announcer } from './announce.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -41,6 +42,10 @@ const voice = new Voice({
   onCaption(item) {
     const el = $('caption');
     if (!item) {
+      el.classList.add('hidden');
+      return;
+    }
+    if (item.noCaption) { // lời đọc thông báo: đã có bảng thông báo nên không hiện thêm phụ đề
       el.classList.add('hidden');
       return;
     }
@@ -128,10 +133,13 @@ director.onReset = () => {
 };
 
 // ---------------------------------------------------------------- hiệu ứng theo dữ liệu từ máy chủ
+const announcer = new Announcer($('announce'), $('sceneWrap'));
 let promoId = null;
 let lastFeedId = 0;
 let fxKey = null;
 function handleExtras(s, first) {
+  // thông báo của chủ phòng (bảng nhỏ + lời đọc)
+  if (announcer.update(s.announce, first)) sfx.chime();
   // nhắc follow / chia sẻ
   if (s.promo && s.promo.id !== promoId) {
     promoId = s.promo.id;
