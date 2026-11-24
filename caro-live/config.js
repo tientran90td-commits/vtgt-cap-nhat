@@ -80,6 +80,7 @@ module.exports = {
   // ===== BIỂN BÁO NHỎ Ở GÓC MÀN HÌNH =====
   // Ghi sẵn các điều cần thiết (gõ tọa độ, nếu bình luận bị ẩn thì thêm @, xin thêm giờ...). Không đọc thành tiếng.
   showSign: true,
+  showCellLabels: true, // ghi tọa độ (A1, H8, O15...) mờ trong từng ô vuông để người xem biết gõ gì
   themeAuto: true, // mỗi ván đổi màu bàn cờ, màu phòng, tóc/áo 2 nhân vật
   boardSkin: 'auto', // kiểu bàn cờ: 'auto' = mỗi ván 1 kiểu | 'wood' = bàn gỗ | rong-vang, thanh-long, bach-ho, chu-tuoc, huyen-vu, cong-nghe, neon-tim, thien-ha
   // CẢNH GIỚI (rank): số ván thắng cần để lên từng bậc: Phàm Nhân->Luyện Khí->Trúc Cơ->Kết Đan->Nguyên Anh->Hóa Thần

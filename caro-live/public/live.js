@@ -521,6 +521,7 @@ function frame(t) {
   themeTick(state);
   const ledOn = !(state && state.settings && state.settings.ledOn === false);
   boardView.ledOn = ledOn;
+  boardView.labelsOn = !(state && state.settings && state.settings.showCellLabels === false);
   if (scene.tickLed) scene.tickLed(time, ledOn);
   boardView.draw(director.view, time);
   scene.render();

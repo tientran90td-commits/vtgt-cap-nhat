@@ -163,6 +163,8 @@ export class BoardView {
     this.px = 0;
     this.base = null;
     this.L = null;
+    this.labelsOn = true; // ghi tọa độ mờ trong từng ô trống
+    this.labelLayer = null;
     this.ledOn = true; // đèn LED sáng ở đường kẻ + vệt sáng ánh gương (chỉ có khi dùng kiểu bàn cờ hoa văn)
   }
 
@@ -179,12 +181,40 @@ export class BoardView {
     this.base.width = px;
     this.base.height = px;
     this.L = paintBoardBase(this.base.getContext('2d'), px, this.size);
+    this.buildLabels();
   }
 
   /** Gọi sau setBoardPalette: vẽ lại nền bàn cờ theo màu mới. */
   setTheme() {
     if (!this.base) return;
     this.L = paintBoardBase(this.base.getContext('2d'), this.px, this.size);
+    this.buildLabels();
+  }
+
+  /** Vẽ sẵn tọa độ (A1..O15) mờ vào từng ô, 1 lần mỗi khi đổi cỡ / đổi màu bàn (không vẽ lại mỗi khung hình). */
+  buildLabels() {
+    const L = this.L;
+    if (!L) return;
+    const c = document.createElement('canvas');
+    c.width = this.px;
+    c.height = this.px;
+    const g = c.getContext('2d');
+    g.font = `700 ${Math.max(7, Math.round(L.cell * 0.3))}px system-ui, Arial, sans-serif`;
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.lineJoin = 'round';
+    g.lineWidth = Math.max(1.5, L.cell * 0.07);
+    g.strokeStyle = 'rgba(0,0,0,0.38)';
+    g.fillStyle = 'rgba(255,255,255,0.62)'; // chữ trắng mờ + viền tối mảnh: đọc được trên mọi màu bàn cờ
+    for (let y = 0; y < this.size; y++) {
+      for (let x = 0; x < this.size; x++) {
+        const { cx, cy } = cellCenter(L, x, y);
+        const t = String.fromCharCode(65 + x) + (y + 1);
+        g.strokeText(t, cx, cy);
+        g.fillText(t, cx, cy);
+      }
+    }
+    this.labelLayer = c;
   }
 
   /** view = { moves, last, winLine } (đã đồng bộ với cử động nhân vật) */
@@ -193,6 +223,15 @@ export class BoardView {
     const ctx = this.ctx;
     const L = this.L;
     ctx.drawImage(this.base, 0, 0);
+    if (this.labelsOn && this.labelLayer) {
+      ctx.drawImage(this.labelLayer, 0, 0);
+      // ô đã có quân: xóa tọa độ (chép lại nền gốc của ô) để quân hiện rõ
+      const h = L.cell * 0.4;
+      for (const m of view.moves) {
+        const p = cellCenter(L, m.x, m.y);
+        ctx.drawImage(this.base, p.cx - h, p.cy - h, h * 2, h * 2, p.cx - h, p.cy - h, h * 2, h * 2);
+      }
+    }
     if (PAL.skin && this.ledOn) drawLed(ctx, L, PAL.skin, t);
 
     // ô nước đi gần nhất

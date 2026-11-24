@@ -234,3 +234,8 @@ THUA HA RANK + CAU NOI HAI HUOC
 - Hoa cuc khong tru diem. Nguoi thua ma chua co diem de mat thi MC noi cau dong vien vui (muc Loi thoai > loseComfort).
 - Da them hon 100 cau noi vui cho tat ca moc (chao, di co, thang, thua, cam on qua, follow, hoi thuc tha tim...).
   Neu truoc day ban tu sua loi thoai (data\thoai.json), bam "Khoi phuc tat ca thoai goc" de nhan cac cau moi.
+
+TOA DO TRONG TUNG O VUONG (Caro)
+- Moi o trong cua ban co 2D deu ghi san toa do mo (A1, H8, O15...) de nguoi xem biet go gi. O da co quan thi toa do tu an.
+- Tat/bat: bang dieu khien > Cai dat > tick "Ghi toa do (A1, H8...) mo trong tung o vuong" (hoac showCellLabels trong config.js).
+
