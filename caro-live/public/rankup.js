@@ -7,8 +7,8 @@ import { setFrame } from './rank.js';
 const SHOW_MS = 8000;
 const SHOW_DOWN_MS = 6500;
 // lời "tụt hạng" hài hước (chọn ngẫu nhiên)
-const DOWN_TITLES = ['💔 TẨU HỎA NHẬP MA! 💔', '💔 ĐẠO TÂM VỠ NÁT! 💔', '💔 BỊ ĐÁNH RỚT RỒI! 💔', '💔 NGÃ NGỰA GIỮA ĐƯỜNG! 💔'];
-const DOWN_SUBS = ['Cảnh giới rơi tự do, về bế quan luyện lại nhé!', 'Ngã ở đâu đứng dậy ở đó, đạo hữu cố lên!', 'Tu vi đi vắng, hẹn gặp lại ở ván sau!', 'Thua keo này ta bày keo khác!', 'Đan dược hết date, cần đi mua thêm!'];
+const DOWN_TITLES = ['💥 ĐỘ KIẾP THẤT BẠI! 💥', '⚡ ĐỘ KIẾP THẤT BẠI! ⚡', '☁️ ĐỘ KIẾP THẤT BẠI! ☁️'];
+const DOWN_SUBS = ['Lôi kiếp đánh cho tan tác, tu vi tiêu tan hết!', 'Ngã ở đâu đứng dậy ở đó, đạo hữu cố lên!', 'Thiên lôi quá mạnh, tu lại từ đầu nhé!', 'Thua keo này ta bày keo khác!', 'Đan dược hết date, cần đi mua thêm!'];
 const DOWN_COLORS = ['#7a8fb8', '#9aa7c8', '#5a6a94', '#c9d3ee'];
 const COLORS = ['#ffd54a', '#ff7ae8', '#5fd8ff', '#6dffb0', '#ffffff', '#ff8a5c'];
 
@@ -41,12 +41,13 @@ export class RankUp {
     el.className = 'ru t' + ru.tier + (down ? ' down' : '');
     const pick = (a) => a[Math.floor(Math.random() * a.length)];
     el.querySelector('.ru-title').textContent = down ? pick(DOWN_TITLES) : '⚡ ĐỘT PHÁ! ⚡';
-    el.querySelector('.ru-sub').textContent = down ? pick(DOWN_SUBS) : 'Cảnh giới mới, khung avatar thăng cấp';
+    el.querySelector('.ru-sub').textContent = down ? `Mất ${ru.lost || 0} điểm đạo hạnh. ` + pick(DOWN_SUBS) : 'Cảnh giới mới, khung avatar thăng cấp';
     el.querySelector('.ru-name').textContent = ru.name;
-    el.querySelector('.ru-from').textContent = ru.fromName || '';
+    const same = down && ru.fromTier === ru.tier; // cùng cảnh giới: hiện số điểm thay vì tên cảnh giới
+    el.querySelector('.ru-from').textContent = same ? `${ru.fromPts} điểm` : ru.fromName || '';
     el.querySelector('.ru-from').className = 'ru-from tc' + (ru.fromTier || 0);
     const to = el.querySelector('.ru-to');
-    to.textContent = ru.tierName;
+    to.textContent = same ? `${ru.toPts || 0} điểm` : ru.tierName;
     to.className = 'ru-to tc' + ru.tier;
     setFrame(el.querySelector('.fr'), ru.tier);
     const img = el.querySelector('img');

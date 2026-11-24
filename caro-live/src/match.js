@@ -525,15 +525,19 @@ class Match {
       result.rankUp = { name: winner.name, avatar: winner.avatar || '', tier: after.tier, tierName: after.name, fromTier: before.tier, fromName: before.name };
       this.rankUpInfo = result.rankUp;
     }
-    // thua: bị trừ điểm đạo hạnh, có thể tụt cảnh giới
-    const pen = Math.max(0, Math.floor(Number(this.cfg.rankLossPenalty) || 0));
-    if (pen > 0 && loser) {
+    // thua = "độ kiếp thất bại": mặc định mất hết điểm đạo hạnh (rankLossPenalty = 'all'), hoặc trừ số điểm cố định
+    const cfgPen = this.cfg.rankLossPenalty;
+    const all = cfgPen === 'all' || cfgPen === Infinity;
+    const pen = all ? Infinity : Math.max(0, Math.floor(Number(cfgPen) || 0));
+    if (pen > 0 && loser && beforeL.pts > 0) {
       this.stats.setRp(loser, Math.max(0, beforeL.pts - pen));
       const afterL = this.rankOf(loser);
-      if (afterL.tier < beforeL.tier) {
-        result.rankDown = { name: loser.name, avatar: loser.avatar || '', tier: afterL.tier, tierName: afterL.name, fromTier: beforeL.tier, fromName: beforeL.name };
-        this.rankDownInfo = result.rankDown;
-      }
+      result.rankDown = {
+        name: loser.name, avatar: loser.avatar || '',
+        tier: afterL.tier, tierName: afterL.name, fromTier: beforeL.tier, fromName: beforeL.name,
+        lost: beforeL.pts - afterL.pts, fromPts: beforeL.pts, toPts: afterL.pts, all,
+      };
+      this.rankDownInfo = result.rankDown;
     }
     let streak = 1;
     let steppedDown = false;
@@ -611,8 +615,8 @@ class Match {
     const d = this.rankDownInfo;
     this.rankDownInfo = null;
     if (d) {
-      this.feed(`💔 Đạo hữu ${d.name} tẩu hỏa nhập ma, rớt xuống ${d.tierName}!`, 'info');
-      if (this.voice.rankDown) this.voice.rankDown(d.name, d.tierName, now);
+      this.feed(`💥 Đạo hữu ${d.name} độ kiếp thất bại, mất ${d.lost} điểm đạo hạnh${d.tier < d.fromTier ? ', rớt xuống ' + d.tierName : ''}!`, 'info');
+      if (this.voice.rankDown) this.voice.rankDown(d.name, d.tierName, now, d.lost);
     }
   }
 

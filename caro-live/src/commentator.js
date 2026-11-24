@@ -179,8 +179,8 @@ class Commentator {
     this.say('rankUp', { ten: this.nm({ name }, 'vô danh'), canhgioi: tierName }, { at: now, gate: { k: 'result' }, prio: 2 });
   }
 
-  rankDown(name, tierName, now) {
-    this.say('rankDown', { ten: this.nm({ name }, 'vô danh'), canhgioi: tierName }, { at: now, gate: { k: 'result' }, prio: 2 });
+  rankDown(name, tierName, now, lost) {
+    this.say('rankDown', { ten: this.nm({ name }, 'vô danh'), canhgioi: tierName, diem: lost || 0 }, { at: now, gate: { k: 'result' }, prio: 2 });
   }
 
   draw(now) {
