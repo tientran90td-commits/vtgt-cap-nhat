@@ -163,7 +163,7 @@ export class BoardView {
     this.px = 0;
     this.base = null;
     this.L = null;
-    this.ledOn = true; // đèn LED chạy ở đường kẻ (chỉ có khi dùng kiểu bàn cờ hoa văn)
+    this.ledOn = true; // đèn LED sáng ở đường kẻ + vệt sáng ánh gương (chỉ có khi dùng kiểu bàn cờ hoa văn)
   }
 
   resize(cssPx) {

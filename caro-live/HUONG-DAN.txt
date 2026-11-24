@@ -165,7 +165,7 @@ CAP NHAT TRUC TIEP (khong can tai lai ban zip)
 KIEU BAN CO + DEN LED (moi)
 - Bang dieu khien > muc cai dat van > "Kieu ban co": Tu doi moi van, hoac chon co dinh
   Rong vang, Thanh Long, Bach Ho, Chu Tuoc, Huyen Vu, Cong nghe, Neon tim, Thien ha, hoac Ban go cu.
-- Tick/bo tick "Den LED chay o duong ke ban co" de bat/tat den LED.
+- Tick/bo tick "Den LED sang o duong ke + vet sang anh guong" de bat/tat den LED.
 - Quan X (do) va O (xanh) luon co vien sang va nen toi nen de nhin. Them kieu moi: sua file public\board-skins.js.
 - Muon ep 1 kieu ngay tren link: live.html?skin=rong-vang (hoac ?skin=0..7).
 
@@ -217,3 +217,8 @@ THONG BAO CUA CHU PHONG (ADMIN)
   (hoac bam Enter). Man hinh LIVE hien bang THONG BAO nho mau vang o goc tren trai va MC doc to noi dung. Het gio tu tat; bam "Tat" de tat som.
 - Co 4 o nho luu 4 thong bao gan nhat de bam gui lai nhanh. Toi da 220 chu.
 - Loi doc luon duoc doc du de "Muc noi" cua MC dang de thap.
+
+DEN LED DUONG KE (da doi kieu)
+- Khong con den chay doc theo duong ke. Gio cac duong ke va vien ban co SANG DEU len (doi mau LED rat cham, tho nhe),
+  cu moi 6 giay lai co 1 vet sang trang "anh guong" quet cheo qua ban co (lan sau doi huong), duong ke di toi dau sang ruc toi do.
+- Van tick/bo tick "Den LED sang o duong ke..." trong bang dieu khien de bat/tat.

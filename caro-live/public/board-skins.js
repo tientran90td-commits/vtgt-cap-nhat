@@ -607,71 +607,105 @@ export function paintSkinBase(ctx, px, size, L, skin) {
 }
 
 /**
- * Đèn LED nhỏ chạy dọc các đường kẻ + chuỗi bóng đèn chạy quanh viền bàn.
+ * LED ĐƯỜNG KẺ: các đường kẻ + viền SÁNG LÊN đều (đổi màu LED rất chậm, thở nhẹ),
+ * cứ vài giây lại có 1 vệt sáng như ánh phản chiếu của gương quét chéo qua bàn cờ, vệt đi tới đâu đường kẻ sáng rực tới đó.
  * Gọi MỖI KHUNG HÌNH sau khi đã vẽ nền (và trước khi vẽ quân cờ). t = giây.
  */
+const GLINT_PERIOD = 6; // cứ 6 giây có 1 lần vệt sáng quét qua
+const GLINT_SECONDS = 1.8; // 1 lần quét kéo dài bấy nhiêu giây
+
 export function drawLed(ctx, L, skin, t) {
   const n = L.size;
   const gw = L.cell * n;
-  const cols = skin.led;
+  const cols = skin.led && skin.led.length ? skin.led : ['#7df'];
   const dot = Math.max(1.4, L.cell * 0.07);
-  const tail = L.cell * 1.15;
+  const cx = L.gx0 + gw / 2;
+  const cy = L.gy0 + gw / 2;
+
+  // dải màu LED chạy rất chậm theo đường chéo (gradient lặp 3 lần để không bị đứt khi trượt)
+  const span = gw * 0.9;
+  const shift = ((t * 0.035) % 1) * span;
+  const gx = L.gx0 - shift;
+  const gy = L.gy0 - shift * 0.6;
+  const grad = ctx.createLinearGradient(gx, gy, gx + span * 3, gy + span * 1.8);
+  const stops = cols.length * 3 + 1;
+  for (let k = 0; k < stops; k++) grad.addColorStop(k / (stops - 1), cols[k % cols.length]);
+
+  const strokeGrid = (wide, core, alphaMul) => {
+    ctx.strokeStyle = grad;
+    for (const [w, al] of [[wide, 0.12], [core, 0.5]]) {
+      ctx.lineWidth = w;
+      ctx.globalAlpha = Math.min(1, al * alphaMul);
+      ctx.beginPath();
+      for (let i = 1; i < n; i++) {
+        const o = i * L.cell;
+        ctx.moveTo(L.gx0 + o, L.gy0); ctx.lineTo(L.gx0 + o, L.gy0 + gw);
+        ctx.moveTo(L.gx0, L.gy0 + o); ctx.lineTo(L.gx0 + gw, L.gy0 + o);
+      }
+      ctx.rect(L.gx0, L.gy0, gw, gw); // viền
+      ctx.stroke();
+    }
+  };
+
   ctx.save();
   ctx.globalCompositeOperation = 'lighter';
-  ctx.lineCap = 'round';
-  ctx.lineWidth = dot * 1.1;
-  for (let i = 1; i < n; i++) {
-    for (let d = 0; d < 2; d++) {
-      const key = i * 2 + d;
-      const speed = 0.07 + 0.09 * hash(key + 99);
-      const dir = hash(key + 7) > 0.5 ? 1 : -1;
-      const count = hash(key + 3) > 0.55 ? 2 : 1;
-      for (let c = 0; c < count; c++) {
-        const p = (((t * speed * dir + hash(key) + c / count) % 1) + 1) % 1;
-        const along = p * gw;
-        const back = Math.max(0, Math.min(gw, along - dir * tail));
-        const col = cols[(key + c) % cols.length];
-        const x1 = d === 0 ? L.gx0 + along : L.gx0 + i * L.cell;
-        const y1 = d === 0 ? L.gy0 + i * L.cell : L.gy0 + along;
-        const x0 = d === 0 ? L.gx0 + back : x1;
-        const y0 = d === 0 ? y1 : L.gy0 + back;
-        const g = ctx.createLinearGradient(x0, y0, x1, y1);
-        g.addColorStop(0, 'rgba(0,0,0,0)');
-        g.addColorStop(1, col);
-        ctx.strokeStyle = g;
-        ctx.beginPath();
-        ctx.moveTo(x0, y0);
-        ctx.lineTo(x1, y1);
-        ctx.stroke();
-        const rg = ctx.createRadialGradient(x1, y1, 0, x1, y1, dot * 2.6);
-        rg.addColorStop(0, col);
-        rg.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = rg;
-        ctx.beginPath();
-        ctx.arc(x1, y1, dot * 2.6, 0, TAU);
-        ctx.fill();
+  ctx.lineCap = 'butt';
+  ctx.lineJoin = 'miter';
+
+  // 1) đường kẻ sáng đều, thở nhẹ
+  const breathe = 0.85 + 0.15 * Math.sin(t * 1.4);
+  strokeGrid(dot * 3.4, dot * 0.95, breathe);
+
+  // 2) vệt sáng "ánh gương" quét chéo, mỗi lần đổi hướng
+  const cyc = Math.floor(t / GLINT_PERIOD);
+  const u = (t - cyc * GLINT_PERIOD) / GLINT_SECONDS;
+  if (u >= 0 && u <= 1) {
+    const ease = u * u * (3 - 2 * u); // đi chậm ở 2 đầu, nhanh ở giữa
+    const flip = cyc % 2 === 1;
+    const ang = flip ? (Math.PI * 3) / 4 : Math.PI / 4; // 45° hoặc 135°
+    const half = Math.SQRT2 * gw / 2; // nửa đường chéo bàn cờ
+    const w = L.cell * 2.4; // nửa bề rộng vệt sáng
+    const pos = -half - w + ease * (2 * half + 2 * w);
+    const fade = Math.sin(Math.min(1, u) * Math.PI); // mờ dần ở 2 đầu
+    // vệt phản chiếu: 3 lớp từ rộng-nhạt tới hẹp-chói, và đường kẻ trong vệt sáng rực lên
+    for (const [k, ak] of [[1, 0.5], [0.55, 0.8], [0.22, 1]]) {
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(ang);
+      ctx.beginPath();
+      ctx.rect(pos - w * k, -gw, w * 2 * k, gw * 2);
+      ctx.clip();
+      ctx.rotate(-ang);
+      ctx.translate(-cx, -cy);
+      ctx.strokeStyle = '#ffffff';
+      ctx.fillStyle = '#ffffff';
+      ctx.globalAlpha = 0.5 * fade * ak;
+      ctx.lineWidth = dot * 1.5;
+      ctx.beginPath();
+      for (let i = 1; i < n; i++) {
+        const o = i * L.cell;
+        ctx.moveTo(L.gx0 + o, L.gy0); ctx.lineTo(L.gx0 + o, L.gy0 + gw);
+        ctx.moveTo(L.gx0, L.gy0 + o); ctx.lineTo(L.gx0 + gw, L.gy0 + o);
       }
+      ctx.rect(L.gx0, L.gy0, gw, gw);
+      ctx.stroke();
+      ctx.restore();
     }
-  }
-  // chuỗi bóng đèn chạy quanh viền
-  const step = L.cell * 0.5;
-  const total = Math.round((gw * 4) / step);
-  const per = (gw * 4) / total;
-  for (let k = 0; k < total; k++) {
-    const d = k * per;
-    let x, y;
-    if (d < gw) { x = L.gx0 + d; y = L.gy0; }
-    else if (d < gw * 2) { x = L.gx0 + gw; y = L.gy0 + (d - gw); }
-    else if (d < gw * 3) { x = L.gx0 + gw - (d - gw * 2); y = L.gy0 + gw; }
-    else { x = L.gx0; y = L.gy0 + gw - (d - gw * 3); }
-    const ph = (((k / total) * 6 - t * 0.9) % 1 + 1) % 1;
-    const b = ph < 0.4 ? 1 - ph / 0.4 : 0;
-    const col = cols[Math.floor(k / 3) % cols.length];
-    ctx.globalAlpha = 0.22 + 0.78 * b;
-    ctx.fillStyle = col;
+    // lớp ánh sáng mờ phủ nhẹ lên mặt bàn (giống mặt gương lóe sáng)
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(ang);
+    const sg = ctx.createLinearGradient(pos - w, 0, pos + w, 0);
+    sg.addColorStop(0, 'rgba(255,255,255,0)');
+    sg.addColorStop(0.5, 'rgba(255,255,255,1)');
+    sg.addColorStop(1, 'rgba(255,255,255,0)');
+    ctx.fillStyle = sg;
+    ctx.globalAlpha = 0.09 * fade;
     ctx.beginPath();
-    ctx.arc(x, y, dot * (0.8 + 0.5 * b), 0, TAU);
-    ctx.fill();
+    ctx.rect(pos - w, -gw, w * 2, gw * 2);
+    ctx.clip();
+    ctx.fillRect(-gw * 2, -gw * 2, gw * 4, gw * 4);
+    ctx.restore();
   }
   ctx.restore();
 }
