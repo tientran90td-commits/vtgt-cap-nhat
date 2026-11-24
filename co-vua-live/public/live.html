@@ -6,6 +6,8 @@
   <title>Cờ vua LIVE - màn hình phát</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="live.css">
+  <link rel="stylesheet" href="rank.css">
+  <link rel="stylesheet" href="rankup.css">
   <link rel="stylesheet" href="announce.css">
 </head>
 <body>
@@ -23,14 +25,14 @@
 
     <section id="players">
       <div class="pcard x" id="pX">
-        <div class="av"><img alt=""><span></span></div>
+        <div class="fr t0"><div class="av"><img alt=""><span></span></div></div>
         <div class="info"><div class="nm"></div><div class="sub"></div></div>
         <div class="mk">⚪</div>
         <div class="bar"><i></i></div>
       </div>
       <div id="vs">VS</div>
       <div class="pcard o" id="pO">
-        <div class="av"><img alt=""><span></span></div>
+        <div class="fr t0"><div class="av"><img alt=""><span></span></div></div>
         <div class="info"><div class="nm"></div><div class="sub"></div></div>
         <div class="mk">⚫</div>
         <div class="bar"><i></i></div>
@@ -73,12 +75,19 @@
     <section id="sceneWrap">
       <canvas id="three"></canvas>
       <video id="celebVideo" playsinline preload="auto"><source src="media/celebrate.mp4" type="video/mp4"><source src="media/celebrate.webm" type="video/webm"></video>
-      <section id="rank">
-        <div id="rankHead"><b>🔥 TOP TƯƠNG TÁC</b><span id="rankNote"></span></div>
-        <ol id="rankList"></ol>
-      </section>
+      <div id="rightCol">
+        <section id="rank">
+          <div id="rankHead"><b>🔥 TOP TƯƠNG TÁC</b><span id="rankNote"></span></div>
+          <ol id="rankList"></ol>
+        </section>
+        <section id="rankBoard">
+          <div id="rankBoardHead"><b>🏯 BẢNG CẢNH GIỚI</b><span>Thắng trận để lên cảnh giới</span></div>
+          <ol id="rankBoardList"></ol>
+        </section>
+      </div>
       <ul id="feed"></ul>
       <div id="announce" class="hidden"><header><i>📢</i>THÔNG BÁO</header><p></p></div>
+      <div id="rankup" class="hidden"><div class="ru-rays"></div><div class="ru-card"><div class="ru-title">⚡ ĐỘT PHÁ! ⚡</div><div class="ru-sub">Cảnh giới mới, khung avatar thăng cấp</div><div class="fr t0"><div class="av"><img alt=""><span></span></div></div><div class="ru-name"></div><div class="ru-tiers"><span class="ru-from"></span><b>➜</b><span class="ru-to"></span></div><div class="ru-sparks"></div></div></div>
       <div id="sign" class="hidden"><b>💡 Cần biết</b><ul id="signList"></ul></div>
       <div id="caption" class="hidden"><b></b><span></span></div>
       <div id="promo" class="hidden"><i></i><span></span></div>

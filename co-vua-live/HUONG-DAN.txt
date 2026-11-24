@@ -206,3 +206,23 @@ GO BO CHONG AUTO-CLICK
 THOAI CHIEN THANG DOC SAU VIDEO
 - Khi video an mung dang chay, MC giu lai loi chuc mung / khen / dot pha, doi video het moi doc de khong bi nhac video ap mat.
   Loi cam on qua trong luc video chay neu qua cu thi bo. Man hinh ket qua giu it nhat 28 giay de doc du.
+
+CANH GIOI (RANK) VA KHUNG AVATAR (moi them cho Co vua LIVE)
+- 6 canh gioi: Pham Nhan -> Luyen Khi -> Truc Co -> Ket Dan -> Nguyen Anh -> Hoa Than. Rank tinh theo DIEM DAO HANH: thang +1 diem.
+- So diem can de len tung bac: sua dong rankWins trong config.js. Mac dinh [2, 4, 6, 8, 12]
+  (Pham Nhan 2 diem len Luyen Khi, them 4 diem len Truc Co, ... tong 32 diem la Hoa Than). Nguoi da thang nhieu van tu truoc duoc len rank ngay.
+- Bang CANH GIOI nam duoi bang TOP TUONG TAC: ten, avatar co khung, canh gioi, so diem/so diem de len cap ke. So nguoi hien: rankBoardRows trong config.js (mac dinh 4).
+- Rank luu trong data\thanh-tich.json nen tat game vao lai van con. Muon lam lai tu dau: xoa file data\thanh-tich.json khi da tat game.
+- Khung avatar dep dan theo cap (Pham Nhan vien xam ... Hoa Than cau vong xoay + vuong mien), hien o the nguoi choi va bang canh gioi.
+- Thang vao ngay len cap: sau khi video an mung chay xong hien BANG DOT PHA giua man hinh, MC chuc mung (sua cau o muc Loi thoai > rankUp).
+
+DO KIEP THAT BAI (THUA)
+- Thua mot van = DO KIEP THAT BAI: nguoi thua MAT HET diem cua canh gioi dang dung (vd Ket Dan 4 diem -> Ket Dan 0 diem, giu canh gioi).
+  Hien bang "DO KIEP THAT BAI" (u am, rung lac, hat roi nhu nuoc mat, ghi ro mat bao nhieu diem), MC doc cau tiec nuoi, dong tin tuc bao.
+  Nguoi dang 0 diem thi thua khong co thong bao. Hoa cuc khong mat diem.
+  Sua trong config.js, dong rankLossPenalty: 'tier' (mac dinh) | 'all' (mat sach, ve Pham Nhan) | so (vd 1 = thua tru 1 diem) | 0 (thua khong mat diem).
+
+CAU NOI HAI HUOC
+- Da them nhieu cau noi vui cho moi moc (chao, tung dong xu, di quan, chieu het, thua, cam on qua, follow, hoi thuc tha tim...) va cau dong vien nguoi thua.
+  Neu truoc day ban tu sua loi thoai (data\thoai.json), bam "Khoi phuc tat ca thoai goc" de nhan cac cau moi. Moi cau toi da 4000 chu.
+

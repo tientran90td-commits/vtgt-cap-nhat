@@ -39,15 +39,15 @@ export class RankUp {
     this.until = now + (down ? SHOW_DOWN_MS : SHOW_MS);
     const el = this.el;
     el.className = 'ru t' + ru.tier + (down ? ' down' : '');
+    const same = down && ru.fromTier === ru.tier; // cùng cảnh giới: hiện số điểm thay vì tên cảnh giới
     const pick = (a) => a[Math.floor(Math.random() * a.length)];
     el.querySelector('.ru-title').textContent = down ? pick(DOWN_TITLES) : '⚡ ĐỘT PHÁ! ⚡';
-    el.querySelector('.ru-sub').textContent = down ? `Mất ${ru.lost || 0} điểm đạo hạnh. ` + pick(DOWN_SUBS) : 'Cảnh giới mới, khung avatar thăng cấp';
+    el.querySelector('.ru-sub').textContent = down ? `Mất ${ru.lost || 0} điểm đạo hạnh${same ? ' (' + ru.tierName + ')' : ''}. ` + pick(DOWN_SUBS) : 'Cảnh giới mới, khung avatar thăng cấp';
     el.querySelector('.ru-name').textContent = ru.name;
-    const same = down && ru.fromTier === ru.tier; // cùng cảnh giới: hiện số điểm thay vì tên cảnh giới
-    el.querySelector('.ru-from').textContent = same ? `${ru.fromName} ${ru.fromPts} điểm` : ru.fromName || '';
+    el.querySelector('.ru-from').textContent = same ? `${ru.fromPts} điểm` : ru.fromName || '';
     el.querySelector('.ru-from').className = 'ru-from tc' + (ru.fromTier || 0);
     const to = el.querySelector('.ru-to');
-    to.textContent = same ? `${ru.tierName} ${ru.toPts || 0} điểm` : ru.tierName;
+    to.textContent = same ? `${ru.toPts || 0} điểm` : ru.tierName;
     to.className = 'ru-to tc' + ru.tier;
     setFrame(el.querySelector('.fr'), ru.tier);
     const img = el.querySelector('img');

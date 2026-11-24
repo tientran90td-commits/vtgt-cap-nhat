@@ -8,6 +8,7 @@
 const crypto = require('crypto');
 const { ChessGame, PIECE_VN } = require('./game');
 const { parseChessMove, parseCommand } = require('./commands');
+const { rankInfo } = require('./rank');
 
 const other = (m) => (m === 'X' ? 'O' : 'X');
 const brief = (u) => ({
@@ -503,13 +504,47 @@ class Match {
     let secs = this.cfg.resultSeconds;
     // có video ăn mừng: giữ màn hình kết quả đủ lâu để video chạy hết rồi mới sang bước kế
     if (this.cfg.celebrateOn && this.result && this.result.winner) secs = Math.max(secs, this.cfg.celebrateMinSeconds || 0);
+    // có bảng "đột phá": cộng thêm thời gian để hiện sau video ăn mừng (~8 giây)
+    const ru = this.result && this.result.rankUp ? 1 : 0;
+    const rd = this.result && this.result.rankDown ? 1 : 0;
+    if (ru || rd) {
+      if (this.cfg.celebrateOn) secs += ru * 7 + rd * 6;
+      else secs = Math.max(secs, ru * 9 + rd * 8);
+    }
     this.phaseEndsAt = now + secs * 1000;
   }
 
   settleWinner(winMark, now, result) {
     const winner = this.players[winMark];
     const loser = this.players[other(winMark)];
+    const steps = this.cfg.rankWins;
+    const before = this.rankOf(winner);
+    const beforeL = this.rankOf(loser);
     this.stats.recordWin(winner);
+    // thắng: +1 điểm đạo hạnh; vừa lên cảnh giới mới thì tặng thêm điểm bảo hộ
+    let pw = before.pts + 1;
+    if (rankInfo(pw, steps).tier > before.tier) pw += Math.max(0, Math.floor(Number(this.cfg.rankPromoBonus) || 0));
+    this.stats.setRp(winner, pw);
+    const after = this.rankOf(winner);
+    if (after.tier > before.tier) {
+      result.rankUp = { name: winner.name, avatar: winner.avatar || '', tier: after.tier, tierName: after.name, fromTier: before.tier, fromName: before.name };
+      this.rankUpInfo = result.rankUp;
+    }
+    // thua = "độ kiếp thất bại": mặc định mất HẾT điểm của cảnh giới đang đứng (giữ cảnh giới, về 0 điểm).
+    // rankLossPenalty: 'tier' | 'all' (mất sạch về Phàm Nhân) | số điểm cố định | 0 (không mất)
+    const cfgPen = this.cfg.rankLossPenalty;
+    const mode = cfgPen === 'all' || cfgPen === Infinity ? 'all' : cfgPen === 'tier' ? 'tier' : 'num';
+    const pen = mode === 'all' ? Infinity : mode === 'tier' ? beforeL.into : Math.max(0, Math.floor(Number(cfgPen) || 0));
+    if (pen > 0 && loser && beforeL.pts > 0) {
+      this.stats.setRp(loser, Math.max(0, beforeL.pts - pen));
+      const afterL = this.rankOf(loser);
+      result.rankDown = {
+        name: loser.name, avatar: loser.avatar || '',
+        tier: afterL.tier, tierName: afterL.name, fromTier: beforeL.tier, fromName: beforeL.name,
+        lost: beforeL.pts - afterL.pts, fromPts: beforeL.into, toPts: afterL.into, all: mode === 'all',
+      };
+      this.rankDownInfo = result.rankDown;
+    }
     let streak = 1;
     let steppedDown = false;
     if (this.cfg.winnerStays) {
@@ -532,11 +567,25 @@ class Match {
     return { winner, loser, streak, steppedDown };
   }
 
+  rankOf(u) {
+    return rankInfo(u && this.stats.rpOf ? this.stats.rpOf(u.id) : 0, this.cfg.rankWins);
+  }
+
+  rankBoard() {
+    if (!this.stats.ranked) return [];
+    if (!this._rb || this._rb.rev !== this.stats.rev || this._rb.n !== this.cfg.rankBoardRows) {
+      const n = Math.max(1, Math.min(8, Number(this.cfg.rankBoardRows) || 4));
+      this._rb = { rev: this.stats.rev, n: this.cfg.rankBoardRows, list: this.stats.ranked(n).map((e) => ({ ...e, rank: rankInfo(e.rp, this.cfg.rankWins) })) };
+    }
+    return this._rb.list;
+  }
+
   finishWin(mark, line, now) {
     this.result = { type: 'win', winner: mark, text: `🏆 ${this.players[mark].name} thắng! (chiếu hết)`, note: '', line };
     const s = this.settleWinner(mark, now, this.result);
     this.feed(this.result.text, 'win', mark);
-    this.voice.win(s.winner, s.loser, { type: 'win', streak: s.streak, steppedDown: s.steppedDown }, now);
+    this.voice.win(s.winner, s.loser, { type: 'win', streak: s.streak, steppedDown: s.steppedDown, rankDown: !!this.result.rankDown }, now);
+    this.announceRankUp(now);
     this.finishCommon(now);
   }
 
@@ -557,7 +606,24 @@ class Match {
       { type: 'forfeit', why, streak: s.streak, steppedDown: s.steppedDown },
       now
     );
+    this.announceRankUp(now);
     this.finishCommon(now);
+  }
+
+  /** Người thắng vừa lên cảnh giới mới: ghi vào dòng tin + MC chúc mừng đột phá. */
+  announceRankUp(now) {
+    const r = this.rankUpInfo;
+    this.rankUpInfo = null;
+    if (r) {
+      this.feed(`⚡ Đạo hữu ${r.name} đột phá lên ${r.tierName}!`, 'win');
+      if (this.voice.rankUp) this.voice.rankUp(r.name, r.tierName, now);
+    }
+    const d = this.rankDownInfo;
+    this.rankDownInfo = null;
+    if (d) {
+      this.feed(`💥 Đạo hữu ${d.name} độ kiếp thất bại, mất ${d.lost} điểm đạo hạnh${d.tier < d.fromTier ? ', rớt xuống ' + d.tierName : ''}!`, 'info');
+      if (this.voice.rankDown) this.voice.rankDown(d.name, d.tierName, now, d.lost);
+    }
   }
 
   finishDraw(now, why = '') {
@@ -692,7 +758,8 @@ class Match {
       turn: this.turn,
       turnEndsAt: this.turnEndsAt,
       turnTotalMs: this.cfg.turnSeconds * 1000,
-      players: this.players,
+      players: { X: this.players.X && { ...this.players.X, rank: this.rankOf(this.players.X) }, O: this.players.O && { ...this.players.O, rank: this.rankOf(this.players.O) } },
+      rankBoard: this.rankBoard(),
       coin: this.coin,
       moves: this.game.moves.map((m) => ({
         n: m.n, m: m.mark, from: m.from, to: m.to, p: m.piece, cap: m.captured, promo: m.promo, ep: m.ep,

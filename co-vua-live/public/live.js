@@ -11,7 +11,9 @@ import { Sfx } from './sfx.js';
 import { Music } from './music.js';
 import { Fx } from './fx.js';
 import { Celebrate } from './celebrate.js';
+import { setFrame, renderRankBoard } from './rank.js';
 import { Announcer } from './announce.js';
+import { RankUp } from './rankup.js';
 import { avatarSrc } from './avatar.js';
 import { themeForGame, classicTheme, applyTheme } from './theme.js';
 
@@ -127,6 +129,10 @@ connect(
   null
 );
 
+const rankup = new RankUp($('rankup'), avatarSrc);
+rankup.onShow = () => sfx.chime();
+window.__rankup = rankup; // để thử nhanh trong F12
+
 director.onReset = () => {
   fx.clear();
   // sang ván mới: bỏ các câu đang chờ của ván cũ
@@ -179,6 +185,8 @@ function resultEffects(s) {
       celebrate.start(); // video ăn mừng (celebrate.js)
       celebStartedKey = fxKey;
     }
+    if (s.result.rankUp) rankup.queue(s.result.rankUp, 'up'); // bảng đột phá hiện sau khi video ăn mừng chạy xong
+    if (s.result.rankDown) rankup.queue(s.result.rankDown, 'down'); // rồi tới bảng độ kiếp thất bại của người thua
   } else {
     sfx.lose();
   }
@@ -279,6 +287,7 @@ function renderPlayers(s, eff, now) {
     const card = cards[mark];
     const person = lobby ? (mark === 'X' ? pv[0] : pv[1]) : s.players[mark];
     setAvatar(card, person);
+    setFrame(card.querySelector('.fr'), person && person.rank ? person.rank.tier : 0); // khung avatar theo cảnh giới
     setText(card.querySelector('.nm'), person ? person.name : 'Chờ người chơi…');
     let sub = '';
     if (confirming) sub = person ? (person.champion ? 'Nhà vô địch • giữ bàn' : person.done ? '❤ Đã thả tim • sẵn sàng!' : 'Hãy THẢ TIM để xác nhận') : '';
@@ -514,6 +523,7 @@ function frame(t) {
   if (state) {
     const now = director.nowServer();
     const eff = director.effPhase;
+    renderRankBoard(state, avatarSrc);
     renderPlayers(state, eff, now);
     renderHint(state, eff, now);
     renderOverlay(state, eff, now);
@@ -522,6 +532,7 @@ function frame(t) {
     processVoice();
     music.duck(!!voice.current || celebrate.active());
     celebrate.tick();
+    rankup.tick(eff === 'finished' && director.resultReady, celebrate.active());
     if (celebrate.active() && eff !== 'finished') celebrate.stop(); // sang bước khác (ván mới...) thì dừng ăn mừng
   }
   requestAnimationFrame(frame);
