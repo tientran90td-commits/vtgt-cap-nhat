@@ -1,0 +1,31 @@
+/* ===== THÔNG BÁO LÊN CẢNH GIỚI (rankup.js) ===== */
+#rankup { position: absolute; left: 50%; top: 46%; z-index: 12; width: 15.5rem; transform: translate(-50%, -50%); pointer-events: none; --tc: #ffd54a; }
+#rankup.hidden { display: none; }
+#rankup.t0 { --tc: #aab6d8; } #rankup.t1 { --tc: #6dffb0; } #rankup.t2 { --tc: #5fd8ff; } #rankup.t3 { --tc: #ffd54a; } #rankup.t4 { --tc: #e39bff; } #rankup.t5 { --tc: #ff8a5c; }
+#rankup .ru-rays { position: absolute; left: 50%; top: 50%; width: 30rem; height: 30rem; margin: -15rem 0 0 -15rem; border-radius: 50%; opacity: 0;
+  background: repeating-conic-gradient(from 0deg, color-mix(in srgb, var(--tc) 55%, transparent) 0 6deg, transparent 6deg 20deg);
+  -webkit-mask: radial-gradient(circle, #000 0, transparent 68%); mask: radial-gradient(circle, #000 0, transparent 68%); }
+#rankup.show .ru-rays { animation: ruRays 8s linear both; }
+#rankup .ru-card { position: relative; padding: 0.7rem 0.8rem 0.8rem; border-radius: 1.1rem; text-align: center; color: #fff; opacity: 0;
+  background: linear-gradient(170deg, rgba(20, 16, 44, 0.95), rgba(40, 24, 70, 0.95)); border: 0.16rem solid var(--tc);
+  box-shadow: 0 0 1.6rem var(--tc), 0 0 0 0.2rem rgba(255, 255, 255, 0.12) inset; }
+#rankup.show .ru-card { animation: ruPop 0.7s cubic-bezier(0.2, 1.5, 0.4, 1) both, ruGlow 1.6s ease-in-out 0.7s infinite alternate, ruOut 0.6s ease-in 7.4s forwards; }
+#rankup .ru-title { font-size: 1.5rem; font-weight: 900; letter-spacing: 0.08em; background: linear-gradient(90deg, #fff, var(--tc), #fff); background-size: 200% 100%;
+  -webkit-background-clip: text; background-clip: text; color: transparent; animation: ruShine 2s linear infinite; text-shadow: none; }
+#rankup .ru-sub { font-size: 0.7rem; color: #cfd8f5; margin-top: 0.1rem; }
+#rankup .fr { --avs: 4.8rem; --decs: 1.5rem; margin: 0.9rem 0 0.4rem; }
+#rankup .fr .av { font-size: 2rem; }
+#rankup .ru-name { font-size: 1.15rem; font-weight: 900; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#rankup .ru-tiers span { white-space: nowrap; }
+#rankup .ru-tiers { display: flex; align-items: center; justify-content: center; gap: 0.4rem; margin-top: 0.25rem; font-size: 0.85rem; font-weight: 800; }
+#rankup .ru-tiers b { color: var(--tc); font-size: 1.2rem; }
+#rankup .ru-to { font-size: 1.15rem; font-weight: 900; }
+#rankup .ru-sparks { position: absolute; left: 50%; top: 38%; width: 0; height: 0; }
+#rankup .ru-sparks i { position: absolute; left: 0; top: 0; width: 0.38rem; height: 0.38rem; border-radius: 50%; opacity: 0; animation: ruSpark 2s ease-out infinite; box-shadow: 0 0 0.5rem currentColor; }
+
+@keyframes ruPop { from { transform: scale(0.3) rotate(-6deg); opacity: 0; } to { transform: none; opacity: 1; } }
+@keyframes ruOut { to { transform: scale(0.9) translateY(-0.8rem); opacity: 0; } }
+@keyframes ruGlow { from { box-shadow: 0 0 1rem var(--tc), 0 0 0 0.2rem rgba(255, 255, 255, 0.12) inset; } to { box-shadow: 0 0 2.6rem var(--tc), 0 0 0 0.2rem rgba(255, 255, 255, 0.2) inset; } }
+@keyframes ruShine { to { background-position: -200% 0; } }
+@keyframes ruRays { 0% { opacity: 0; transform: rotate(0); } 8% { opacity: 0.9; } 90% { opacity: 0.8; } 100% { opacity: 0; transform: rotate(120deg); } }
+@keyframes ruSpark { 0% { transform: translate(0, 0) scale(0.4); opacity: 0; } 15% { opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(1.1); opacity: 0; } }

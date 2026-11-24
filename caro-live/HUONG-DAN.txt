@@ -216,3 +216,8 @@ DEN LED DUONG KE (da doi kieu)
 
 GO BO CHONG AUTO-CLICK
 - Co che chong auto-click tha tim da bi go. Moi luot tha tim deu duoc cong day du diem. File cu src\likeguard.js (neu con) khong con duoc dung, xoa cung duoc.
+
+THONG BAO LEN CANH GIOI (DOT PHA) - da lam dep hon
+- Khi nguoi thang len canh gioi moi: sau khi video an mung chay xong se hien BANG DOT PHA lon giua man hinh trong khoang 8 giay:
+  avatar voi khung cap moi, ten, "canh gioi cu -> canh gioi moi", tia sang va hat lap lanh mau theo cap. MC cung doc cau chuc mung.
+- Man hinh ket qua duoc giu lau hon (them khoang 7 giay) de bang dot pha hien du.

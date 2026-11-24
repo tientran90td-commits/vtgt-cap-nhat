@@ -499,6 +499,8 @@ class Match {
     let secs = this.cfg.resultSeconds;
     // có video ăn mừng: giữ màn hình kết quả đủ lâu để video chạy hết rồi mới sang bước kế
     if (this.cfg.celebrateOn && this.result && this.result.winner) secs = Math.max(secs, this.cfg.celebrateMinSeconds || 0);
+    // có bảng "đột phá": cộng thêm thời gian để hiện sau video ăn mừng (~8 giây)
+    if (this.result && this.result.rankUp) secs += this.cfg.celebrateOn ? 7 : Math.max(0, 10 - secs);
     this.phaseEndsAt = now + secs * 1000;
   }
 
@@ -509,7 +511,7 @@ class Match {
     this.stats.recordWin(winner);
     const after = this.rankOf(winner);
     if (after.tier > before.tier) {
-      result.rankUp = { name: winner.name, tier: after.tier, tierName: after.name };
+      result.rankUp = { name: winner.name, avatar: winner.avatar || '', tier: after.tier, tierName: after.name, fromTier: before.tier, fromName: before.name };
       this.rankUpInfo = result.rankUp;
     }
     let streak = 1;

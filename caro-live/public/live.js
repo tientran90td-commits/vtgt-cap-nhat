@@ -17,6 +17,7 @@ import { fourInRow } from './threat.js';
 import { avatarSrc } from './avatar.js';
 import { setFrame, renderRankBoard } from './rank.js';
 import { Announcer } from './announce.js';
+import { RankUp } from './rankup.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -133,6 +134,10 @@ director.onReset = () => {
 };
 
 // ---------------------------------------------------------------- hiệu ứng theo dữ liệu từ máy chủ
+const rankup = new RankUp($('rankup'), avatarSrc);
+rankup.onShow = () => sfx.chime();
+window.__rankup = rankup; // để thử nhanh trong F12
+window.__st = () => state;
 const announcer = new Announcer($('announce'), $('sceneWrap'));
 let promoId = null;
 let lastFeedId = 0;
@@ -174,10 +179,7 @@ function resultEffects(s) {
     fx.fireworks(6500);
     fx.showBanner('🏆 ' + w.name + ' ĐẠI THẮNG!', 'Bá đạo! Bá khí ngút trời!');
     if (!(s.settings && s.settings.celebrateOn === false)) celebrate.start(); // video ăn mừng (celebrate.js)
-    if (s.result.rankUp) {
-      const ru = s.result.rankUp; // lên cảnh giới mới: thông báo sau banner thắng
-      setTimeout(() => fx.showBanner('⚡ ' + ru.name + ' ĐỘT PHÁ ' + ru.tierName.toUpperCase() + '!', 'Khung avatar thăng cấp!'), 3200);
-    }
+    if (s.result.rankUp) { rankup.queue(s.result.rankUp); } // bảng đột phá hiện sau khi video ăn mừng chạy xong
   } else {
     sfx.lose();
   }
@@ -522,6 +524,7 @@ function frame(t) {
     processVoice();
     music.duck(!!voice.current || celebrate.active());
     celebrate.tick();
+    rankup.tick(eff === 'finished' && director.resultReady, celebrate.active());
     if (celebrate.active() && eff !== 'finished') celebrate.stop(); // sang bước khác (ván mới...) thì dừng ăn mừng
   }
   requestAnimationFrame(frame);
