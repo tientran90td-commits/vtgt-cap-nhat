@@ -227,10 +227,10 @@ THOAI CHIEN THANG DOC SAU VIDEO
   Loi cam on qua trong luc video chay neu qua cu thi bo. Man hinh ket qua giu it nhat 28 giay de doc du.
 
 THUA HA RANK + CAU NOI HAI HUOC
-- Thua mot van = DO KIEP THAT BAI: nguoi thua MAT HET diem dao hanh (ve 0 diem). Hien bang "DO KIEP THAT BAI" (u am, rung lac, hat roi nhu nuoc mat,
-  ghi ro mat bao nhieu diem), MC doc cau tiec nuoi, dong tin tuc bao. Neu tu cap cao ve thap thi bi tut canh gioi.
-  Nguoi chua co diem nao thi thua khong co thong bao.
-  Sua trong config.js: rankLossPenalty: 'all' (mac dinh, mat het) | so (vd 1 = thua chi tru 1 diem) | 0 (thua khong mat diem).
+- Thua mot van = DO KIEP THAT BAI: nguoi thua MAT HET diem cua canh gioi dang dung (vd Ket Dan 4 diem -> Ket Dan 0 diem, giu canh gioi).
+  Hien bang "DO KIEP THAT BAI" (u am, rung lac, hat roi nhu nuoc mat, ghi ro mat bao nhieu diem), MC doc cau tiec nuoi, dong tin tuc bao.
+  Nguoi dang 0 diem thi thua khong co thong bao.
+  Sua trong config.js, dong rankLossPenalty: 'tier' (mac dinh) | 'all' (mat sach, ve Pham Nhan, tut canh gioi) | so (vd 1 = thua tru 1 diem) | 0 (thua khong mat diem).
 - Hoa cuc khong tru diem. Nguoi thua ma chua co diem de mat thi MC noi cau dong vien vui (muc Loi thoai > loseComfort).
 - Da them hon 100 cau noi vui cho tat ca moc (chao, di co, thang, thua, cam on qua, follow, hoi thuc tha tim...).
   Neu truoc day ban tu sua loi thoai (data\thoai.json), bam "Khoi phuc tat ca thoai goc" de nhan cac cau moi.

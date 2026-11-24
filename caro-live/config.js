@@ -84,7 +84,7 @@ module.exports = {
   boardSkin: 'auto', // kiểu bàn cờ: 'auto' = mỗi ván 1 kiểu | 'wood' = bàn gỗ | rong-vang, thanh-long, bach-ho, chu-tuoc, huyen-vu, cong-nghe, neon-tim, thien-ha
   // CẢNH GIỚI (rank): số ván thắng cần để lên từng bậc: Phàm Nhân->Luyện Khí->Trúc Cơ->Kết Đan->Nguyên Anh->Hóa Thần
   rankWins: [2, 4, 6, 8, 12],
-  rankLossPenalty: 'all', // thua = ĐỘ KIẾP THẤT BẠI: mất HẾT điểm đạo hạnh ('all'). Muốn trừ ít thì ghi số, ví dụ 1 = thua trừ 1 điểm; 0 = thua không mất điểm
+  rankLossPenalty: 'tier', // thua = ĐỘ KIẾP THẤT BẠI: 'tier' = mất hết điểm của cảnh giới đang đứng (Kết Đan 4 điểm -> Kết Đan 0 điểm, giữ cảnh giới) | 'all' = mất sạch về Phàm Nhân | số (vd 1 = trừ 1 điểm) | 0 = thua không mất điểm
   rankPromoBonus: 0, // (tùy chọn) vừa lên cảnh giới mới được tặng sẵn bấy nhiêu điểm để thua ngay 1 ván không bị tụt liền. Mặc định 0: thắng +1, thua -1 đúng như nhau
   rankBoardRows: 4, // số người hiện trên bảng rank
   celebrateOn: true, // có người thắng -> phát video ăn mừng (public/media/celebrate.mp4): có tiếng ngay, 4 giây sau mới hiện hình thế chỗ 2 nhân vật

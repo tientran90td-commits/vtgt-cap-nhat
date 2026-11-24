@@ -525,17 +525,18 @@ class Match {
       result.rankUp = { name: winner.name, avatar: winner.avatar || '', tier: after.tier, tierName: after.name, fromTier: before.tier, fromName: before.name };
       this.rankUpInfo = result.rankUp;
     }
-    // thua = "độ kiếp thất bại": mặc định mất hết điểm đạo hạnh (rankLossPenalty = 'all'), hoặc trừ số điểm cố định
+    // thua = "độ kiếp thất bại": mặc định mất HẾT điểm của cảnh giới đang đứng (giữ cảnh giới, về 0 điểm).
+    // rankLossPenalty: 'tier' | 'all' (mất sạch về Phàm Nhân) | số điểm cố định | 0 (không mất)
     const cfgPen = this.cfg.rankLossPenalty;
-    const all = cfgPen === 'all' || cfgPen === Infinity;
-    const pen = all ? Infinity : Math.max(0, Math.floor(Number(cfgPen) || 0));
+    const mode = cfgPen === 'all' || cfgPen === Infinity ? 'all' : cfgPen === 'tier' ? 'tier' : 'num';
+    const pen = mode === 'all' ? Infinity : mode === 'tier' ? beforeL.into : Math.max(0, Math.floor(Number(cfgPen) || 0));
     if (pen > 0 && loser && beforeL.pts > 0) {
       this.stats.setRp(loser, Math.max(0, beforeL.pts - pen));
       const afterL = this.rankOf(loser);
       result.rankDown = {
         name: loser.name, avatar: loser.avatar || '',
         tier: afterL.tier, tierName: afterL.name, fromTier: beforeL.tier, fromName: beforeL.name,
-        lost: beforeL.pts - afterL.pts, fromPts: beforeL.pts, toPts: afterL.pts, all,
+        lost: beforeL.pts - afterL.pts, fromPts: beforeL.into, toPts: afterL.into, all: mode === 'all',
       };
       this.rankDownInfo = result.rankDown;
     }
