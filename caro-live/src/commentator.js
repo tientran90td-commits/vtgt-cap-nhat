@@ -172,10 +172,15 @@ class Commentator {
     this.say('congrats', { ten: w }, { at: now, gate });
     if (info.streak >= 2) this.say('streak', { ten: w, so: info.streak }, { at: now, gate });
     if (info.steppedDown) this.say('stepDown', { ten: w }, { at: now, gate });
+    if (info.type !== 'forfeit' && !info.rankDown) this.say('loseComfort', { thua: l }, { at: now, gate });
   }
 
   rankUp(name, tierName, now) {
     this.say('rankUp', { ten: this.nm({ name }, 'vô danh'), canhgioi: tierName }, { at: now, gate: { k: 'result' }, prio: 2 });
+  }
+
+  rankDown(name, tierName, now) {
+    this.say('rankDown', { ten: this.nm({ name }, 'vô danh'), canhgioi: tierName }, { at: now, gate: { k: 'result' }, prio: 2 });
   }
 
   draw(now) {

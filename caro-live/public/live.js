@@ -184,7 +184,8 @@ function resultEffects(s) {
       celebrate.start(); // video ăn mừng (celebrate.js)
       celebStartedKey = fxKey;
     }
-    if (s.result.rankUp) { rankup.queue(s.result.rankUp); } // bảng đột phá hiện sau khi video ăn mừng chạy xong
+    if (s.result.rankUp) rankup.queue(s.result.rankUp, 'up'); // bảng đột phá hiện sau khi video ăn mừng chạy xong
+    if (s.result.rankDown) rankup.queue(s.result.rankDown, 'down'); // rồi tới bảng tụt cảnh giới của người thua
   } else {
     sfx.lose();
   }

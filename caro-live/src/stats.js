@@ -47,13 +47,27 @@ class Stats {
     return (this.data[id] && this.data[id].wins) || 0;
   }
 
-  /** Danh sách người đã thắng ít nhất 1 ván, xếp từ nhiều ván thắng nhất (rank cao nhất) trở xuống. */
+  /** Điểm đạo hạnh (quyết định rank). Dữ liệu cũ chưa có thì lấy bằng số ván thắng. */
+  rpOf(id) {
+    const e = this.data[id];
+    if (!e) return 0;
+    return e.rp != null ? e.rp : e.wins || 0;
+  }
+
+  setRp(user, v) {
+    this.entry(user).rp = Math.max(0, Math.floor(v));
+    this.rev++;
+    this.save();
+  }
+
+  /** Người đã từng thắng ít nhất 1 ván, xếp theo điểm đạo hạnh (rank cao nhất) trở xuống. */
   ranked(n = 5) {
     return Object.entries(this.data)
       .filter(([, e]) => e.wins > 0)
-      .sort((a, b) => b[1].wins - a[1].wins || a[1].games - b[1].games)
+      .map(([id, e]) => ({ id, name: e.name, avatar: e.avatar || '', wins: e.wins, rp: e.rp != null ? e.rp : e.wins, games: e.games }))
+      .sort((a, b) => b.rp - a.rp || b.wins - a.wins || a.games - b.games)
       .slice(0, n)
-      .map(([id, e]) => ({ id, name: e.name, avatar: e.avatar || '', wins: e.wins }));
+      .map(({ games, ...rest }) => rest);
   }
 
   top(n = 5) {

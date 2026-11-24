@@ -20,7 +20,7 @@ export function setFrame(frEl, tier) {
 let boardKey = '';
 export function renderRankBoard(s, avatarSrc) {
   const list = s.rankBoard || [];
-  const key = JSON.stringify(list.map((e) => [e.id, e.name, e.avatar, e.wins]));
+  const key = JSON.stringify(list.map((e) => [e.id, e.name, e.avatar, e.wins, e.rank.tier, e.rank.into]));
   if (key === boardKey) return;
   boardKey = key;
   const ol = document.getElementById('rankBoardList');
@@ -66,7 +66,7 @@ export function renderRankBoard(s, avatarSrc) {
     const prog = document.createElement('span');
     prog.className = 'rb-prog';
     if (r.max) {
-      prog.textContent = `Đỉnh cao • ${r.wins} trận`;
+      prog.textContent = `Đỉnh cao • thắng ${e.wins} trận`;
     } else {
       prog.textContent = `Thắng ${r.into}/${r.need} → ${TIER_NAMES[r.tier + 1]}`;
     }

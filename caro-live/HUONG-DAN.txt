@@ -186,7 +186,7 @@ VIDEO AN MUNG KHI CO NGUOI THANG
 
 CANH GIOI (RANK) VA KHUNG AVATAR
 - 6 canh gioi: Pham Nhan -> Luyen Khi -> Truc Co -> Ket Dan -> Nguyen Anh -> Hoa Than. Rank tinh theo TONG SO VAN THANG.
-- So van thang can de len tung bac: sua dong rankWins trong config.js. Mac dinh [2, 4, 6, 8, 12]
+- So diem can de len tung bac: sua dong rankWins trong config.js. Mac dinh [2, 4, 6, 8, 12]
   (Pham Nhan thang 2 van len Luyen Khi, Luyen Khi thang them 4 van len Truc Co, ... tong 32 van la Hoa Than).
 - Bang CANH GIOI nam duoi bang tu vi: ten, avatar co khung, canh gioi, thang bao nhieu/bao nhieu tran de len cap ke.
   So nguoi hien tren bang: dong rankBoardRows trong config.js (mac dinh 4).
@@ -225,3 +225,11 @@ THONG BAO LEN CANH GIOI (DOT PHA) - da lam dep hon
 THOAI CHIEN THANG DOC SAU VIDEO
 - Khi video an mung dang chay, MC giu lai loi chuc mung / khen / dot pha, doi video het moi doc de khong bi nhac video ap mat.
   Loi cam on qua trong luc video chay neu qua cu thi bo. Man hinh ket qua giu it nhat 28 giay de doc du.
+
+THUA HA RANK + CAU NOI HAI HUOC
+- Thua mot van bi tru diem dao hanh (rankLossPenalty trong config.js, mac dinh 1 = nguoc lai voi thang +1). Tru xuong duoi moc cua canh gioi
+  thi bi TUT canh gioi: hien bang "TAU HOA NHAP MA" (u am, rung lac, hat roi nhu nuoc mat), MC doc cau tiec nuoi, dong tin tuc bao tut hang.
+  Dat rankLossPenalty = 0 de tat ha rank. rankPromoBonus (mac dinh 0) la so diem tang them khi vua len cap, neu muon thua 1 van khong tut lien.
+- Hoa cuc khong tru diem. Nguoi thua ma chua tut cap thi MC noi cau dong vien vui (muc Loi thoai > loseComfort).
+- Da them hon 100 cau noi vui cho tat ca moc (chao, di co, thang, thua, cam on qua, follow, hoi thuc tha tim...).
+  Neu truoc day ban tu sua loi thoai (data\thoai.json), bam "Khoi phuc tat ca thoai goc" de nhan cac cau moi.

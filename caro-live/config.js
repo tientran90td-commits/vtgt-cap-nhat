@@ -84,6 +84,8 @@ module.exports = {
   boardSkin: 'auto', // kiểu bàn cờ: 'auto' = mỗi ván 1 kiểu | 'wood' = bàn gỗ | rong-vang, thanh-long, bach-ho, chu-tuoc, huyen-vu, cong-nghe, neon-tim, thien-ha
   // CẢNH GIỚI (rank): số ván thắng cần để lên từng bậc: Phàm Nhân->Luyện Khí->Trúc Cơ->Kết Đan->Nguyên Anh->Hóa Thần
   rankWins: [2, 4, 6, 8, 12],
+  rankLossPenalty: 1, // thua một ván bị trừ bấy nhiêu điểm đạo hạnh (0 = thua không bị hạ rank)
+  rankPromoBonus: 0, // (tùy chọn) vừa lên cảnh giới mới được tặng sẵn bấy nhiêu điểm để thua ngay 1 ván không bị tụt liền. Mặc định 0: thắng +1, thua -1 đúng như nhau
   rankBoardRows: 4, // số người hiện trên bảng rank
   celebrateOn: true, // có người thắng -> phát video ăn mừng (public/media/celebrate.mp4): có tiếng ngay, 4 giây sau mới hiện hình thế chỗ 2 nhân vật
   celebrateMinSeconds: Number(process.env.CARO_CELEB_MIN) || (fast ? 0 : 28), // màn hình kết quả giữ ít nhất bấy nhiêu giây để video chạy hết (video ~10,4 giây + vài giây quân cuối còn đang đặt xuống + thời gian MC đọc lời chúc mừng SAU video)
