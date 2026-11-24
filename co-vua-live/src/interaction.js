@@ -4,7 +4,6 @@
  * Người có điểm cao nhất sẽ được chọn lên bàn chơi (xem match.js).
  */
 
-const { LikeGuard } = require('./likeguard');
 
 class Interaction {
   constructor(pointsCfg, guardModeFn) {
@@ -18,8 +17,6 @@ class Interaction {
     );
     this.users = new Map();
     this.seq = 0;
-    this.guard = new LikeGuard(guardModeFn); // chống auto-click thả tim (likeguard.js)
-    this.lastLike = { limited: 0, suspect: false, newly: false };
   }
 
   touch(user) {
@@ -35,7 +32,6 @@ class Interaction {
         diamonds: 0,
         likePts: 0, // điểm đã nhận từ thả tim trong vòng này (để giới hạn)
         likeFrac: 0, // phần lẻ điểm tim (do bị giảm hệ số) để cộng dồn
-        suspect: false, // nghi dùng auto-click thả tim
         giftPts: 0, // điểm đã nhận từ quà trong vòng này (để giới hạn)
         lastCommentAt: 0,
         shared: false,
@@ -73,7 +69,6 @@ class Interaction {
       g.uniqueId = toId;
       this.users.set(toId, g);
     }
-    if (this.guard && this.guard.st) this.guard.st.delete(fromId);
   }
 
   addComment(user, now = Date.now()) {
@@ -89,11 +84,7 @@ class Interaction {
     const u = this.touch(user);
     let n = Math.max(0, Number(count) || 0);
     if (this.cfg.likeMaxPerEvent > 0) n = Math.min(n, this.cfg.likeMaxPerEvent); // 0 = không giới hạn
-    // Chống auto-click: lượt bấm quá dồn dập chỉ được tính 1 phần (người bấm tay bình thường không bị ảnh hưởng)
-    const g = this.guard.take(user.id, n, now);
-    this.lastLike = { limited: g.reduced, suspect: g.suspect, newly: !!g.newly };
-    u.suspect = g.suspect;
-    let raw = (g.full + g.reduced * g.over) * this.cfg.like + u.likeFrac;
+    let raw = n * this.cfg.like + u.likeFrac;
     let p = Math.floor(raw);
     u.likeFrac = raw - p;
     if (this.cfg.likeCapPerRound > 0) p = Math.max(0, Math.min(p, this.cfg.likeCapPerRound - u.likePts));

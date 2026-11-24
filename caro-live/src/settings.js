@@ -60,10 +60,6 @@ class Settings {
       c.boardSkin = patch.boardSkin;
       changed.push('boardSkin');
     }
-    if (typeof patch.likeGuard === 'string' && ['off', 'loose', 'normal', 'strict'].includes(patch.likeGuard) && c.likeGuard !== patch.likeGuard) {
-      c.likeGuard = patch.likeGuard;
-      changed.push('likeGuard');
-    }
     for (const k of BOOLS) {
       if (patch[k] === undefined) continue;
       const v = !!patch[k];
@@ -132,7 +128,6 @@ class Settings {
     for (const k of Object.keys(NUMBERS)) out[k] = c[k];
     for (const k of BOOLS) out[k] = c[k];
     out.boardSkin = c.boardSkin || 'auto';
-    out.likeGuard = c.likeGuard || 'normal';
     return out;
   }
 

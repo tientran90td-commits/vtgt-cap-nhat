@@ -20,7 +20,7 @@ class Hub {
     this.cfg = cfg;
     const dataDir = path.join(__dirname, '..', 'data');
     this.settings = new Settings(cfg, path.join(dataDir, 'cai-dat.json'));
-    this.interaction = new Interaction(cfg.points, () => this.cfg.likeGuard || 'normal');
+    this.interaction = new Interaction(cfg.points);
     this.stats = new Stats(path.join(dataDir, 'thanh-tich.json'));
     this.namer = new Namer(path.join(dataDir, 'cach-doc-ten.json'));
     this.script = new Script(path.join(dataDir, 'thoai.json'));
@@ -83,7 +83,6 @@ class Hub {
 
   onLike(user, count, now = Date.now()) {
     this.interaction.addLike(user, count, now);
-    if (this.interaction.lastLike.newly) this.match.feed(`⚠ ${user.name} thả tim dồn dập bất thường (nghi auto-click): điểm tim đang bị giảm`, 'warn');
     this.match.onLike(user, now); // pha xác nhận: người được chọn thả tim -> ghi nhận
   }
 

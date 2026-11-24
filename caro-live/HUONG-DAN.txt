@@ -174,14 +174,6 @@ LOI THOAI + NHAN VAT TIEN HIEP
 - Neu ban DA TUNG sua loi thoai (file data\thoai.json), cau cu cua ban van duoc giu: bam nut "Khoi phuc tat ca thoai goc" o muc Loi thoai de lay cau tien hiep moi.
 - Hai nhan vat mac dao bao / tien phuc (kim quan, tram ngoc, tay ao rong, lua phi doi).
 
-CHONG AUTO-CLICK THA TIM
-- Nguoi bam tay thi bam tung dot roi nghi, app auto-click thi bam deu deu khong nghi. Moi nguoi co "binh suc bam tim":
-  het suc thi luot tim chi duoc tinh 1 phan nho (khong ve 0). Nghi 1 chut la suc hoi lai.
-- Bang dieu khien > cai dat van > "Chong auto-click tha tim": Vua (khuyen dung) / Long / Chat / Tat.
-- Nguoi nghi auto-click hien dau canh bao trong bang xep hang cua bang dieu khien va co dong thong bao.
-- Chi anh huong diem tha tim. Qua tang, follow, chia se va viec "tha tim xac nhan len dai" khong bi anh huong.
-- Muon chinh so: sua file src\likeguard.js (muc PRESETS).
-
 VIDEO AN MUNG KHI CO NGUOI THANG
 - Co nguoi thang van -> nhac cua video phat ngay, 4 giay sau hinh moi hien len thay cho 2 nhan vat o duoi. Neu trinh duyet khong phat duoc mp4 thi tu dung ban webm (celebrate.webm). Het video thi tro ve nhu cu
   (2 nhan vat quay lai) va game chay cac buoc tiep theo binh thuong. Man hinh ket qua duoc giu it nhat 22 giay de video chay het.
@@ -209,8 +201,7 @@ TIM KHONG LEN DIEM (da sua)
 - Truoc day neu TikTok gui su kien tim chi co ma so ma thieu @ten, game tinh thanh 1 nguoi khac -> diem tim khong len va tha tim
   xac nhan khong nhan. Gio game tu noi lai (hoc ma so <-> @ten tu binh luan/qua/follow) va gop diem lai cho dung nguoi.
 - Tim ma TikTok KHONG gui kem ten nguoi tha thi khong the tinh diem; moi phut game se bao 1 dong "luot tim khong ro nguoi tha".
-- Neu thay nguoi tha tim lien tuc bi dau ⚠ (nghi auto-click) trong bang dieu khien thi do la bo chong auto-click dang giam diem:
-  doi "Chong auto-click tim" sang "Long" hoac "Tat" de thu.
+- (Co che chong auto-click da duoc go bo: moi luot tha tim deu tinh du diem.)
 
 THONG BAO CUA CHU PHONG (ADMIN)
 - Bang dieu khien > the "Thong bao cho nguoi xem": go noi dung, chon thoi gian hien (mac dinh tu tinh theo do dai chu), bam "Phat thong bao"
@@ -222,3 +213,6 @@ DEN LED DUONG KE (da doi kieu)
 - Khong con den chay doc theo duong ke. Gio cac duong ke va vien ban co SANG DEU len (doi mau LED rat cham, tho nhe),
   cu moi 6 giay lai co 1 vet sang trang "anh guong" quet cheo qua ban co (lan sau doi huong), duong ke di toi dau sang ruc toi do.
 - Van tick/bo tick "Den LED sang o duong ke..." trong bang dieu khien de bat/tat.
+
+GO BO CHONG AUTO-CLICK
+- Co che chong auto-click tha tim da bi go. Moi luot tha tim deu duoc cong day du diem. File cu src\likeguard.js (neu con) khong con duoc dung, xoa cung duoc.
