@@ -178,7 +178,7 @@ CAP NHAT TRUC TIEP (khong can tai lai ban zip)
 
 VIDEO AN MUNG KHI CO NGUOI THANG
 - Co nguoi thang van -> nhac cua video phat ngay, 4 giay sau hinh moi hien len thay cho 2 nhan vat o duoi. Neu trinh duyet khong phat duoc mp4 thi tu dung ban webm (celebrate.webm). Het video thi tro ve nhu cu
-  (2 nhan vat quay lai) va game chay cac buoc tiep theo binh thuong. Man hinh ket qua duoc giu it nhat 22 giay de video chay het.
+  (2 nhan vat quay lai) va game chay cac buoc tiep theo binh thuong. Man hinh ket qua duoc giu it nhat 28 giay de video chay het.
 - Bat/tat: Bang dieu khien > cai dat van > "Video an mung khi co nguoi thang".
 - Doi video khac: thay file public\media\celebrate.mp4 (nen dung mp4 ma H.264 + AAC, hinh vuong cho dep). Neu video dai hon, tang
   celebrateMinSeconds trong config.js.
@@ -202,3 +202,7 @@ THONG BAO CUA CHU PHONG (ADMIN)
 
 GO BO CHONG AUTO-CLICK
 - Co che chong auto-click tha tim da bi go. Moi luot tha tim deu duoc cong day du diem. File cu src\likeguard.js (neu con) khong con duoc dung, xoa cung duoc.
+
+THOAI CHIEN THANG DOC SAU VIDEO
+- Khi video an mung dang chay, MC giu lai loi chuc mung / khen / dot pha, doi video het moi doc de khong bi nhac video ap mat.
+  Loi cam on qua trong luc video chay neu qua cu thi bo. Man hinh ket qua giu it nhat 28 giay de doc du.

@@ -138,10 +138,12 @@ const rankup = new RankUp($('rankup'), avatarSrc);
 rankup.onShow = () => sfx.chime();
 window.__rankup = rankup; // để thử nhanh trong F12
 window.__st = () => state;
+window.__voice = voice;
 const announcer = new Announcer($('announce'), $('sceneWrap'));
 let promoId = null;
 let lastFeedId = 0;
 let fxKey = null;
+let celebStartedKey = null; // ván nào đã bắt đầu phát video ăn mừng (để giữ thoại chiến thắng lại, đọc sau khi video hết)
 function handleExtras(s, first) {
   // thông báo của chủ phòng (bảng nhỏ + lời đọc)
   if (announcer.update(s.announce, first)) sfx.chime();
@@ -178,7 +180,10 @@ function resultEffects(s) {
     sfx.win();
     fx.fireworks(6500);
     fx.showBanner('🏆 ' + w.name + ' ĐẠI THẮNG!', 'Bá đạo! Bá khí ngút trời!');
-    if (!(s.settings && s.settings.celebrateOn === false)) celebrate.start(); // video ăn mừng (celebrate.js)
+    if (!(s.settings && s.settings.celebrateOn === false)) {
+      celebrate.start(); // video ăn mừng (celebrate.js)
+      celebStartedKey = fxKey;
+    }
     if (s.result.rankUp) { rankup.queue(s.result.rankUp); } // bảng đột phá hiện sau khi video ăn mừng chạy xong
   } else {
     sfx.lose();
@@ -471,9 +476,15 @@ function renderOverlay(s, eff, now) {
 function processVoice() {
   const due = director.dueCues(spoken);
   const now = director.nowServer();
+  // Thoại chiến thắng (chúc mừng, khen, đột phá...) KHÔNG đọc đè lên nhạc video ăn mừng: giữ lại, video hết mới đọc
+  const s = state;
+  const celebOn = !(s && s.settings && s.settings.celebrateOn === false);
+  const playing = celebrate.active(); // video đang chạy: giữ MỌI lời đọc lại (kể cả cảm ơn quà), tránh đọc đè lên nhạc
+  const holdResult = celebOn && s && s.result && s.result.winner && celebStartedKey !== s.gameNo + ':' + s.result.type;
   for (const c of due) {
+    if (playing || (holdResult && c.gate && c.gate.k === 'result')) continue;
     spoken.add(c.id);
-    if (now - c.at > 40000) continue; // câu đã quá cũ
+    if (now - c.at > (c.gate && c.gate.k === 'result' ? 60000 : 15000)) continue; // câu đã quá cũ (lời cảm ơn quà bị giữ lâu quá thì bỏ, tránh đọc dồn sau video)
     voice.push(c);
   }
   const need = !forceMuted && ((voice.supported && voice.settings.on && voice.needsGesture) || sfx.needsGesture() || music.needsGesture());

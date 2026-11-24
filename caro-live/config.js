@@ -86,7 +86,7 @@ module.exports = {
   rankWins: [2, 4, 6, 8, 12],
   rankBoardRows: 4, // số người hiện trên bảng rank
   celebrateOn: true, // có người thắng -> phát video ăn mừng (public/media/celebrate.mp4): có tiếng ngay, 4 giây sau mới hiện hình thế chỗ 2 nhân vật
-  celebrateMinSeconds: Number(process.env.CARO_CELEB_MIN) || (fast ? 0 : 22), // màn hình kết quả giữ ít nhất bấy nhiêu giây để video chạy hết (video ~10,4 giây + vài giây quân cuối còn đang đặt xuống)
+  celebrateMinSeconds: Number(process.env.CARO_CELEB_MIN) || (fast ? 0 : 28), // màn hình kết quả giữ ít nhất bấy nhiêu giây để video chạy hết (video ~10,4 giây + vài giây quân cuối còn đang đặt xuống + thời gian MC đọc lời chúc mừng SAU video)
   ledOn: true, // đèn LED chạy ở đường kẻ bàn cờ
   // Đến lượt mà người chơi chưa bình luận gì sau bấy nhiêu giây -> biển báo nhấp nháy để gây chú ý (0 = tắt).
   idleHintSeconds: fast ? 0 : 12,
