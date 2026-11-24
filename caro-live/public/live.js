@@ -15,6 +15,7 @@ import { Fx } from './fx.js';
 import { Celebrate } from './celebrate.js';
 import { fourInRow } from './threat.js';
 import { avatarSrc } from './avatar.js';
+import { setFrame, renderRankBoard } from './rank.js';
 
 const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
@@ -165,6 +166,10 @@ function resultEffects(s) {
     fx.fireworks(6500);
     fx.showBanner('🏆 ' + w.name + ' ĐẠI THẮNG!', 'Bá đạo! Bá khí ngút trời!');
     if (!(s.settings && s.settings.celebrateOn === false)) celebrate.start(); // video ăn mừng (celebrate.js)
+    if (s.result.rankUp) {
+      const ru = s.result.rankUp; // lên cảnh giới mới: thông báo sau banner thắng
+      setTimeout(() => fx.showBanner('⚡ ' + ru.name + ' ĐỘT PHÁ ' + ru.tierName.toUpperCase() + '!', 'Khung avatar thăng cấp!'), 3200);
+    }
   } else {
     sfx.lose();
   }
@@ -265,6 +270,7 @@ function renderPlayers(s, eff, now) {
     const card = cards[mark];
     const person = lobby ? (mark === 'X' ? pv[0] : pv[1]) : s.players[mark];
     setAvatar(card, person);
+    setFrame(card.querySelector('.fr'), person && person.rank ? person.rank.tier : 0); // khung avatar theo cảnh giới
     setText(card.querySelector('.nm'), person ? person.name : 'Chờ đạo hữu…');
     let sub = '';
     if (confirming) sub = person ? (person.champion ? 'Nhà vô địch • giữ bàn' : person.done ? '❤ Đã thả tim • sẵn sàng!' : 'Hãy THẢ TIM để xác nhận') : '';
@@ -499,6 +505,7 @@ function frame(t) {
   if (state) {
     const now = director.nowServer();
     const eff = director.effPhase;
+    renderRankBoard(state, avatarSrc);
     renderPlayers(state, eff, now);
     renderHint(state, eff, now);
     renderOverlay(state, eff, now);

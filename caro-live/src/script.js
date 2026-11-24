@@ -78,6 +78,8 @@ const DEFAULTS = [
     text: 'Cung hỉ đạo hữu {ten}! Quả là bá đạo, bá khí lộ rõ, tu vi cao thâm khó lường!\nCung hỉ đạo hữu {ten}! Bá khí ngút trời, uy chấn bát phương, thiên hạ khó có địch thủ!\nCung hỉ, cung hỉ! Đạo hữu {ten} bá đạo như vậy, quả là thiên tài cái thế, không ai sánh bằng!\nĐạo hữu {ten} một chiêu định càn khôn, bá khí lẫm liệt. Xin chư vị đạo hữu cùng cung hỉ!' },
   { key: 'streak', group: 'Kết quả', role: 'mc', label: 'Thắng liên tiếp', vars: ['ten', 'so'],
     text: 'Đạo hữu {ten} đã liên tiếp thắng {so} trận, bá đạo vô song, đạo hạnh thâm hậu, không ai cản nổi!' },
+  { key: 'rankUp', group: 'Kết quả', role: 'mc', label: 'Người thắng đột phá cảnh giới (rank)', vars: ['ten', 'canhgioi'],
+    text: 'Thiên địa dị tượng! Đạo hữu {ten} đã đột phá, tiến nhập {canhgioi}, khung tu vi thêm rực rỡ!\nChúc mừng đạo hữu {ten} đột phá thành công, bước vào cảnh giới {canhgioi}, bá khí càng thêm ngút trời!' },
   { key: 'stepDown', group: 'Kết quả', role: 'mc', label: 'Đủ chuỗi thắng, nhường chỗ', vars: ['ten'],
     text: 'Đã đủ số trận liên thắng, xin đạo hữu nhường lôi đài cho người khác.' },
   { key: 'draw', group: 'Kết quả', role: 'ref', label: 'Hòa', vars: [],

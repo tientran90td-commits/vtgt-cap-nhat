@@ -8,6 +8,7 @@
 const crypto = require('crypto');
 const { Game, labelOf } = require('./game');
 const { parseMove, parsePartial, parseCommand } = require('./commands');
+const { rankInfo } = require('./rank');
 
 const other = (m) => (m === 'X' ? 'O' : 'X');
 const brief = (u) => ({
@@ -504,7 +505,13 @@ class Match {
   settleWinner(winMark, now, result) {
     const winner = this.players[winMark];
     const loser = this.players[other(winMark)];
+    const before = this.rankOf(winner);
     this.stats.recordWin(winner);
+    const after = this.rankOf(winner);
+    if (after.tier > before.tier) {
+      result.rankUp = { name: winner.name, tier: after.tier, tierName: after.name };
+      this.rankUpInfo = result.rankUp;
+    }
     let streak = 1;
     let steppedDown = false;
     if (this.cfg.winnerStays) {
@@ -527,11 +534,25 @@ class Match {
     return { winner, loser, streak, steppedDown };
   }
 
+  rankOf(u) {
+    return rankInfo(u && this.stats.winsOf ? this.stats.winsOf(u.id) : 0, this.cfg.rankWins);
+  }
+
+  rankBoard() {
+    if (!this.stats.ranked) return [];
+    if (!this._rb || this._rb.rev !== this.stats.rev || this._rb.n !== this.cfg.rankBoardRows) {
+      const n = Math.max(1, Math.min(8, Number(this.cfg.rankBoardRows) || 4));
+      this._rb = { rev: this.stats.rev, n: this.cfg.rankBoardRows, list: this.stats.ranked(n).map((e) => ({ ...e, rank: rankInfo(e.wins, this.cfg.rankWins) })) };
+    }
+    return this._rb.list;
+  }
+
   finishWin(mark, line, now) {
     this.result = { type: 'win', winner: mark, text: `🏆 Đạo hữu ${this.players[mark].name} đại thắng!`, note: '', line };
     const s = this.settleWinner(mark, now, this.result);
     this.feed(this.result.text, 'win', mark);
     this.voice.win(s.winner, s.loser, { type: 'win', streak: s.streak, steppedDown: s.steppedDown }, now);
+    this.announceRankUp(now);
     this.finishCommon(now);
   }
 
@@ -552,7 +573,17 @@ class Match {
       { type: 'forfeit', why, streak: s.streak, steppedDown: s.steppedDown },
       now
     );
+    this.announceRankUp(now);
     this.finishCommon(now);
+  }
+
+  /** Người thắng vừa lên cảnh giới mới: ghi vào dòng tin + MC chúc mừng đột phá. */
+  announceRankUp(now) {
+    const r = this.rankUpInfo;
+    this.rankUpInfo = null;
+    if (!r) return;
+    this.feed(`⚡ Đạo hữu ${r.name} đột phá lên ${r.tierName}!`, 'win');
+    if (this.voice.rankUp) this.voice.rankUp(r.name, r.tierName, now);
   }
 
   finishDraw(now) {
@@ -679,7 +710,8 @@ class Match {
       turn: this.turn,
       turnEndsAt: this.turnEndsAt,
       turnTotalMs: this.cfg.turnSeconds * 1000,
-      players: this.players,
+      players: { X: this.players.X && { ...this.players.X, rank: this.rankOf(this.players.X) }, O: this.players.O && { ...this.players.O, rank: this.rankOf(this.players.O) } },
+      rankBoard: this.rankBoard(),
       coin: this.coin,
       moves: this.game.moves.map((m) => ({ x: m.x, y: m.y, m: m.mark })),
       result: this.result,

@@ -174,6 +174,10 @@ class Commentator {
     if (info.steppedDown) this.say('stepDown', { ten: w }, { at: now, gate });
   }
 
+  rankUp(name, tierName, now) {
+    this.say('rankUp', { ten: this.nm({ name }, 'vô danh'), canhgioi: tierName }, { at: now, gate: { k: 'result' }, prio: 2 });
+  }
+
   draw(now) {
     this.say('draw', {}, { at: now, gate: { k: 'result' }, prio: 3 });
   }

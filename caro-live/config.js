@@ -83,6 +83,9 @@ module.exports = {
   themeAuto: true, // mỗi ván đổi màu bàn cờ, màu phòng, tóc/áo 2 nhân vật
   boardSkin: 'auto', // kiểu bàn cờ: 'auto' = mỗi ván 1 kiểu | 'wood' = bàn gỗ | rong-vang, thanh-long, bach-ho, chu-tuoc, huyen-vu, cong-nghe, neon-tim, thien-ha
   likeGuard: 'normal', // chống auto-click thả tim: off = tắt | loose = lỏng | normal = vừa | strict = chặt (xem src/likeguard.js)
+  // CẢNH GIỚI (rank): số ván thắng cần để lên từng bậc: Phàm Nhân->Luyện Khí->Trúc Cơ->Kết Đan->Nguyên Anh->Hóa Thần
+  rankWins: [2, 4, 6, 8, 12],
+  rankBoardRows: 4, // số người hiện trên bảng rank
   celebrateOn: true, // có người thắng -> phát video ăn mừng (public/media/celebrate.mp4): có tiếng ngay, 4 giây sau mới hiện hình thế chỗ 2 nhân vật
   celebrateMinSeconds: Number(process.env.CARO_CELEB_MIN) || (fast ? 0 : 22), // màn hình kết quả giữ ít nhất bấy nhiêu giây để video chạy hết (video ~10,4 giây + vài giây quân cuối còn đang đặt xuống)
   ledOn: true, // đèn LED chạy ở đường kẻ bàn cờ

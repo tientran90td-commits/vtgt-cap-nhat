@@ -1,0 +1,72 @@
+/* ===== CẢNH GIỚI (RANK): khung avatar + bảng xếp hạng rank. Module riêng (rank.js) ===== */
+/* cột bên phải: bảng tu vi (trên) + bảng rank (dưới) */
+#rightCol { position: absolute; right: 0.35rem; top: 0.4rem; z-index: 6; width: 10.4rem; display: flex; flex-direction: column; gap: 0.3rem; }
+#rightCol #rank { position: static; width: auto; }
+
+#rankBoard { padding: 0.25rem 0.3rem 0.3rem; border-radius: 0.6rem; background: rgba(10, 14, 30, 0.72); border: 0.06rem solid rgba(255, 255, 255, 0.12); }
+#rankBoardHead { display: flex; flex-direction: column; margin-bottom: 0.2rem; }
+#rankBoardHead b { font-size: 0.74rem; color: #d9b8ff; white-space: nowrap; }
+#rankBoardHead span { font-size: 0.56rem; color: #b9c6ea; line-height: 1.15; }
+#rankBoardList { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.18rem; }
+#rankBoardList li { display: flex; align-items: center; gap: 0.32rem; padding: 0.1rem 0.25rem 0.1rem 0.2rem; border-radius: 0.4rem; background: rgba(255, 255, 255, 0.08); min-width: 0; }
+#rankBoardList li.hint { justify-content: center; text-align: center; font-size: 0.62rem; white-space: normal; padding: 0.3rem; }
+#rankBoardList .rb-info { flex: 1; min-width: 0; display: flex; flex-direction: column; line-height: 1.12; }
+#rankBoardList .rb-name { font-size: 0.68rem; font-weight: 800; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#rankBoardList .rb-tier { font-size: 0.6rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+#rankBoardList .rb-prog { font-size: 0.54rem; color: #b9c6ea; white-space: nowrap; }
+#rankBoardList .rb-bar { height: 0.14rem; margin-top: 0.06rem; border-radius: 0.1rem; background: rgba(255, 255, 255, 0.16); overflow: hidden; }
+#rankBoardList .rb-bar i { display: block; height: 100%; background: linear-gradient(90deg, #7dffb0, #ffd54a); }
+
+/* màu chữ cảnh giới */
+.tc0 { color: #aab6d8; }
+.tc1 { color: #6dffb0; }
+.tc2 { color: #5fd8ff; }
+.tc3 { color: #ffd54a; }
+.tc4 { color: #e39bff; }
+.tc5 { background: linear-gradient(90deg, #ffd54a, #ff7a5c, #ff4fd8, #7a9bff); -webkit-background-clip: text; background-clip: text; color: transparent; }
+
+/* ===== KHUNG AVATAR: cấp càng cao càng đẹp ===== */
+.fr { --fw: 0.1rem; --ring: #5b6688; position: relative; display: inline-flex; flex: none; border-radius: 50%; padding: var(--fw); isolation: isolate; }
+.fr::before { content: ''; position: absolute; inset: 0; border-radius: 50%; background: var(--ring); z-index: -1; }
+.fr .av { width: var(--avs, 2.7rem); height: var(--avs, 2.7rem); }
+.fr::after { position: absolute; left: 50%; top: 0; transform: translate(-50%, -62%); font-size: var(--decs, 0.7rem); line-height: 1; pointer-events: none; text-shadow: 0 0 0.3rem currentColor; }
+
+/* 0 Phàm Nhân: viền xám mảnh */
+.fr.t0 { --fw: 0.08rem; --ring: #6b7699; }
+
+/* 1 Luyện Khí: viền xanh lục, sáng nhẹ */
+.fr.t1 { --fw: 0.13rem; --ring: conic-gradient(#b8ffd8, #2bb673, #e6fff2, #2bb673, #b8ffd8); filter: drop-shadow(0 0 0.25rem rgba(80, 255, 160, 0.55)); }
+
+/* 2 Trúc Cơ: viền xanh lam kép + ánh sáng */
+.fr.t2 { --fw: 0.17rem; --ring: conic-gradient(#e0f7ff, #38b6ff, #1c6bff, #38b6ff, #e0f7ff); filter: drop-shadow(0 0 0.35rem rgba(70, 190, 255, 0.75)); }
+.fr.t2 .av { box-shadow: 0 0 0 0.06rem #0b1d4d; }
+
+/* 3 Kết Đan: viền vàng kim xoay + sao */
+.fr.t3 { --fw: 0.2rem; --ring: conic-gradient(from 0deg, #fff3b0, #ffb800, #fff7d1, #ff9a00, #fff3b0); filter: drop-shadow(0 0 0.45rem rgba(255, 200, 40, 0.85)); }
+.fr.t3::before { animation: frSpin 5s linear infinite; }
+.fr.t3::after { content: '✦'; color: #ffe27a; }
+.fr.t3 .av { box-shadow: 0 0 0 0.06rem #4a2f00; }
+
+/* 4 Nguyên Anh: tím - hồng - lam xoay, nhấp nháy sáng, thêm sao 2 bên */
+.fr.t4 { --fw: 0.23rem; --ring: conic-gradient(from 0deg, #ff7ae8, #8a5bff, #4fd8ff, #b86bff, #ff7ae8); animation: frGlow4 2.2s ease-in-out infinite; }
+.fr.t4::before { animation: frSpin 3.2s linear infinite; }
+.fr.t4::after { content: '❖'; color: #f2b8ff; }
+.fr.t4 .av { box-shadow: 0 0 0 0.07rem #2a0a4d; }
+
+/* 5 Hóa Thần: cầu vồng vàng-đỏ xoay nhanh, hào quang nhịp thở, vương miện, viền ngoài vàng */
+.fr.t5 { --fw: 0.27rem; --ring: conic-gradient(from 0deg, #ffe066, #ff5e3a, #ff4fd8, #6a8bff, #4fffd8, #ffe066); animation: frGlow5 1.8s ease-in-out infinite; box-shadow: 0 0 0 0.08rem rgba(255, 224, 102, 0.9); }
+.fr.t5::before { animation: frSpin 2.2s linear infinite; }
+.fr.t5::after { content: '👑'; transform: translate(-50%, -78%); font-size: calc(var(--decs, 0.7rem) * 1.35); }
+.fr.t5 .av { box-shadow: 0 0 0 0.08rem #3a0f00; }
+
+@keyframes frSpin { to { transform: rotate(360deg); } }
+@keyframes frGlow4 { 0%, 100% { filter: drop-shadow(0 0 0.3rem rgba(190, 110, 255, 0.7)); } 50% { filter: drop-shadow(0 0 0.7rem rgba(255, 130, 240, 1)); } }
+@keyframes frGlow5 { 0%, 100% { filter: drop-shadow(0 0 0.4rem rgba(255, 190, 60, 0.9)); } 50% { filter: drop-shadow(0 0 0.95rem rgba(255, 90, 60, 1)); } }
+
+/* khung nhỏ trong bảng rank */
+#rankBoardList .fr { --avs: 1.45rem; --decs: 0.55rem; }
+#rankBoardList .av { font-size: 0.75rem; }
+#rankBoardList .fr.t1, #rankBoardList .fr.t2 { --fw: 0.1rem; }
+#rankBoardList .fr.t3, #rankBoardList .fr.t4, #rankBoardList .fr.t5 { --fw: 0.14rem; }
+/* khung ở thẻ người chơi */
+.pcard .fr { --avs: 2.7rem; }

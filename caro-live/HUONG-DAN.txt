@@ -191,3 +191,16 @@ VIDEO AN MUNG KHI CO NGUOI THANG
 - Trinh duyet co the tat tieng video cho den khi bam vao trang 1 lan. Trong OBS / TikFinity thuong van co tieng.
 - MC khen nguoi thang "ba dao, ba khi...": sua o muc Loi thoai (winGame, congrats, winForfeit, streak). Neu ban da tung sua loi thoai
   (data\thoai.json), bam "Khoi phuc tat ca thoai goc" de nhan cau khen moi.
+
+CANH GIOI (RANK) VA KHUNG AVATAR
+- 6 canh gioi: Pham Nhan -> Luyen Khi -> Truc Co -> Ket Dan -> Nguyen Anh -> Hoa Than. Rank tinh theo TONG SO VAN THANG.
+- So van thang can de len tung bac: sua dong rankWins trong config.js. Mac dinh [2, 4, 6, 8, 12]
+  (Pham Nhan thang 2 van len Luyen Khi, Luyen Khi thang them 4 van len Truc Co, ... tong 32 van la Hoa Than).
+- Bang CANH GIOI nam duoi bang tu vi: ten, avatar co khung, canh gioi, thang bao nhieu/bao nhieu tran de len cap ke.
+  So nguoi hien tren bang: dong rankBoardRows trong config.js (mac dinh 4).
+- Rank duoc luu trong data\thanh-tich.json (cung file thanh tich), nen tat game, nguoi choi thoat ra vao lai van con rank.
+  Muon lam lai tu dau: xoa file data\thanh-tich.json khi da tat game.
+- Khung avatar dep dan theo cap: Pham Nhan vien xam; Luyen Khi vien xanh luc; Truc Co vien xanh lam; Ket Dan vang kim xoay + sao;
+  Nguyen Anh tim hong xoay + nhap nhay; Hoa Than cau vong xoay nhanh + vuong mien. Khung hien o the nguoi choi va bang canh gioi.
+- Thang vao ngay len cap: co dong thong bao, banner "DOT PHA" va MC chuc mung (sua cau o muc Loi thoai > rankUp).
+- Rank lay tu so van thang da co san: nguoi da thang nhieu van tu truoc se duoc len rank ngay.

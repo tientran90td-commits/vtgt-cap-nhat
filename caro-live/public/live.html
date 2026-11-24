@@ -6,6 +6,7 @@
   <title>Caro LIVE - màn hình phát</title>
   <link rel="icon" href="data:,">
   <link rel="stylesheet" href="live.css">
+  <link rel="stylesheet" href="rank.css">
 </head>
 <body>
   <!--
@@ -22,14 +23,14 @@
 
     <section id="players">
       <div class="pcard x" id="pX">
-        <div class="av"><img alt=""><span></span></div>
+        <div class="fr t0"><div class="av"><img alt=""><span></span></div></div>
         <div class="info"><div class="nm"></div><div class="sub"></div></div>
         <div class="mk">✕</div>
         <div class="bar"><i></i></div>
       </div>
       <div id="vs">VS</div>
       <div class="pcard o" id="pO">
-        <div class="av"><img alt=""><span></span></div>
+        <div class="fr t0"><div class="av"><img alt=""><span></span></div></div>
         <div class="info"><div class="nm"></div><div class="sub"></div></div>
         <div class="mk">○</div>
         <div class="bar"><i></i></div>
@@ -72,10 +73,16 @@
     <section id="sceneWrap">
       <canvas id="three"></canvas>
       <video id="celebVideo" playsinline preload="auto"><source src="media/celebrate.mp4" type="video/mp4"><source src="media/celebrate.webm" type="video/webm"></video>
-      <section id="rank">
-        <div id="rankHead"><b>🔥 BẢNG TU VI</b><span id="rankNote"></span></div>
-        <ol id="rankList"></ol>
-      </section>
+      <div id="rightCol">
+        <section id="rank">
+          <div id="rankHead"><b>🔥 BẢNG TU VI</b><span id="rankNote"></span></div>
+          <ol id="rankList"></ol>
+        </section>
+        <section id="rankBoard">
+          <div id="rankBoardHead"><b>🏯 BẢNG CẢNH GIỚI</b><span>Thắng trận để lên cảnh giới</span></div>
+          <ol id="rankBoardList"></ol>
+        </section>
+      </div>
       <ul id="feed"></ul>
       <div id="sign" class="hidden"><b>💡 Chỉ điểm</b><ul id="signList"></ul></div>
       <div id="caption" class="hidden"><b></b><span></span></div>
