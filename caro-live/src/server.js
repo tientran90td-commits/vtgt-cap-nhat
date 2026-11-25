@@ -13,6 +13,8 @@ const config = require('../config');
 const { Hub } = require('./hub');
 const { startDemo } = require('./demo');
 const updater = require('./updater');
+const remoteHttp = require('./remote-http');
+const { Remote } = require('./remote');
 
 const PUBLIC = path.join(__dirname, '..', 'public');
 const MIME = {
@@ -93,7 +95,7 @@ function serveAppLink(req, res, url) {
     res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     res.end(JSON.stringify(obj));
   };
-  if (!applink.isLoopback(req.socket.remoteAddress)) return send(403, { ok: false });
+  if (!applink.isLocalRequest(req)) return send(403, { ok: false });
   if (url.pathname === '/app-link' && req.method === 'GET') return send(200, { ok: true, ...applink.info(config.port), listening: config.host });
   if (url.pathname === '/app-link/wifi' && req.method === 'POST') {
     applink.setWifi(url.searchParams.get('on') === '1');
@@ -114,13 +116,14 @@ const server = http.createServer((req, res) => {
   if (url.pathname === '/avatar') return serveAvatar(url.searchParams.get('u'), res);
   if (url.pathname === '/demo-avatar') return serveDemoAvatar(url.searchParams.get('n'), res);
   if (url.pathname.startsWith('/app-link')) return serveAppLink(req, res, url);
+  if (url.pathname.startsWith('/remote') && remoteHttp.handle(req, res, url)) return;
   if (url.pathname === '/music-list') return serveMusicList(res);
-  if (url.pathname.startsWith('/update/') && updater.handle(req, res, url, { log })) return;
+  if (url.pathname.startsWith('/update/') && !applink.viaProxy(req) && updater.handle(req, res, url, { log })) return;
   if (url.pathname === '/viewers') {
     // chỉ trả cho trang chạy trên chính máy này
     // (hoặc từ app Caro Trợ Thủ qua WiFi/Tailscale, có đúng mã kết nối)
     const host = String(req.headers.host || '').replace(/:\d+$/, '');
-    const localHost = ['localhost', '127.0.0.1', '[::1]'].includes(host);
+    const localHost = ['localhost', '127.0.0.1', '[::1]'].includes(host) && !applink.viaProxy(req);
     if (!localHost && !applink.allowHttpRemote(req, url)) {
       res.writeHead(403);
       return res.end('Forbidden');
@@ -204,7 +207,12 @@ function broadcast(force = false) {
   for (const c of wss.clients) if (c.readyState === 1) c.send(payload);
 }
 
-wss.on('connection', (ws) => {
+const remote = new Remote({ dataDir: path.join(__dirname, '..', 'data'), port: config.port, log });
+remoteHttp.attach(remote);
+remote.phones = () => [...wss.clients].filter((c) => c._remote && c.readyState === 1).length;
+
+wss.on('connection', (ws, req) => {
+  ws._remote = applink.viaProxy(req);
   ws.send(JSON.stringify(hub.getState()));
   ws.on('message', (data) => {
     try {
@@ -241,6 +249,7 @@ server.on('error', (e) => {
 });
 
 server.listen(config.port, config.host, () => {
+  remote.autostart().catch((e) => log('Không bật được xem từ xa:', e.message));
   console.log('');
   console.log('==============================================');
   console.log('  CARO LIVE v1.0 đã sẵn sàng!');

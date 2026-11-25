@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<title>Caro LIVE</title>
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'">
+<link rel="stylesheet" href="shell.css">
+</head>
+<body>
+<header>
+  <div class="logo">♟ Caro LIVE</div>
+  <div id="ver" class="muted"></div>
+  <div id="pill" class="pill off">Đang tắt</div>
+</header>
+
+<main>
+  <section class="card">
+    <h2>1. Chạy game</h2>
+    <label>Cách kết nối TikTok
+      <select id="mode">
+        <option value="tiktok">Trực tiếp bằng ID TikTok (khuyên dùng)</option>
+        <option value="tikfinity">Qua TikFinity</option>
+        <option value="demo">Chạy thử (khán giả ảo)</option>
+      </select>
+    </label>
+    <label id="idRow">ID TikTok của bạn (không có @)
+      <input id="tiktok" placeholder="ví dụ: ten_kenh_cua_ban" autocomplete="off" spellcheck="false">
+    </label>
+    <div class="row">
+      <button id="btnStart" class="primary">▶ Bắt đầu</button>
+      <button id="btnStop" disabled>■ Dừng</button>
+    </div>
+    <div id="msg" class="msg"></div>
+    <button id="btnOld" class="link">📂 Lấy bảng xếp hạng từ game cũ</button>
+  </section>
+
+  <section class="card">
+    <h2>2. Mở màn hình</h2>
+    <div class="row">
+      <button id="liveP" disabled>📱 Màn hình LIVE dọc</button>
+      <button id="liveL" disabled>🖥 Màn hình LIVE ngang</button>
+      <button id="panel" disabled>🎛 Bảng điều khiển</button>
+    </div>
+    <div id="edgeNote" class="muted small"></div>
+  </section>
+
+  <section class="card">
+    <h2>3. Kết nối app điện thoại (Caro Trợ Thủ)</h2>
+    <p class="muted small">Nhập tài khoản + mật khẩu tự đặt. Trên điện thoại nhập đúng tài khoản + mật khẩu đó là xem và điều khiển được game này, ở đâu cũng được (không cần chung WiFi, không cần nhập IP).</p>
+    <div class="row two">
+      <label>Tài khoản <input id="acc" placeholder="ít nhất 3 ký tự" autocomplete="off" spellcheck="false"></label>
+      <label>Mật khẩu <input id="pw" type="password" placeholder="ít nhất 6 ký tự" autocomplete="new-password"></label>
+    </div>
+    <div class="row">
+      <button id="rOn" class="primary" disabled>Bật kết nối</button>
+      <button id="rOff" disabled>Tắt kết nối</button>
+    </div>
+    <div id="rStat" class="stat"></div>
+  </section>
+
+  <section class="card grow">
+    <h2>Nhật ký <button id="folder" class="link">mở thư mục game</button></h2>
+    <pre id="log"></pre>
+  </section>
+</main>
+<script src="shell.js"></script>
+</body>
+</html>

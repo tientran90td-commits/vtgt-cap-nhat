@@ -51,6 +51,24 @@ function isLoopback(addr) {
   return /^(::1|127\.|::ffff:127\.)/.test(String(addr || ''));
 }
 
+// Truy cập qua đường hầm Internet (cloudflared) cũng đến từ 127.0.0.1, nhưng luôn kèm các dòng tiêu đề này.
+// Phải coi là "từ xa": chỉ cho vào khi có mã tài khoản dài (không phải mã 6 số, vì mã 6 số dò được qua Internet).
+let remoteToken = '';
+function setRemoteToken(t) {
+  remoteToken = String(t || '');
+}
+function viaProxy(req) {
+  const h = (req && req.headers) || {};
+  return !!(h['cf-connecting-ip'] || h['cf-ray'] || h['cf-visitor'] || h['x-forwarded-for'] || h['x-forwarded-host'] || h.forwarded);
+}
+/** Yêu cầu đến từ chính máy này (không qua đường hầm)? */
+function isLocalRequest(req) {
+  return isLoopback(req.socket && req.socket.remoteAddress) && !viaProxy(req);
+}
+function tokenOk(given) {
+  return !!remoteToken && sameCode(given, remoteToken);
+}
+
 function sameCode(a, b) {
   const x = Buffer.from(String(a || ''));
   const y = Buffer.from(String(b || ''));
@@ -74,15 +92,16 @@ function localOrigin(origin) {
  */
 function allowWs(info) {
   const req = info.req;
-  const loop = isLoopback(req.socket && req.socket.remoteAddress);
-  if (loop) return localOrigin(info.origin) || info.origin === APP_ORIGIN;
-  if (!wifiOn()) return false;
   let given = '';
   try {
     given = new URL(req.url, 'http://x').searchParams.get('code') || '';
   } catch (e) {
     /* bỏ qua */
   }
+  if (viaProxy(req)) return tokenOk(given); // qua Internet: chỉ cần đúng mã tài khoản
+  const loop = isLoopback(req.socket && req.socket.remoteAddress);
+  if (loop) return localOrigin(info.origin) || info.origin === APP_ORIGIN;
+  if (!wifiOn()) return false;
   return sameCode(given, code());
 }
 
@@ -106,9 +125,11 @@ function info(port) {
  * Từ chính máy này: như cũ. Từ máy khác: phải bật WiFi và gửi đúng mã (?code=...).
  */
 function allowHttpRemote(req, url) {
+  const given = url.searchParams.get('code') || '';
+  if (viaProxy(req)) return tokenOk(given);
   if (isLoopback(req.socket && req.socket.remoteAddress)) return true;
   if (!wifiOn()) return false;
-  return sameCode(url.searchParams.get('code') || '', code());
+  return sameCode(given, code());
 }
 
-module.exports = { allowHttpRemote, wifiOn, setWifi, code, newCode, isLoopback, allowWs, lanAddresses, info, APP_ORIGIN };
+module.exports = { allowHttpRemote, wifiOn, setWifi, code, newCode, isLoopback, isLocalRequest, viaProxy, setRemoteToken, allowWs, lanAddresses, info, APP_ORIGIN };

@@ -1,0 +1,43 @@
+name: Build Caro LIVE Windows
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'caro-live/**'
+      - '.github/scripts/build-caro-win.py'
+      - '.github/workflows/caro-live-windows.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Cài thư viện game (chỉ bản chạy thật)
+        working-directory: caro-live
+        run: npm ci --omit=dev --no-audit --no-fund
+
+      - name: Tải Electron cho Windows
+        run: curl -fsSL -o electron-win.zip https://github.com/electron/electron/releases/download/v33.4.11/electron-v33.4.11-win32-x64.zip
+
+      - name: Ghép gói app Windows
+        run: python3 .github/scripts/build-caro-win.py caro-live electron-win.zip CaroLIVE-Windows.zip
+
+      - name: Đăng lên Releases (link tải cố định)
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: caro-live-windows
+          name: Caro LIVE - app Windows (bản mới nhất)
+          body: |
+            Tải CaroLIVE-Windows.zip, giải nén ra ổ đĩa, bấm đúp "Caro LIVE.exe". Xem DOC-TRUOC-KHI-CHAY.txt trong gói.
+          files: CaroLIVE-Windows.zip
+          make_latest: false

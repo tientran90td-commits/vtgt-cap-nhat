@@ -1,3 +1,18 @@
+=== APP WINDOWS CO GIAO DIEN (Caro LIVE.exe) - KHUYEN DUNG ===
+Tai file CaroLIVE-Windows.zip, giai nen ra o dia (vi du D:\CaroLIVE), bam dup "Caro LIVE.exe". KHONG can cai Node.js.
+(Windows co the hien canh bao "Windows da bao ve may tinh": bam "Thong tin them" -> "Van chay". Do app chua mua chu ky so.)
+  1) Chon cach ket noi (ID TikTok / TikFinity / Chay thu), nhap ID TikTok, bam "Bat dau".
+  2) "Man hinh LIVE doc/ngang" mo bang Microsoft Edge (co giong doc tieng Viet tu nhien). "Bang dieu khien" mo ngay trong app.
+  3) KET NOI DIEN THOAI: o the 3 nhap Tai khoan + Mat khau tu dat (it nhat 3 va 6 ky tu), bam "Bat ket noi".
+     Tren dien thoai mo app Caro Tro Thu (ban 2.8 tro len), chon "Tai khoan", nhap DUNG tai khoan + mat khau do -> xem va dieu khien game
+     o dau cung duoc (WiFi hay 4G), khong can nhap IP. Lan dau bat, app tai them 1 thanh phan ~55 MB (cloudflared).
+     Mat khau khong duoc luu tren may; chi luu ma da bam trong data\remote-keys.json (DUNG gui file nay cho ai).
+  4) Muon giu BANG XEP HANG cu: bam "Lay bang xep hang tu game cu" (luc game dang DUNG), chon thu muc game cu.
+     Thu cong: chep file data\thanh-tich.json (bang xep hang) va data\cai-dat.json (cai dat) tu game cu sang thu muc data cua app moi.
+     Cac lan cap nhat sau, thu muc data luon duoc giu nguyen.
+  Neu app bao khong ket noi duoc dien thoai: kiem tra may tinh co Internet, game dang chay, the 3 hien "da co the noi vao".
+  Luu y: duong truyen Internet dung dich vu mien phi cua Cloudflare/ntfy, khong cam ket luc nao cung chay; khi rot app tu noi lai.
+
 CARO LIVE v1.0 (BAN CHINH THUC) - HUONG DAN NHANH (Vietnamese, khong dau de tranh loi font)
 ====================================================================
 

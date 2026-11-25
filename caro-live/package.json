@@ -2,7 +2,7 @@
   "name": "caro-live-tiktok",
   "version": "1.0.0",
   "description": "Game Caro cho TikTok LIVE: người xem bình luận tọa độ (j9, k6) để đánh cờ",
-  "main": "src/server.js",
+  "main": "electron/main.js",
   "scripts": {
     "start": "node src/server.js",
     "demo": "node src/server.js --demo"
