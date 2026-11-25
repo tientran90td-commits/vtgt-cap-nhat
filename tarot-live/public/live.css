@@ -48,9 +48,9 @@ body.nobg #stars { display: none; }
 .slot { position: relative; transition: transform .6s ease, filter .6s ease, opacity .6s; width: var(--cw); aspect-ratio: 400 / 667; }
 #stage[data-layout="portrait"] #cards { --cw: 16rem; }
 #stage[data-layout="portrait"] #cards.three { --cw: 11.6rem; gap: .5rem; }
-#stage[data-layout="portrait"] #cards.five { --cw: 9.8rem; gap: .5rem .5rem; flex-wrap: wrap; width: 33rem; }
+#stage[data-layout="portrait"] #cards.five { margin-top: 2.6rem; --cw: 9.4rem; gap: .5rem .5rem; flex-wrap: wrap; width: 33rem; }
 #stage[data-layout="portrait"] #cards.five .slot:nth-child(n+4) { margin-top: 2rem; }
-#stage[data-layout="landscape"] #cards.five { --cw: 8.4rem; gap: .4rem .5rem; flex-wrap: wrap; width: 28rem; }
+#stage[data-layout="landscape"] #cards.five { --cw: 7rem; gap: .4rem .5rem; flex-wrap: wrap; width: 24rem; margin-top: 2.4rem; }
 #stage[data-layout="landscape"] #cards.five .slot:nth-child(n+4) { margin-top: 1.9rem; }
 #stage[data-layout="landscape"] #cards { --cw: 15rem; }
 #stage[data-layout="landscape"] #cards.three { --cw: 10.4rem; gap: .5rem; }
@@ -78,7 +78,7 @@ body.nobg #stars { display: none; }
 #idleMsg .big { font-size: 2.1rem; font-weight: 800; color: var(--gold); text-shadow: 0 .1rem .5rem #000; }
 #idleMsg .sm { font-size: 1.25rem; margin-top: .3rem; color: #f7f1e3dd; text-shadow: 0 .1rem .3rem #000; }
 #idleMsg b { color: #fff; background: #7b4fd4aa; border-radius: .4rem; padding: 0 .4rem; }
-#stage.reading #idleMsg { opacity: 0; pointer-events: none; }
+#stage.reading #idleMsg { display: none; }
 
 /* ---------- khung đọc ---------- */
 #who { display: flex; align-items: center; gap: .7rem; font-size: 1.3rem; color: #f7f1e3cc; min-height: 2.4rem; }

@@ -154,11 +154,18 @@ function render() {
     sfx.shuffle();
     slots.forEach((s) => s.classList.remove('flipped', 'dim', 'active', 'show'));
     setPanel('Đang xáo bài…', '', '', st.say);
+  } else if (st.kind === 'reveal') {
+    slots.forEach((s) => {
+      s.classList.add('flipped', 'show');
+      s.classList.remove('dim', 'active');
+    });
+    sfx.flip();
+    setPanel('Lật bài!', '', '', cur.cards.map((c) => c.vi + (c.rev ? ' (ngược)' : '')).join(' • '));
   } else if (st.kind === 'card') {
     const c = cur.cards[st.idx];
     slots.forEach((s, i) => {
-      s.classList.toggle('flipped', i <= st.idx);
-      s.classList.toggle('show', i <= st.idx);
+      s.classList.toggle('flipped', cur.flipAll || i <= st.idx);
+      s.classList.toggle('show', cur.flipAll || i <= st.idx);
       s.classList.toggle('active', i === st.idx);
       s.classList.toggle('dim', i !== st.idx && cur.cards.length > 1);
     });

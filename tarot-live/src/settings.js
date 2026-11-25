@@ -14,7 +14,7 @@ const NUMBERS = {
   announceEvery: [0, 30],
   voiceVolume: [0, 1],
 };
-const BOOLS = ['allowThree', 'allowFive', 'autoDraw', 'giftPriority', 'voiceOn', 'paused'];
+const BOOLS = ['flipAll', 'allowThree', 'allowFive', 'autoDraw', 'giftPriority', 'voiceOn', 'paused'];
 const SPEEDS = ['slow', 'normal', 'fast'];
 
 class Settings {

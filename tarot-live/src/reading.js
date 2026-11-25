@@ -80,6 +80,12 @@ function build(drawn, user, opts = {}) {
   if (opts.sensitive) intro += ' ' + SENSITIVE_NOTE;
   steps.push({ kind: 'shuffle', say: intro, dur: dur(intro, 5000) });
 
+  const flipAll = !!opts.flipAll && spread > 1;
+  if (flipAll) {
+    const rv = `Mình lật cả ${spread === 3 ? 'ba' : 'năm'} lá cùng lúc nhé. Giờ cùng xem từng lá một.`;
+    steps.push({ kind: 'reveal', say: rv, dur: dur(rv, 4500) });
+  }
+
   cards.forEach((c, i) => {
     const lead = `${spread > 1 ? ORD[i] + ', ' + c.pos : c.pos}: ${c.vi}${c.rev ? ', lá ngược' : ''}.`;
     const say = `${lead} Từ khóa: ${c.kw}. ${c.text}`;
@@ -101,7 +107,7 @@ function build(drawn, user, opts = {}) {
     s.at = at;
     at += s.dur;
   }
-  return { cards, steps, total: at, topic, topicLabel: TOPIC_LABEL[topic], spread };
+  return { cards, steps, total: at, flipAll, topic, topicLabel: TOPIC_LABEL[topic], spread };
 }
 
 module.exports = { build, TOPIC_LABEL, DISCLAIMER };

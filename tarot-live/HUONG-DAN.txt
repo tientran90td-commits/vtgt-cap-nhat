@@ -39,6 +39,7 @@ Chi mang tinh GIAI TRI va goi mo. Game KHONG du doan suc khoe, tien bac, sinh tu
 6) BO BAI VA LOI DOC
    - Anh: bo Rider-Waite-Smith (1909) cua Pamela Colman Smith, da het ban quyen (public domain). Xem public\cards\NGUON-ANH.txt.
    - Loi doc 78 la (xuoi / nguoc, tong quat / tinh duyen / cong viec) va loi khuyen rieng cho tung la do tac gia game tu viet bang tieng Viet.
+   - Trai 3 / 5 la: mac dinh UP ca bai roi LAT HET 1 LUOT, sau do doc tung la (tat trong Cai dat neu muon lat tung la luc doc).
    - Moi vi tri trong trai bai co cach doc rieng (vi du "Tro ngai" doc mat can luu y cua la, "Loi khuyen" doc loi khuyen rieng).
    - Muon sua chu: mo src\cards\*.js (major, wands, cups, swords, pents) va src\cards\advice.js bang Notepad, giu nguyen dau nhay va dau phay.
 

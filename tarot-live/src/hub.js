@@ -131,6 +131,7 @@ class Hub {
       speed: s.readSpeed,
       number: this.count,
       fast: this.cfg.fast,
+      flipAll: s.flipAll,
     });
     this.count++;
     this.current = {

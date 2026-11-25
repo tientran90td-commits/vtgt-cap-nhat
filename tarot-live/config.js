@@ -35,6 +35,7 @@ module.exports = {
     subtitle: 'Gõ !bai để rút lá bài của bạn',
     defaultSpread: 1, // 1 = rút 1 lá | 3 = rút 3 lá (quá khứ - hiện tại - tương lai) | 5 = rút 5 lá (tình huống - nguyên nhân - trở ngại - lời khuyên - kết quả)
     allowThree: true, // cho khán giả xin "3 lá"
+    flipAll: true, // 3/5 lá: úp cả bài, lật hết 1 lượt rồi mới đọc từng lá (tắt = lật từng lá khi đọc)
     allowFive: true, // cho khán giả xin "5 lá" (mỗi lượt khoảng 1,5 phút)
     reverseChance: 30, // % lá bị ngược (0 = không có lá ngược)
     userCooldown: fast ? 0 : 90, // giây: 1 người phải chờ bấy nhiêu giây mới được xin lượt nữa (0 = không giới hạn)
