@@ -1,0 +1,38 @@
+TIEU CHUAN LIVE CUA TIKTOK VA CACH GAME NAY TRANH VI PHAM
+(Tra cuu ngay 25/11/2026 tu trang Community Guidelines cua TikTok (muc Accounts and Features, Integrity and Authenticity),
+ thong bao LIVE Monetization Guidelines va chinh sach gift. TikTok hay doi luat, hay xem lai trong ung dung:
+ TikTok > Cai dat > LIVE Safety / Trung tam an toan LIVE.)
+
+1) TIKTOK QUY DINH GI (tom tat)
+- Ai LIVE va ai tang qua deu phai tu 18 tuoi. Noi dung vi pham se bi DONG phien LIVE, co the bi han che LIVE hoac khoa tai khoan.
+- LIVE co muc dich chinh la dua nguoi xem ra ngoai TikTok (link, Zalo, Facebook, so dien thoai, mua hang...) bi cam / khong duoc de xuat.
+- Noi dung "lua hoac thao tung de tang qua, follow, tim, view" hoac hua thuong gia de doi tuong tac -> khong duoc de xuat len muc Danh cho ban (FYF),
+  co the bi han che kiem tien.
+- Noi dung gia tao, chat luong thap, lap lai khong duoc kiem tien tu LIVE (LIVE Monetization Guidelines).
+- Co bac / bốc tham / tra tien de co co hoi thang giai thuong bi cam (chinh sach TikTok Shop dinh nghia ro: dua tien hoac vat gia tri de co co hoi thang giai).
+- Chu phong chiu trach nhiem moi thu phat trong LIVE, ke ca nhac, video, thong bao.
+
+2) GAME DA LAM GI DE TRANH
+- Da bo toan bo cau thoai, thong bao, bieu tuong co yeu to bao luc (set danh, bao thu, ⚔, 💥...).
+- Nhac follow / chia se khong con noi "duoc cong diem". Dong tin tuc khi co nguoi follow / share chi cam on, khong khoe diem thuong.
+- Ten nguoi xem (nickname TikTok) hien tren man hinh va duoc MC doc to: tu dong BO link va che tu tho tuc, thay bang "Khan gia 123" (file src\safety.js).
+- Thong bao cua chu phong: game TU CHOI neu co link, so dien thoai, Zalo/Facebook/Telegram, moi mua hang / kiem tien / dau tu, hoac tu tho tuc.
+- Che do DEMO (khan gia ao): luon hien dai chu do "CHE DO THU" tren man hinh live, de khong lo phat nham len LIVE that
+  (tuong tac gia la vi pham). Bang dieu khien cung ghi ro.
+- Game KHONG co giai thuong, khong boc tham, khong ban co hoi thang bang tien/qua. Qua tang chi lam tang diem tuong tac de duoc chon len ban.
+  Dung giu nguyen nhu vay: DUNG hua tang tien / qua / the cao cho nguoi thang, va dung hua "tang qua de chac chan duoc choi".
+
+3) CHU PHONG NEN LAM
+- KHONG bat che do DEMO khi dang LIVE that. KHONG dung o "Go thu" de gia lam khan gia khi LIVE that.
+- Phai co nguoi that dang ngoi LIVE; dung treo LIVE tu dong 24/7 khong co nguoi (de bi coi la noi dung tu dong / chat luong thap).
+- Dung ep, dung nan nỉ tang qua; dung noi cau kieu "tang qua moi duoc choi". Cau moi trong game da duoc viet nhe nhang.
+- Nhac: chi dung nhac khong ban quyen (thu muc public\music). Neu khong bo file, game tu tao nhac nen nhe, an toan.
+- Video an mung (public\media\celebrate.mp4 / .webm): chi giu neu hinh VA tieng la cua ban hoac mien phi ban quyen. Neu khong chac, hay thay bang video cua ban.
+- Avatar, ten nguoi xem hien tren man hinh: neu thay ten xau bo qua loc, vao TikTok chan/bao cao nguoi do.
+- Chay thu 10-15 phut truoc, vao LIVE Safety Center xem co thong bao vi pham nao khong.
+
+4) NHUNG DIEU CHUA THE DAM BAO (noi that)
+- Khong the cam ket TikTok se khong nhac nho / han che. Cac cau thoai tu sua cua ban (data\thoai.json) cung nam trong trach nhiem cua ban.
+- Game doc binh luan, tim, qua qua thu vien khong chinh thuc (tiktok-live-connector) hoac TikFinity. TikTok khong phat hanh hai cong cu nay;
+  neu thay TikTok canh bao khi dung, hay ngung va xem lai.
+- Game chua duoc thu tren LIVE that qua nhieu gio; hay theo doi 1-2 buoi dau.

@@ -4,7 +4,7 @@
  * Quy ước: x = cột (A=0), y = hàng (hàng 1 = 0). Hàng 15 nằm trên cùng.
  */
 
-import { paintSkinBase, drawLed } from './board-skins.js';
+import { paintSkinBase, drawLed, drawSkinFx } from './board-skins.js';
 
 export const COLORS = { X: '#ff4d4f', O: '#2f9bff', gold: '#ffd54a' };
 
@@ -233,6 +233,7 @@ export class BoardView {
       }
     }
     if (PAL.skin && this.ledOn) drawLed(ctx, L, PAL.skin, t);
+    if (PAL.skin) drawSkinFx(ctx, L, PAL.skin, t); // sao băng / hiệu ứng động riêng của kiểu bàn
 
     // ô nước đi gần nhất
     if (view.last) {

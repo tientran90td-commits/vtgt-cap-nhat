@@ -82,7 +82,7 @@ module.exports = {
   showSign: true,
   showCellLabels: true, // ghi tọa độ (A1, H8, O15...) mờ trong từng ô vuông để người xem biết gõ gì
   themeAuto: true, // mỗi ván đổi màu bàn cờ, màu phòng, tóc/áo 2 nhân vật
-  boardSkin: 'auto', // kiểu bàn cờ: 'auto' = mỗi ván 1 kiểu | 'wood' = bàn gỗ | rong-vang, thanh-long, bach-ho, chu-tuoc, huyen-vu, cong-nghe, neon-tim, thien-ha
+  boardSkin: 'auto', // kiểu bàn cờ: 'auto' = mỗi ván 1 kiểu | 'wood' = bàn gỗ | rong-vang, thanh-long, bach-ho, chu-tuoc, huyen-vu, cong-nghe, neon-tim, thien-ha, vu-tru (vũ trụ, có sao băng)
   // CẢNH GIỚI (rank): số ván thắng cần để lên từng bậc: Phàm Nhân->Luyện Khí->Trúc Cơ->Kết Đan->Nguyên Anh->Hóa Thần
   rankWins: [2, 4, 6, 8, 12],
   rankLossPenalty: 'tier', // thua = ĐỘ KIẾP THẤT BẠI: 'tier' = mất hết điểm của cảnh giới đang đứng (Kết Đan 4 điểm -> Kết Đan 0 điểm, giữ cảnh giới) | 'all' = mất sạch về Phàm Nhân | số (vd 1 = trừ 1 điểm) | 0 = thua không mất điểm

@@ -116,6 +116,7 @@ connect(
     offset = s.serverNow - Date.now();
     if (first) for (const c of s.cues) spoken.add(c.id); // không đọc lại thoại cũ khi mở trang
     director.onState(s, offset);
+    demoRibbon(!!s.demo);
     if (s.settings) {
       voice.setSettings(s.settings.voice);
       sfx.setOptions(s.settings.sfx);
@@ -198,6 +199,18 @@ function setText(el, text) {
 }
 
 let feedKey = '';
+/** Chế độ thử (khán giả ảo) mà lỡ phát lên LIVE thật là vi phạm "tương tác giả": luôn hiện dải chữ đỏ để chủ phòng nhận ra ngay. */
+let demoEl = null;
+function demoRibbon(on) {
+  if (on && !demoEl) {
+    demoEl = document.createElement('div');
+    demoEl.textContent = '🧪 CHẾ ĐỘ THỬ • khán giả ảo, KHÔNG dùng khi LIVE thật';
+    demoEl.style.cssText = 'position:fixed;top:3px;left:50%;transform:translateX(-50%);z-index:60;background:rgba(200,30,30,.88);color:#fff;font:700 11px system-ui,Arial;padding:3px 10px;border-radius:10px;pointer-events:none;white-space:nowrap';
+    document.body.appendChild(demoEl);
+  }
+  if (demoEl) demoEl.style.display = on ? 'block' : 'none';
+}
+
 function renderFeed(s) {
   const key = s.feed.length ? s.feed[s.feed.length - 1].id + ':' + s.feed.length : '';
   if (key === feedKey) return;

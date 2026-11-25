@@ -15,6 +15,7 @@ const { Settings } = require('./settings');
 const { Script, SAMPLE, VAR_HELP } = require('./script');
 const { parseMove } = require('./commands');
 const { labelOf } = require('./game');
+const { checkAnnouncement } = require('./safety');
 
 class Hub {
   constructor(cfg) {
@@ -106,7 +107,7 @@ class Hub {
   onShare(user, now = Date.now()) {
     const p = this.interaction.addShare(user);
     if (p) {
-      this.match.feed(`🔁 Đạo hữu ${user.name} chia sẻ LIVE (+${p} điểm)`, 'gift');
+      this.match.feed(`🔁 Đạo hữu ${user.name} đã chia sẻ LIVE, cảm ơn!`, 'gift');
       this.commentator.shareThanks(user, now);
     }
   }
@@ -114,7 +115,7 @@ class Hub {
   onFollow(user, now = Date.now()) {
     const p = this.interaction.addFollow(user);
     if (p) {
-      this.match.feed(`➕ Đạo hữu ${user.name} đã follow (+${p} điểm)`, 'gift');
+      this.match.feed(`➕ Đạo hữu ${user.name} đã follow, chào mừng!`, 'gift');
       this.commentator.followThanks(user, now);
     }
   }
@@ -123,6 +124,8 @@ class Hub {
   announce(text, seconds, now = Date.now()) {
     const t = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 220);
     if (!t) return { ok: false, msg: 'Chưa gõ nội dung thông báo.' };
+    const chk = checkAnnouncement(t); // không cho dẫn người xem ra ngoài TikTok / từ thô tục
+    if (!chk.ok) return chk;
     let secs = Number(seconds);
     if (!(secs > 0)) secs = Math.min(30, Math.max(8, 5 + t.length * 0.1)); // tự tính theo độ dài chữ
     secs = Math.min(120, Math.max(3, secs));
@@ -248,6 +251,7 @@ class Hub {
   getState(now = Date.now()) {
     const s = this.match.getState(now);
     s.recent = this.chatLog;
+    s.demo = !!this.cfg.demo; // đang chạy chế độ thử (khán giả ảo)
     s.notice = this.notice;
     s.announce = this.announcement && now < this.announcement.until ? { id: this.announcement.id, text: this.announcement.text, until: this.announcement.until } : null;
     s.promo = this.promo && now < this.promo.until ? this.promo : null;

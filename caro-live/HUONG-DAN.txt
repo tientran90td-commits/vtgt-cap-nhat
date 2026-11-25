@@ -244,3 +244,11 @@ LOI THOAI AN TOAN (DA LOAI CAU CO YEU TO BAO LUC)
   Vi du: "Do kiep that bai" gio la may den/mua nhe, khong con set danh chay den; "loi dai" doi thanh "dai thi dau".
 - Neu truoc day ban tu sua loi thoai (data\thoai.json) thi cac cau cu van con: bam "Khoi phuc tat ca thoai goc" trong muc Loi thoai de nhan cau moi.
 
+TIEU CHUAN LIVE TIKTOK (MOI)
+- Xem file TIEU-CHUAN-TIKTOK.txt: tom tat luat LIVE cua TikTok, game da tranh gi, va chu phong can lam gi.
+- Thay doi: nhac follow/chia se khong con hua cong diem; ten nguoi xem tho tuc/link duoc che; thong bao co link/Zalo/so dien thoai bi tu choi;
+  che do DEMO luon co dai chu do "CHE DO THU" tren man hinh live.
+
+BAN CO VU TRU (CO SAO BANG)
+- Bang dieu khien > Kieu ban co > chon "Vu tru (co sao bang)". Cu vai chuc giay lai co mot ngoi sao bang bay ngang ban co.
+

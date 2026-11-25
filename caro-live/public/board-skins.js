@@ -548,6 +548,147 @@ export const SKINS = [
       ctx.stroke();
     },
   },
+  {
+    id: 'vu-tru',
+    name: 'Vũ trụ',
+    bg: ['#0a0f2c', '#02030b'],
+    plate: 'rgba(3,5,16,0.42)',
+    line: 'rgba(190,215,255,0.46)',
+    border: '#9fc4ff',
+    label: '#c9dcff',
+    led: ['#bfe3ff', '#ffffff', '#c9b6ff'],
+    art(ctx, w, h) {
+      const r = rngOf(2024);
+      // tinh vân xanh tím + một chút hồng ngọc, loãng
+      ctx.globalAlpha = 0.65;
+      glow(ctx, w * 0.2, h * 0.25, w * 0.55, '70,90,220', 0.5);
+      glow(ctx, w * 0.82, h * 0.68, w * 0.5, '140,70,210', 0.42);
+      glow(ctx, w * 0.55, h * 0.95, w * 0.35, '50,160,200', 0.3);
+      // sao nền
+      for (let i = 0; i < 230; i++) {
+        const x = r() * w, y = r() * h, s = r() * 1.9 + 0.5;
+        ctx.fillStyle = r() > 0.85 ? '#ffe6b0' : r() > 0.6 ? '#bfd8ff' : '#ffffff';
+        ctx.globalAlpha = 0.3 + r() * 0.6;
+        ctx.fillRect(x, y, s, s);
+      }
+      // vài ngôi sao lớn có tia sáng chữ thập
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = Math.max(1, w / 1100);
+      for (let i = 0; i < 9; i++) {
+        const x = r() * w, y = r() * h, l = w * (0.006 + r() * 0.008);
+        ctx.globalAlpha = 0.55;
+        ctx.beginPath();
+        ctx.moveTo(x - l, y);
+        ctx.lineTo(x + l, y);
+        ctx.moveTo(x, y - l);
+        ctx.lineTo(x, y + l);
+        ctx.stroke();
+      }
+      // hành tinh có vành đai (góc trên phải)
+      const pxp = w * 0.86, pyp = h * 0.14, pr = w * 0.075;
+      ctx.globalAlpha = 0.7;
+      const pg = ctx.createRadialGradient(pxp - pr * 0.4, pyp - pr * 0.4, pr * 0.1, pxp, pyp, pr);
+      pg.addColorStop(0, '#ffd9a0');
+      pg.addColorStop(0.6, '#d98c5f');
+      pg.addColorStop(1, '#6b3a4f');
+      ctx.fillStyle = pg;
+      ctx.beginPath();
+      ctx.arc(pxp, pyp, pr, 0, TAU);
+      ctx.fill();
+      ctx.save();
+      ctx.translate(pxp, pyp);
+      ctx.rotate(-0.35);
+      ctx.strokeStyle = 'rgba(255,230,190,0.75)';
+      ctx.lineWidth = Math.max(2, pr * 0.14);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, pr * 1.75, pr * 0.46, 0, Math.PI, TAU); // nửa vành đai phía sau hành tinh bị che
+      ctx.stroke();
+      ctx.restore();
+      ctx.fillStyle = pg;
+      ctx.beginPath();
+      ctx.arc(pxp, pyp, pr, 0, TAU);
+      ctx.fill();
+      ctx.save();
+      ctx.translate(pxp, pyp);
+      ctx.rotate(-0.35);
+      ctx.strokeStyle = 'rgba(255,236,200,0.85)';
+      ctx.lineWidth = Math.max(2, pr * 0.14);
+      ctx.beginPath();
+      ctx.ellipse(0, 0, pr * 1.75, pr * 0.46, 0, 0, Math.PI); // nửa vành đai phía trước
+      ctx.stroke();
+      ctx.restore();
+      // mặt trăng nhỏ (góc dưới trái)
+      const mx = w * 0.1, my = h * 0.86, mr = w * 0.04;
+      const mg = ctx.createRadialGradient(mx - mr * 0.4, my - mr * 0.4, mr * 0.1, mx, my, mr);
+      mg.addColorStop(0, '#ffffff');
+      mg.addColorStop(1, '#8e99b8');
+      ctx.globalAlpha = 0.9;
+      ctx.fillStyle = mg;
+      ctx.beginPath();
+      ctx.arc(mx, my, mr, 0, TAU);
+      ctx.fill();
+      ctx.fillStyle = 'rgba(80,90,120,0.35)';
+      for (const [dx, dy, rr] of [[-0.3, 0.2, 0.22], [0.25, -0.25, 0.16], [0.2, 0.35, 0.12]]) {
+        ctx.beginPath();
+        ctx.arc(mx + dx * mr, my + dy * mr, rr * mr, 0, TAU);
+        ctx.fill();
+      }
+    },
+    /** Hiệu ứng động (gọi mỗi khung hình): sao lấp lánh + THỈNH THOẢNG có sao băng vút qua. t = giây. */
+    fx(ctx, L, t) {
+      const px = L.px;
+      ctx.save();
+      ctx.globalCompositeOperation = 'lighter';
+      // sao lấp lánh nhẹ
+      const r = rngOf(909);
+      for (let i = 0; i < 18; i++) {
+        const x = r() * px, y = r() * px, ph = r() * 6.28, sp = 0.8 + r() * 1.6;
+        const a = 0.15 + 0.35 * (0.5 + 0.5 * Math.sin(t * sp + ph));
+        ctx.globalAlpha = a;
+        ctx.fillStyle = '#ffffff';
+        ctx.beginPath();
+        ctx.arc(x, y, Math.max(1, px / 520) * (1 + 0.5 * a), 0, TAU);
+        ctx.fill();
+      }
+      // sao băng: mỗi chu kỳ 8 giây có ~65% khả năng xuất hiện 1 sao, vút qua trong ~1 giây
+      const PERIOD = 8;
+      const DUR = 1.05;
+      const k = Math.floor(t / PERIOD);
+      const rr = rngOf(k * 7919 + 31);
+      const show = rr() < 0.65;
+      const off = rr() * (PERIOD - DUR - 0.5);
+      const x0 = px * (0.12 + rr() * 0.76);
+      const y0 = px * (0.02 + rr() * 0.38);
+      const dir = rr() < 0.5 ? 1 : -1;
+      const ang = 0.35 + rr() * 0.45; // độ nghiêng so với phương ngang (rad), đi chéo xuống
+      const dx = Math.cos(ang) * dir;
+      const dy = Math.sin(ang);
+      const p = (t - k * PERIOD - off) / DUR;
+      if (show && p >= 0 && p <= 1) {
+        const dist = px * 0.42;
+        const hxx = x0 + dx * dist * p;
+        const hy = y0 + dy * dist * p;
+        const tail = px * 0.17;
+        const ux = dx;
+        const uy = dy;
+        const a = Math.pow(Math.sin(Math.PI * p), 0.7);
+        const g = ctx.createLinearGradient(hxx, hy, hxx - ux * tail, hy - uy * tail);
+        g.addColorStop(0, 'rgba(255,255,255,0.95)');
+        g.addColorStop(0.35, 'rgba(190,220,255,0.55)');
+        g.addColorStop(1, 'rgba(120,160,255,0)');
+        ctx.globalAlpha = a;
+        ctx.strokeStyle = g;
+        ctx.lineCap = 'round';
+        ctx.lineWidth = Math.max(2, px / 260);
+        ctx.beginPath();
+        ctx.moveTo(hxx, hy);
+        ctx.lineTo(hxx - ux * tail, hy - uy * tail);
+        ctx.stroke();
+        glow(ctx, hxx, hy, px * 0.02, '220,235,255', 0.9);
+      }
+      ctx.restore();
+    },
+  },
 ];
 
 const ID_INDEX = Object.fromEntries(SKINS.map((s, i) => [s.id, i]));
@@ -613,6 +754,11 @@ export function paintSkinBase(ctx, px, size, L, skin) {
  */
 const GLINT_PERIOD = 6; // cứ 6 giây có 1 lần vệt sáng quét qua
 const GLINT_SECONDS = 1.8; // 1 lần quét kéo dài bấy nhiêu giây
+
+/** Hiệu ứng động riêng của kiểu bàn (ví dụ sao băng của bàn Vũ trụ). Gọi mỗi khung hình, trước khi vẽ quân cờ. */
+export function drawSkinFx(ctx, L, skin, t) {
+  if (skin && typeof skin.fx === 'function') skin.fx(ctx, L, t);
+}
 
 export function drawLed(ctx, L, skin, t) {
   const n = L.size;

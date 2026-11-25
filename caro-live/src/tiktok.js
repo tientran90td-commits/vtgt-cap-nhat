@@ -4,6 +4,8 @@
  * Dùng thư viện tiktok-live-connector. Tự kết nối lại nếu bị rớt mạng hoặc chưa LIVE.
  */
 
+const { sanitizeName } = require('./safety');
+
 function pickUser(u) {
   if (!u) return null;
   const uniqueId = String(u.uniqueId || u.displayId || '').trim();
@@ -21,7 +23,7 @@ function pickUser(u) {
     id,
     rawId, // mã số TikTok (có thể khác id chữ): dùng để nối cùng 1 người giữa các loại sự kiện
     uniqueId: uniqueId || id,
-    name: String(u.nickname || uniqueId || id).trim(),
+    name: sanitizeName(u.nickname || uniqueId || id, rawId || id), // bỏ link / che từ thô tục trong tên hiển thị
     avatar,
   };
 }
