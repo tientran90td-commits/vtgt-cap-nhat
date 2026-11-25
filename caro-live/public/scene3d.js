@@ -17,6 +17,7 @@ const SEAT_Z = 1.75;
 // Các góc quay. p = vị trí camera, l = điểm nhìn.
 const POSES = {
   wide: { p: [5.2, 3.4, 2.4], l: [0, 0.8, 0] },
+  gift: { p: [0, 0, 0], l: [0, 0, 0] }, // camera zoom vào khán giả vừa tặng quà (toạ độ do spotlight() đặt)
   room: { p: [8.4, 2.1, 5.2], l: [-0.5, -0.5, -1.2] }, // lùi xa: thấy cả phòng, ghế trống và khán giả
   table: { p: [3.6, 3.3, 2.1], l: [0, 0.55, 0] },
   focusX: { p: [4.4, 3.5, -1.2], l: [0, 1.15, 1.2] }, // sau lưng O, nhìn mặt X
@@ -89,6 +90,22 @@ export class Scene3D {
   /** Báo nhân vật `mark` nên ngồi ở bàn (present) hay đứng dậy đi ra. instant: đặt luôn, không diễn. */
   seat(mark, present, instant = false) {
     this.seats[mark].want(present, instant);
+  }
+
+  /** Khán giả `id` vừa tặng quà: ăn mừng và đặt camera 'gift' trước mặt họ. Trả về true nếu có nhân vật để zoom. */
+  spotlight(id, label) {
+    const at = this.crowd.spotlight(id, label);
+    if (!at) return false;
+    const dx = -at.x;
+    const dz = -at.z;
+    const d = Math.hypot(dx, dz) || 1;
+    const nx = dx / d;
+    const nz = dz / d; // hướng từ họ về bàn
+    // đứng lệch sang bên (không đứng giữa khán giả và bàn để khỏi vướng 2 người chơi), nhìn chéo vào mặt họ
+    const side = at.x * 0 + (at.z >= 0 ? 1 : -1);
+    POSES.gift.p = [at.x + nx * 2.5 - nz * 2.2 * side, -0.15, at.z + nz * 2.5 + nx * 2.2 * side];
+    POSES.gift.l = [at.x, 0.1, at.z];
+    return true;
   }
 
   /** Danh sách khán giả (tên + ảnh đại diện) để vẽ nhân vật đứng quanh phòng. */
@@ -567,6 +584,9 @@ export class NullScene {
   setTheme() {}
   seat() {}
   setCrowd() {}
+  spotlight() {
+    return false;
+  }
   cellToWorld() {
     return {};
   }

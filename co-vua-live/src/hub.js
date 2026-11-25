@@ -89,6 +89,12 @@ class Hub {
 
   onGift(user, gift, now = Date.now()) {
     const pts = this.interaction.addGift(user, Number(gift.diamonds) || 0, Number(gift.count) || 1);
+    // khán giả (không phải người chơi) tặng quà -> màn hình live zoom vào nhân vật đứng ngoài của họ
+    const gu = this.interaction.users.get(user.id);
+    if (gu && !this.match.markOf(gu.id)) {
+      this.giftSeq = (this.giftSeq || 0) + 1;
+      this.giftSpot = { id: now * 100 + (this.giftSeq % 100), userId: gu.id, name: gu.name, avatar: gu.avatar || '', gift: String(gift.name || 'Quà'), count: Number(gift.count) || 1, until: now + 7000 };
+    }
     if (gift.announce !== false) {
       const n = Number(gift.count) || 1;
       const pt = pts ? ` (+${pts} điểm)` : '';
@@ -241,9 +247,10 @@ class Hub {
     const max = Number.isFinite(this.cfg.crowdMax) ? this.cfg.crowdMax : 10;
     if (max <= 0) return [];
     const m = this.match;
+    const sp = this.giftSpot && now < this.giftSpot.until ? this.giftSpot.userId : null; // người vừa tặng quà luôn có mặt
     return [...this.interaction.users.values()]
       .filter((u) => u.seenAt && now - u.seenAt < 15 * 60000 && !m.markOf(u.id))
-      .sort((a, b) => b.seenAt - a.seenAt)
+      .sort((a, b) => (b.id === sp) - (a.id === sp) || b.seenAt - a.seenAt)
       .slice(0, max)
       .map((u) => ({ id: u.id, name: u.name, avatar: u.avatar || '' }));
   }
@@ -268,6 +275,7 @@ class Hub {
     s.recent = this.chatLog;
     s.demo = !!this.cfg.demo; // đang chạy chế độ thử (khán giả ảo)
     s.crowd = this.crowd(now);
+    s.giftSpot = this.giftSpot && now < this.giftSpot.until && !this.match.markOf(this.giftSpot.userId) ? this.giftSpot : null;
     s.notice = this.notice;
     s.announce = this.announcement && now < this.announcement.until ? { id: this.announcement.id, text: this.announcement.text, until: this.announcement.until } : null;
     s.promo = this.promo && now < this.promo.until ? this.promo : null;

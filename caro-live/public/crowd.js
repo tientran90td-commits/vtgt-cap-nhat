@@ -110,6 +110,31 @@ function makeTag(v) {
   return { sprite, dispose: () => { tex.dispose(); sprite.material.dispose(); } };
 }
 
+function makeGiftLabel(text) {
+  const canvas = document.createElement('canvas');
+  canvas.width = 512;
+  canvas.height = 112;
+  const ctx = canvas.getContext('2d');
+  ctx.fillStyle = 'rgba(255,196,60,0.95)';
+  roundRect(ctx, 3, 3, 506, 106, 53);
+  ctx.fill();
+  let size = 54;
+  ctx.font = `800 ${size}px system-ui, Arial, sans-serif`;
+  while (ctx.measureText(text).width > 450 && size > 20) {
+    size -= 2;
+    ctx.font = `800 ${size}px system-ui, Arial, sans-serif`;
+  }
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillStyle = '#3a2200';
+  ctx.fillText(text, 256, 58);
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthWrite: false }));
+  sprite.scale.set(1.7, 0.372, 1);
+  return { sprite, dispose: () => { tex.dispose(); sprite.material.dispose(); } };
+}
+
 function buildFigure(id) {
   const h = hash(id);
   const skin = mat(SKINS[h % SKINS.length]);
@@ -247,9 +272,34 @@ export class Crowd {
   }
 
   remove(m) {
+    if (m.gift) {
+      this.scene.remove(m.gift.sprite);
+      m.gift.dispose();
+    }
     this.scene.remove(m.group);
     this.scene.remove(m.tag.sprite);
     m.tag.dispose();
+  }
+
+  /**
+   * Người này vừa tặng quà: cho đứng vào chỗ ngay, ăn mừng + hiện tên quà. Trả về vị trí (toạ độ 3D)
+   * để camera zoom tới, hoặc null nếu không có nhân vật của người đó.
+   */
+  spotlight(id, label, seconds = 4.2) {
+    const m = this.members.get(String(id));
+    if (!m || !this.enabled) return null;
+    if (m.mode === 'enter') {
+      m.mode = 'stand';
+      m.pos.set(m.slot.x, FLOOR_Y, m.slot.z);
+    }
+    m.spotT = seconds;
+    if (m.gift) {
+      this.scene.remove(m.gift.sprite);
+      m.gift.dispose();
+    }
+    m.gift = makeGiftLabel(label);
+    this.scene.add(m.gift.sprite);
+    return { x: m.pos.x, z: m.pos.z, ry: m.ry };
   }
 
   update(dt, time, cheer = false) {
@@ -288,6 +338,14 @@ export class Crowd {
       walking = true;
     }
     const t = time + m.phase;
+    if (m.spotT > 0) {
+      m.spotT -= dt;
+      if (m.spotT <= 0 && m.gift) {
+        this.scene.remove(m.gift.sprite);
+        m.gift.dispose();
+        m.gift = null;
+      }
+    }
     let hop = 0;
     let armUp = 0;
     if (walking) {
@@ -300,27 +358,28 @@ export class Crowd {
     } else {
       m.legs[0].rotation.x = m.legs[1].rotation.x = 0;
       m.wave = Math.max(0, m.wave - dt);
-      if (cheer) {
+      if (cheer || m.spotT > 0) {
         hop = Math.abs(Math.sin(t * 6)) * 0.22;
         armUp = 1;
       }
       m.arms[0].rotation.x = 0;
       m.arms[1].rotation.x = 0;
-      m.arms[0].rotation.z = -0.08 - (armUp ? 2.6 : 0);
-      m.arms[1].rotation.z = 0.08 + (armUp ? 2.6 : 0);
+      m.arms[0].rotation.z = 0.08 + (armUp ? 2.75 : 0); // giơ 2 tay chữ V (ra ngoài, không vắt qua đầu)
+      m.arms[1].rotation.z = -0.08 - (armUp ? 2.75 : 0);
       if (!armUp && m.wave > 0) {
-        m.arms[0].rotation.z = -2.5 + Math.sin(time * 12) * 0.35;
+        m.arms[0].rotation.z = 2.5 + Math.sin(time * 12) * 0.35;
       }
       m.group.rotation.z = Math.sin(t * 1.2) * 0.025;
     }
     if (walking) {
-      m.arms[0].rotation.z = -0.08;
-      m.arms[1].rotation.z = 0.08;
+      m.arms[0].rotation.z = 0.08;
+      m.arms[1].rotation.z = -0.08;
       m.group.rotation.z = 0;
     }
     m.group.position.set(m.pos.x, FLOOR_Y + hop, m.pos.z);
     m.group.rotation.y = m.mode === 'leave' ? m.ry : m.mode === 'enter' ? Math.atan2(slot.x - m.pos.x, slot.z - m.pos.z) : m.ry;
     m.tag.sprite.position.set(m.pos.x, FLOOR_Y + hop + 2.55, m.pos.z);
     m.tag.sprite.visible = m.mode !== 'leave';
+    if (m.gift) m.gift.sprite.position.set(m.pos.x, FLOOR_Y + hop + 2.9, m.pos.z);
   }
 }

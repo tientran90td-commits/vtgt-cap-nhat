@@ -260,3 +260,9 @@ NHAN VAT NGOI / DUNG DAY VA KHAN GIA QUANH PHONG
 - Chinh so luong: Bang dieu khien > Cai dat > "So khan gia dung quanh phong" (0 = tat, toi da 14).
 - Ten khan gia cung duoc loc tu tho tuc / link giong ten nguoi choi.
 
+KHAN GIA TANG QUA (NGOAI TRAN)
+- Khi nguoi xem KHONG phai nguoi choi tang qua, camera zoom vao nhan vat cua ho dung xa ban co (khoang 4 giay):
+  nhan vat gio 2 tay mung, hien ten + ten qua. Nhieu qua lien tiep thi lan luot (khong nhay camera lien tuc).
+- Nguoi vua tang qua luon co mat trong phong du so khan gia dang bi gioi han. Nguoi dang ngoi o ban thi khong zoom.
+- Tat tinh nang nay: dat "So khan gia dung quanh phong" = 0 trong Cai dat.
+

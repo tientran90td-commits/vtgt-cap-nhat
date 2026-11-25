@@ -23,6 +23,9 @@ export class Director {
     this.onReset = null;
     this.onPlaced = null; // gọi khi 1 quân vừa chạm bàn (dùng cho âm thanh/hiệu ứng)
     this.seatInit = false;
+    this.lastSpot = 0;
+    this.pendingSpot = null;
+    this.spotUntil = 0;
     this.lockPose = null; // chỉ dùng khi kiểm tra góc quay
     this.view = { moves: [], last: null, winLine: null, resultReady: false, effPhase: 'lobby', busy: false };
   }
@@ -37,6 +40,12 @@ export class Director {
       this.queued = s.moves.length;
     }
     this.syncNames();
+    // khán giả (ngoài trận) vừa tặng quà -> xếp hàng chờ để zoom camera vào họ
+    const gs = s.giftSpot;
+    if (gs && gs.id !== this.lastSpot) {
+      this.lastSpot = gs.id;
+      if (this.seatInit) this.pendingSpot = gs; // lần đầu mở trang thì bỏ qua quà cũ
+    }
     this.syncSeats(!this.seatInit);
     this.seatInit = true;
   }
@@ -171,6 +180,13 @@ export class Director {
       }
     }
 
+    if (this.pendingSpot && time >= this.spotUntil) {
+      const gs = this.pendingSpot;
+      this.pendingSpot = null;
+      const label = '🎁 ' + gs.gift + (gs.count > 1 ? ' x' + gs.count : '');
+      if (sc.spotlight && sc.spotlight(gs.userId, label)) this.spotUntil = time + 4.2;
+    }
+    if (time < this.spotUntil) sc.setPose('gift');
     sc.crowdCheer = eff === 'finished' && !!(s.result && s.result.winner);
     if (this.lockPose) sc.setPose(this.lockPose);
     sc.update(dt, time, { urgency });
