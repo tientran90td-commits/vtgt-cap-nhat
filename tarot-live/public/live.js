@@ -272,7 +272,7 @@ function renderSide() {
   if (a && a.id !== lastAnnounce) lastAnnounce = a.id;
 
   // giọng đọc: cài đặt + câu cảm ơn / mời gọi từ máy chủ
-  voice.setSettings({ on: set.voiceOn, volume: set.voiceVolume, mcRate: 0.98, mcPitch: 1.0 });
+  voice.setSettings({ on: set.voiceOn, volume: set.voiceVolume, mcVoice: set.voiceName, mcRate: Number(set.voiceRate) || 0.9, mcPitch: Number(set.voicePitch) || 0.95 });
   const maxId = S.cues.length ? S.cues[S.cues.length - 1].id : 0;
   if (lastCue === null) lastCue = maxId; // lần đầu nối: không đọc lại câu cũ
   for (const c of S.cues) if (c.id > lastCue) voice.push({ role: 'mc', text: c.text, prio: c.prio || 2 });

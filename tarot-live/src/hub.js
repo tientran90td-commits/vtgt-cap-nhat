@@ -251,7 +251,7 @@ class Hub {
     const name = (info && info.name) || item.name;
     const drawn = draw(5, s.reverseChance);
     const made = makeCards(drawn, { topic, sensitive });
-    const show = showSteps(made.cards, { name }, { profile: prof, sensitive, speed: s.readSpeed, fast: this.cfg.fast });
+    const show = showSteps(made.cards, { name }, { profile: prof, sensitive, speed: s.readSpeed, rate: s.voiceRate, fast: this.cfg.fast });
     this.current = {
       id: ++this.seq,
       userId: item.userId || '',
@@ -327,7 +327,7 @@ class Hub {
       result.cards.forEach((t, i) => { if (c.cards[i]) c.cards[i].text = t; });
       c.ai = true;
     }
-    const rd = readSteps(c.cards, { ai: result, speed: s.readSpeed, number: this.count - 1, fast: this.cfg.fast });
+    const rd = readSteps(c.cards, { ai: result, speed: s.readSpeed, rate: s.voiceRate, number: this.count - 1, fast: this.cfg.fast });
     layout(rd.steps, base);
     c.steps.push(...rd.steps);
     c.total = base + rd.total;

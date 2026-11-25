@@ -69,3 +69,11 @@ Chi mang tinh GIAI TRI va goi mo. Game KHONG du doan suc khoe, tien bac, sinh tu
    - AI loi / cham qua 9 giay / tra ve noi dung la (link, so dien thoai, tu cam) -> game tu doc bang loi viet san, khong bi dung.
    - Chi phi: tinh theo luot, bang gia cua nha cung cap. Khoa bi lo thi doi khoa ngay. File ai-api-key.txt khong nam trong file zip / kho GitHub.
    - Goi Gemini mien phi co the bi Google dung du lieu de cai thien san pham: nen biet truoc khi dung.
+
+9) GIONG DOC HOP VOI TAROT
+   - Nen dung giong NU, am, cham, hoi tram. Tren Windows dung Microsoft Edge: giong "Microsoft HoaiMy Online (Natural) - Vietnamese" (nu, tu nhien nhat).
+     Giong nam: "Microsoft NamMinh Online (Natural)". Game tu chon HoaiMy neu co. Muon doi: Cai dat > "Giong doc".
+   - Mac dinh: toc do 0,9 va cao do 0,95 (cham, tram, hop khong khi Tarot). Cai dat > Toc do doc / Cao do. Bam "Thu giong doc" de nghe thu.
+   - Giong do TRINH DUYET MO MAN HINH LIVE quyet dinh (khong phai may chu). Termux: dung Chrome tren dien thoai, giong Google tieng Viet
+     (Cai dat Android > Chuyen van ban thanh giong noi > Google > tai goi tieng Viet). Danh sach giong hien trong bang dieu khien la cua trinh duyet dang mo no.
+   - Giong cua OBS / TikTok LIVE Studio: neu nguon hinh la trinh duyet tich hop, giong co the khac Edge; hay thu truoc khi LIVE.

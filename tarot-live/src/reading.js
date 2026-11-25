@@ -127,7 +127,7 @@ function build(drawn, user, opts = {}) {
 // 1) showSteps: xáo bài (MC chào) -> chia bài -> lật cả 5 lá -> đọc tên từng lá. Chạy NGAY, trong lúc AI đang viết.
 // 2) readSteps: đọc từng lá + tổng kết + lời chúc. Được nối vào sau khi AI trả lời (hoặc dùng lời viết sẵn).
 function makeDur(opts) {
-  const mpc = MS_PER_CHAR[opts.speed] || MS_PER_CHAR.normal;
+  const mpc = (MS_PER_CHAR[opts.speed] || MS_PER_CHAR.normal) / (Number(opts.rate) > 0 ? Number(opts.rate) : 1); // đọc chậm thì mỗi bước dài ra
   return (text, min) => (opts.fast ? 1200 : Math.max(min, Math.round(text.length * mpc)));
 }
 

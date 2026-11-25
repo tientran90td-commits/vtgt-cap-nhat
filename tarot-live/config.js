@@ -45,6 +45,9 @@ module.exports = {
     giftPriority: false, // người xin lượt mà từng tặng quà được xếp lên trước (tắt mặc định)
     voiceOn: true,
     voiceVolume: 1,
+    voiceName: '', // để trống = tự chọn giọng nữ tiếng Việt tự nhiên nhất (ví dụ Microsoft HoaiMy)
+    voiceRate: 0.9, // tốc độ đọc: chậm, trầm, hợp không khí Tarot
+    voicePitch: 0.95, // cao độ
     announceText: '',
     announceEvery: 0, // phút (0 = tắt)
     paused: false, // tạm ngưng nhận lượt mới

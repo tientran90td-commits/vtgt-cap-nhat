@@ -74,7 +74,7 @@ $('btnTest3').onclick = () => cmd('testDraw', { spread: 3 });
 $('btnTest5').onclick = () => cmd('testDraw', { spread: 5 });
 $('btnVoice').onclick = () => {
   voice.unlock();
-  voice.test('mc', 'Xin chào cả nhà, mình là MC Tarot. Hôm nay chúng ta cùng rút bài nhé.');
+  voice.test('mc', 'Xin chào cả nhà, mình là MC Tarot. Hít một hơi thật sâu, và cùng xem lá bài hôm nay muốn nhắn nhủ điều gì nhé.');
 };
 $('btnAnnounce').onclick = () => {
   saveForm();
@@ -82,7 +82,7 @@ $('btnAnnounce').onclick = () => {
 };
 
 // ------------------------------------------------------------ cài đặt (tự lưu)
-const FIELDS = ['title', 'subtitle', 'minScore', 'reverseChance', 'readSpeed', 'autoDraw', 'autoIdleSeconds', 'giftPriority', 'voiceOn', 'voiceVolume', 'announceText', 'announceEvery', 'askInfo', 'collectSeconds', 'aiProvider', 'aiModel', 'aiTimeout'];
+const FIELDS = ['title', 'subtitle', 'minScore', 'reverseChance', 'readSpeed', 'autoDraw', 'autoIdleSeconds', 'giftPriority', 'voiceOn', 'voiceVolume', 'voiceRate', 'voicePitch', 'announceText', 'announceEvery', 'askInfo', 'collectSeconds', 'aiProvider', 'aiModel', 'aiTimeout'];
 
 function fillForm(set) {
   for (const k of FIELDS) {
@@ -111,6 +111,19 @@ for (const k of FIELDS) {
   el.addEventListener('change', saveForm);
 }
 
+// danh sách giọng tiếng Việt của trình duyệt đang mở bảng điều khiển
+let voiceSig = '';
+function syncVoiceList(chosen) {
+  const sel = $('voiceName');
+  const names = voice.viVoices().map((v) => v.name);
+  const sig = names.join('|') + '#' + chosen;
+  if (sig === voiceSig || document.activeElement === sel) return;
+  voiceSig = sig;
+  sel.innerHTML = '<option value="">Tự chọn giọng nữ tiếng Việt hay nhất</option>' + names.map((n) => `<option value="${esc(n)}">${esc(n)}</option>`).join('');
+  sel.value = names.includes(chosen) ? chosen : '';
+}
+$('voiceName').addEventListener('change', () => cmd('set', { values: { voiceName: $('voiceName').value } }));
+
 // ------------------------------------------------------------ vẽ
 let lastHtml = {};
 function setHtml(id, html) {
@@ -130,6 +143,8 @@ function render(s) {
   const ph = $('chipPhase');
   ph.textContent = s.current ? (s.current.pending ? '🤖 Xáo bài / chờ AI' : '🎴 Đang bói') : s.collect ? '📝 Chờ thông tin' : s.preparing ? '🤖 AI đang viết' : s.settings.paused ? '⏸ Tạm ngưng' : '⏳ Đang chờ người tương tác';
   $('btnPause').textContent = s.settings.paused ? '▶ Mở lại nhận lượt mới' : '⏸ Tạm ngưng nhận lượt mới';
+  voice.setSettings({ mcVoice: s.settings.voiceName, mcRate: Number(s.settings.voiceRate), mcPitch: Number(s.settings.voicePitch) });
+  syncVoiceList(s.settings.voiceName);
   $('voiceInfo').textContent = voice.describe();
   const ki = $('aiKeyInfo');
   if (s.ai.provider === 'off') ki.textContent = 'AI đang tắt: game đọc bằng lời viết sẵn.';
