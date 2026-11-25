@@ -60,11 +60,11 @@ $('previewFrame').src = '/live.html?layout=portrait&mute=1';
 // ------------------------------------------------------------ nút điều khiển
 $('btnSkip').onclick = () => cmd('skip');
 $('btnClear').onclick = () => {
-  if (confirm('Xóa toàn bộ hàng chờ?')) cmd('clear');
+  if (confirm('Xóa toàn bộ điểm tương tác?')) cmd('clear');
 };
 $('btnPause').onclick = () => cmd('set', { values: { paused: !(S && S.settings.paused) } });
 $('btnDraw').onclick = () => {
-  cmd('draw', { name: $('drName').value, spread: $('drSpread').value, topic: $('drTopic').value, dob: $('drDob').value, question: $('drQuestion').value });
+  cmd('draw', { name: $('drName').value, topic: $('drTopic').value, dob: $('drDob').value, question: $('drQuestion').value });
   $('drName').value = '';
   $('drDob').value = '';
   $('drQuestion').value = '';
@@ -82,7 +82,7 @@ $('btnAnnounce').onclick = () => {
 };
 
 // ------------------------------------------------------------ cài đặt (tự lưu)
-const FIELDS = ['title', 'subtitle', 'defaultSpread', 'allowThree', 'allowFive', 'reverseChance', 'userCooldown', 'maxQueue', 'readSpeed', 'autoDraw', 'autoIdleSeconds', 'giftPriority', 'voiceOn', 'voiceVolume', 'announceText', 'announceEvery', 'askInfo', 'collectSeconds', 'aiProvider', 'aiModel', 'aiTimeout'];
+const FIELDS = ['title', 'subtitle', 'minScore', 'reverseChance', 'readSpeed', 'autoDraw', 'autoIdleSeconds', 'giftPriority', 'voiceOn', 'voiceVolume', 'announceText', 'announceEvery', 'askInfo', 'collectSeconds', 'aiProvider', 'aiModel', 'aiTimeout'];
 
 function fillForm(set) {
   for (const k of FIELDS) {
@@ -128,7 +128,7 @@ function render(s) {
   tt.textContent = 'TikTok: ' + (s.connection.text || '…');
   tt.className = 'chip ' + (s.connection.status === 'connected' || s.connection.status === 'demo' ? 'on' : s.connection.status === 'error' ? 'err' : 'wait');
   const ph = $('chipPhase');
-  ph.textContent = s.current ? '🎴 Đang bói' : s.collect ? '📝 Chờ thông tin' : s.preparing ? '🤖 AI đang viết' : s.settings.paused ? '⏸ Tạm ngưng' : '⏳ Đang chờ';
+  ph.textContent = s.current ? (s.current.pending ? '🤖 Xáo bài / chờ AI' : '🎴 Đang bói') : s.collect ? '📝 Chờ thông tin' : s.preparing ? '🤖 AI đang viết' : s.settings.paused ? '⏸ Tạm ngưng' : '⏳ Đang chờ người tương tác';
   $('btnPause').textContent = s.settings.paused ? '▶ Mở lại nhận lượt mới' : '⏸ Tạm ngưng nhận lượt mới';
   $('voiceInfo').textContent = voice.describe();
   const ki = $('aiKeyInfo');
@@ -148,8 +148,8 @@ function render(s) {
 
   $('qCount').textContent = s.queueTotal ? `(${s.queueTotal} người)` : '';
   setHtml('queue', s.queue.length
-    ? s.queue.map((q, i) => `<li><span>${i + 1}.</span><span class="nm">${esc(q.name)}</span><span class="hint">${q.spread} lá • ${esc(TOPIC[q.topic] || '')}</span>${q.vip ? '<span class="vip">★ ưu tiên</span>' : ''}<button data-bump="${q.id}">Ưu tiên</button><button data-rm="${q.id}">Xóa</button></li>`).join('')
-    : '<li class="hint">Hàng chờ trống.</li>');
+    ? s.queue.map((q, i) => `<li><span>${i + 1}.</span><span class="nm">${esc(q.name)}</span><span class="hint">${q.score} điểm${q.seen ? ' • đã xem: ' + esc(q.seen) : ''}</span>${q.vip ? '<span class="vip">★ đủ điểm</span>' : ''}<button data-bump="${esc(q.id)}">Chọn ngay</button><button data-rm="${esc(q.id)}">Loại</button></li>`).join('')
+    : '<li class="hint">Chưa có ai tương tác.</li>');
   setHtml('hist', s.history.length
     ? s.history.map((h) => `<li><b>${esc(h.name)}</b> <span class="hint">${esc(h.topic)}${h.auto ? ' • tự rút' : ''}:</span> ${h.cards.map(esc).join(', ')}</li>`).join('')
     : '<li class="hint">Chưa có lượt nào.</li>');

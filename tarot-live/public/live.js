@@ -152,7 +152,7 @@ function render() {
       lastStep = -2;
       const h = S.history[0];
       const last = h ? `Vừa rồi: ${h.name} rút ${h.cards.join(', ')}` : 'Mỗi lượt có lời đọc riêng cho bạn.';
-      setPanel('Mời bạn rút bài ✨', '', '', `Bình luận !bai để vào hàng chờ. ${last}`);
+      setPanel('Mời bạn rút bài ✨', '', '', `Bình luận, thả tim, chia sẻ để được chọn. ${last}`);
     }
     return;
   }
@@ -179,6 +179,27 @@ function render() {
     sfx.shuffle();
     slots.forEach((s) => s.classList.remove('flipped', 'dim', 'active', 'show'));
     setPanel('Đang xáo bài…', '', '', st.say);
+  } else if (st.kind === 'deal') {
+    slots.forEach((s) => {
+      s.classList.remove('flipped', 'dim', 'active');
+      s.classList.add('show');
+    });
+    setPanel('Chia bài', '', '', cur.cards.map((c) => c.pos).join(' • '));
+  } else if (st.kind === 'name') {
+    const c = cur.cards[st.idx];
+    slots.forEach((s, i) => {
+      s.classList.add('flipped', 'show');
+      s.classList.toggle('active', i === st.idx);
+      s.classList.toggle('dim', i !== st.idx);
+    });
+    sfx.flip();
+    setPanel(`${c.pos} • ${c.vi}`, c.rev ? '(lá ngược)' : '', '', '');
+  } else if (st.kind === 'wait') {
+    slots.forEach((s) => {
+      s.classList.add('flipped', 'show');
+      s.classList.remove('dim', 'active');
+    });
+    setPanel('Đang tổng hợp lời đọc…', '', '', st.say);
   } else if (st.kind === 'reveal') {
     slots.forEach((s) => {
       s.classList.add('flipped', 'show');
@@ -225,13 +246,13 @@ function renderSide() {
   if (!S.queue.length) {
     const s = document.createElement('span');
     s.className = 'qmore';
-    s.textContent = 'chưa có ai — gõ !bai để vào hàng chờ';
+    s.textContent = 'bình luận, thả tim, chia sẻ để được chọn';
     ql.appendChild(s);
   } else {
     for (const it of S.queue.slice(0, 4)) {
       const c = document.createElement('span');
       c.className = 'qchip' + (it.vip ? ' vip' : '');
-      c.textContent = `${it.name} · ${it.spread} lá`;
+      c.textContent = `${it.name} · ${it.score} điểm`;
       ql.appendChild(c);
     }
     if (S.queueTotal > 4) {

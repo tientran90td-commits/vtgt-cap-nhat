@@ -14,6 +14,7 @@ const NUMBERS = {
   announceEvery: [0, 30],
   voiceVolume: [0, 1],
   collectSeconds: [15, 180],
+  minScore: [1, 100],
   aiTimeout: [3, 25],
 };
 const BOOLS = ['allowThree', 'allowFive', 'autoDraw', 'giftPriority', 'voiceOn', 'paused', 'askInfo'];

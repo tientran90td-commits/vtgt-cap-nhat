@@ -16,23 +16,23 @@ Chi mang tinh GIAI TRI va goi mo. Game KHONG du doan suc khoe, tien bac, sinh tu
    - Bam dup  CHAY-GAME.bat, nhap ID TikTok (khong co @). Tai khoan phai DANG LIVE.
    - Hoac dung TikFinity Desktop: mo TikFinity, ket noi, roi bam dup  CHAY-TIKFINITY.bat.
 
-4) CACH KHAN GIA CHOI (go vao binh luan)
-   - !bai            rut 1 la (so la mac dinh sua duoc trong Cai dat)
-   - !bai 3          rut 3 la (Qua khu - Hien tai - Tuong lai gan)
-   - !bai 5          rut 5 la (Tinh huong - Nguyen nhan - Tro ngai - Loi khuyen - Ket qua co the), moi luot khoang 1,5 phut
-   - !bai tinh yeu / !bai cong viec (hoac hoc tap)   chon chu de. Vi du:  !bai 3 tinh yeu   |   boi bai cong viec 5 la
-   - Cung hieu: "rut bai", "xem bai", "boi bai", "xem tarot", "!tarot".
+4) CACH CHON NGUOI XEM (khan gia khong can go lenh gi)
+   - Game tu CHON NGUOI TUONG TAC TOT NHAT. Diem: binh luan 1 (khong spam, khong lap cau cu), go !bai +3, tha tim 0,05/tim,
+     chia se 8, follow 6, tang qua 4. Du diem toi thieu (mac dinh 3, sua trong Cai dat) va vua tuong tac trong 5 phut gan day moi duoc chon.
+   - Duoc chon xong diem ve 0: muon duoc chon lai phai tuong tac tiep.
+   - Moi nguoi chi xem 1 lan cho moi chu de: Tong quat, Tinh duyen, Cong viec - hoc tap. Da xem chu de nao thi khong xem lai chu de do,
+     chu de khac van duoc neu ho tuong tac tot tiep. Xem du 3 chu de thi khong duoc chon nua (trong buoi LIVE do).
+   - Luon trai 5 la: Tinh huong - Nguyen nhan - Tro ngai - Loi khuyen - Ket qua (tinh duyen / cong viec co ten vi tri rieng). Moi luot khoang 2 - 2,5 phut.
    - Hoi ve suc khoe / tien bac / kien tung / co bac...: game van rut nhung chi doc thong diep chung va noi ro la khong xem muc do.
-   - Moi nguoi 1 luot trong hang cho; xong phai cho (mac dinh 90 giay) moi xin lai (sua trong Cai dat).
 
 5) BANG DIEU KHIEN (http://localhost:3002)
    - "MO MAN HINH LIVE DOC": mo 1 tab sach (9:16). Dung tab do lam nguon hinh cho OBS / TikTok LIVE Studio.
      OBS Browser Source:  http://localhost:3002/live.html?layout=portrait   (ngang: layout=landscape)
    - Giong doc phat ra tu TAB MAN HINH LIVE; bam chuot vao tab do 1 lan. Dung Microsoft Edge de co giong tieng Viet tu nhien.
      Phim tat trong tab live: F toan man hinh, M tat/bat giong, P doc, L ngang.
-   - Hang cho: nut "Uu tien" day nguoi len dau, "Xoa" bo nguoi do. "Bo qua luot nay", "Tam ngung nhan luot moi", "Xoa hang cho".
-   - "Tu rut cho mot nguoi": ban tu nhap ten va rut ngay. "Chay thu 1/3/5 la" de xem truoc.
-   - Cai dat tu luu: ten chuong trinh, dong phu, so la mac dinh, cho phep 3 la / 5 la, ti le la nguoc, thoi gian cho, tu rut khi vang nguoi, giong doc.
+   - Muc "Nguoi tuong tac tot nhat": xem diem, nut "Chon ngay" (chon nguoi do cho luot ke), "Loai" (khong chon nguoi do nua). "Bo qua luot nay", "Tam ngung", "Xoa diem tuong tac".
+   - "Tu rut cho mot nguoi": ban tu nhap ten (va ngay sinh, chuyen muon xem neu co) roi rut ngay. "Chay thu 1/3/5 la" de xem truoc.
+   - Cai dat tu luu: ten chuong trinh, dong phu, diem toi thieu, ti le la nguoc, thoi gian cho thong tin, AI, giong doc.
    - Thong bao chu phong: co the lap lai moi N phut; game tu choi neu co link, so dien thoai, Zalo/Facebook, moi mua hang...
    - Muon thu nhanh khong can khan gia: mo trinh duyet vao  http://localhost:3002/test?u=An&c=!bai%203
 
@@ -49,13 +49,15 @@ Chi mang tinh GIAI TRI va goi mo. Game KHONG du doan suc khoe, tien bac, sinh tu
    - Cap nhat: bang dieu khien -> "Kiem tra ban moi" -> "Cap nhat ngay" (giu nguyen cai dat va ID TikTok).
    - Xem them TIEU-CHUAN-TIKTOK.txt.
 
-7) HOI THONG TIN NGUOI DUOC CHON (mac dinh BAT)
-   - Den luot ai, man hinh hien khung dem nguoc (60 giay): nguoi do binh luan  ho ten, ngay/thang/nam sinh, chuyen muon xem.
+7) NGUOI DUOC CHON PHAI NOI THONG TIN (mac dinh BAT)
+   - Chon xong, man hinh hien khung dem nguoc (60 giay), MC moi nguoi do binh luan ho ten, ngay/thang/nam sinh, chuyen muon xem.
      Vi du:  Lan, 20/08/1998, tinh duyen   hoac   Ten Minh sinh ngay 3 thang 8 nam 1990 muon xem cong viec
-     Co the chia lam nhieu binh luan. Du ngay sinh + (ten hoac chuyen muon xem) thi game bat dau sau 3 giay. Het gio ma chua gui thi doc thong diep chung.
-   - Game tinh CUNG HOANG DAO va SO CHU DAO tu ngay sinh, MC noi trong loi chao. Man hinh KHONG hien ngay sinh (ngay sinh chi gui cho AI neu bat), game KHONG luu ngay sinh / cau hoi ra file.
+   - Game nhan dien binh luan do: du ca 3 thong tin la gui AI NGAY; chi co ngay sinh + (ten hoac chuyen muon xem) thi cho them 3 giay.
+     Nguoi do gui chu de da xem roi thi MC nhac chon chu de khac. Het gio ma khong gui gi: bo qua, moi nguoi tiep theo.
+   - Trong luc AI viet: MC chao + noi cung hoang dao, so chu dao -> chia bai -> lat ca 5 la -> doc ten tung la. AI tra ve la doc tung la.
+     Neu AI chua kip: MC bao "dang tong hop", doi AI xong thi doc. AI loi / qua 9 giay: doc bang loi viet san.
+   - Man hinh KHONG hien ngay sinh (ngay sinh chi gui cho AI neu bat), game KHONG luu ngay sinh / cau hoi ra file.
    - Tat o Cai dat: bo dau "Nguoi duoc chon phai binh luan...". Chu phong tu rut cung co o nhap ngay sinh / chuyen muon xem.
-   - Cau hoi ve suc khoe, tien bac, kien tung, co bac...: van doc nhung chi thong diep chung.
 
 8) AI VIET LOI DOC (khong bat buoc, mac dinh TAT)
    - Dung de moi lan rut deu co loi doc rieng theo ten, cung, chuyen muon xem va dung cac la da rut. Trai 5 la doc khoang 2 phut.

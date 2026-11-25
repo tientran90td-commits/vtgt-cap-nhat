@@ -55,12 +55,12 @@
         <div class="btnrow">
           <button id="btnSkip">⏭ Bỏ qua lượt này</button>
           <button id="btnPause">⏸ Tạm ngưng nhận lượt mới</button>
-          <button id="btnClear" class="danger">🗑 Xóa hàng chờ</button>
+          <button id="btnClear" class="danger">🗑 Xóa điểm tương tác</button>
         </div>
       </div>
 
       <div class="card">
-        <h2>📋 Hàng chờ <small id="qCount"></small></h2>
+        <h2>🏆 Người tương tác tốt nhất <small id="qCount"></small></h2>
         <ul id="queue" class="ql"></ul>
         <p class="hint tiny">Khán giả gõ <kbd>!bai</kbd>, <kbd>!bai 3</kbd>, <kbd>!bai tình yêu</kbd>, <kbd>!bai công việc</kbd>… để vào hàng chờ. “Ưu tiên” đẩy người đó lên đầu.</p>
       </div>
@@ -69,7 +69,6 @@
         <h2>🪄 Tự rút cho một người</h2>
         <div class="row">
           <input type="text" id="drName" placeholder="Tên (ví dụ: Lan)" maxlength="30">
-          <select id="drSpread"><option value="1">1 lá</option><option value="3">3 lá</option><option value="5">5 lá</option></select>
           <select id="drTopic"><option value="general">Tổng quát</option><option value="love">Tình duyên</option><option value="work">Công việc - học tập</option></select>
           <button id="btnDraw" class="primary">Rút ngay</button>
         </div>
@@ -93,13 +92,9 @@
         <form id="setForm" class="form" onsubmit="return false">
           <label>Tên chương trình (hiện trên cùng)<input type="text" id="title" maxlength="40"></label>
           <label>Dòng phụ<input type="text" id="subtitle" maxlength="40"></label>
-          <label>Số lá mặc định khi chỉ gõ !bai
-            <select id="defaultSpread"><option value="1">1 lá</option><option value="3">3 lá</option><option value="5">5 lá</option></select></label>
-          <label class="chk"><input type="checkbox" id="allowThree"> Cho khán giả xin 3 lá</label>
-          <label class="chk"><input type="checkbox" id="allowFive"> Cho khán giả xin 5 lá (mỗi lượt ~1,5 phút)</label>
+          <p class="hint tiny">Game luôn trải 5 lá. Người tương tác tốt nhất được chọn (bình luận 1 điểm, gõ !bai 3, tim 0,05, chia sẻ 8, follow 6, quà 4).</p>
+          <label>Điểm tối thiểu để được chọn<input type="number" id="minScore" min="1" max="100"></label>
           <label>Tỉ lệ lá ngược (%) <input type="number" id="reverseChance" min="0" max="100"></label>
-          <label>Chờ giữa 2 lượt của cùng 1 người (giây, 0 = không giới hạn)<input type="number" id="userCooldown" min="0" max="900"></label>
-          <label>Hàng chờ tối đa (người)<input type="number" id="maxQueue" min="1" max="60"></label>
           <label>Tốc độ chuyển lá
             <select id="readSpeed"><option value="slow">Chậm (đọc kỹ)</option><option value="normal">Vừa</option><option value="fast">Nhanh</option></select></label>
           <label class="chk"><input type="checkbox" id="autoDraw"> Không ai xin thì tự rút “thông điệp cho cả phòng”</label>

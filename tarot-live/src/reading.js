@@ -122,4 +122,86 @@ function build(drawn, user, opts = {}) {
   return { cards, steps, total: at, flipAll, ai: !!opts.ai, profile: opts.profile || null, topic, topicLabel: TOPIC_LABEL[topic], spread };
 }
 
-module.exports = { build, introText, TOPIC_LABEL, DISCLAIMER, POS };
+
+// ---------------------------------------------------------------- luồng 5 lá kiểu "chờ AI"
+// 1) showSteps: xáo bài (MC chào) -> chia bài -> lật cả 5 lá -> đọc tên từng lá. Chạy NGAY, trong lúc AI đang viết.
+// 2) readSteps: đọc từng lá + tổng kết + lời chúc. Được nối vào sau khi AI trả lời (hoặc dùng lời viết sẵn).
+function makeDur(opts) {
+  const mpc = MS_PER_CHAR[opts.speed] || MS_PER_CHAR.normal;
+  return (text, min) => (opts.fast ? 1200 : Math.max(min, Math.round(text.length * mpc)));
+}
+
+function layout(steps, base = 0) {
+  let at = base;
+  for (const st of steps) {
+    st.at = at;
+    at += st.dur;
+  }
+  return at;
+}
+
+/** 5 lá chưa có lời AI: lời đọc viết sẵn theo vị trí (dùng khi AI tắt / lỗi). */
+function makeCards(drawn, opts = {}) {
+  const topic = opts.sensitive ? 'general' : opts.topic || 'general';
+  const positions = POS[drawn.length === 5 ? 5 : drawn.length === 3 ? 3 : 1][topic];
+  return {
+    topic,
+    topicLabel: TOPIC_LABEL[topic],
+    cards: drawn.map((d, i) => ({
+      id: d.card.id,
+      vi: d.card.vi,
+      en: d.card.en,
+      rev: d.rev,
+      pos: positions[i],
+      kw: d.rev ? d.card.kRev : d.card.kUp,
+      text: roleText(d.card, d.rev, topic, positions[i]),
+    })),
+  };
+}
+
+function showSteps(cards, user, opts = {}) {
+  const dur = makeDur(opts);
+  const rnd = opts.rng || Math.random;
+  const n = cards.length;
+  const steps = [];
+  const intro = introText(user.name, opts.profile, opts.sensitive, rnd);
+  steps.push({ kind: 'shuffle', say: intro, dur: dur(intro, 6000) });
+  const deal = `Mình chia ${n === 5 ? 'năm' : n} lá bài ra bàn.`;
+  steps.push({ kind: 'deal', say: deal, dur: dur(deal, 3500) });
+  const rv = `Giờ mình lật cả ${n === 5 ? 'năm' : n} lá cùng lúc nhé.`;
+  steps.push({ kind: 'reveal', say: rv, dur: dur(rv, 3500) });
+  cards.forEach((c, i) => {
+    const say = `${ORD[i]}, ${c.pos}: ${c.vi}${c.rev ? ', lá ngược' : ''}.`;
+    steps.push({ kind: 'name', idx: i, say, dur: dur(say, 3200) });
+  });
+  return { steps, total: layout(steps, 0) };
+}
+
+/** Đọc từng lá + tổng kết + lời chúc. ai = { cards:[chuỗi], summary } hoặc null. Trả về { steps (at tính từ 0), total }. */
+function readSteps(cards, opts = {}) {
+  const dur = makeDur(opts);
+  const rnd = opts.rng || Math.random;
+  const n = cards.length;
+  const steps = [];
+  cards.forEach((c, i) => {
+    const say = `${ORD[i]}, ${c.pos}: ${c.vi}${c.rev ? ', lá ngược' : ''}. Từ khóa: ${c.kw}. ${c.text}`;
+    steps.push({ kind: 'card', idx: i, say, dur: dur(say, 7000) });
+  });
+  if (n > 1) {
+    const w = n === 3 ? 'ba' : 'năm';
+    let sum;
+    if (opts.ai && opts.ai.summary) sum = `Tổng kết: ${opts.ai.summary}`;
+    else {
+      const kws = cards.map((c) => c.kw.split(',')[0].trim());
+      const list = kws.slice(0, -1).join(', ') + ' và ' + kws[kws.length - 1];
+      sum = `Tổng kết: ${w} từ khóa dành cho bạn là ${list}. Hãy xem ${w} lá bài như một câu chuyện gợi mở để suy ngẫm, quyết định luôn nằm ở bạn.`;
+    }
+    steps.push({ kind: 'sum', say: sum, dur: dur(sum, 4500) });
+  }
+  let out = pick(OUTRO, rnd);
+  if (opts.number == null || opts.number % 4 === 0) out += ' ' + DISCLAIMER;
+  steps.push({ kind: 'outro', say: out, dur: dur(out, 3500) });
+  return { steps, total: layout(steps, 0) };
+}
+
+module.exports = { makeCards, showSteps, readSteps, layout, build, introText, TOPIC_LABEL, DISCLAIMER, POS };

@@ -32,7 +32,7 @@ module.exports = {
   // ===== GIÁ TRỊ MẶC ĐỊNH (đổi ở bảng điều khiển cũng được, bảng sẽ lưu vào data/cai-dat.json) =====
   defaults: {
     title: 'Tarot LIVE',
-    subtitle: 'Gõ !bai để rút lá bài của bạn',
+    subtitle: 'Tương tác tốt nhất sẽ được xem 5 lá Tarot',
     defaultSpread: 1, // 1 = rút 1 lá | 3 = rút 3 lá (quá khứ - hiện tại - tương lai) | 5 = rút 5 lá (tình huống - nguyên nhân - trở ngại - lời khuyên - kết quả)
     allowThree: true, // cho khán giả xin "3 lá"
     allowFive: true, // cho khán giả xin "5 lá" (mỗi lượt khoảng 1,5 phút)
@@ -40,7 +40,7 @@ module.exports = {
     userCooldown: fast ? 0 : 90, // giây: 1 người phải chờ bấy nhiêu giây mới được xin lượt nữa (0 = không giới hạn)
     maxQueue: 25, // hàng chờ tối đa
     readSpeed: 'normal', // slow | normal | fast  (tốc độ chuyển lá, theo độ dài lời đọc)
-    autoDraw: true, // không ai xin thì tự rút "thông điệp cho cả phòng" để màn hình không đứng yên
+    autoDraw: false, // không ai xin thì tự rút "thông điệp cho cả phòng" để màn hình không đứng yên
     autoIdleSeconds: fast ? 3 : 45,
     giftPriority: false, // người xin lượt mà từng tặng quà được xếp lên trước (tắt mặc định)
     voiceOn: true,
@@ -48,6 +48,7 @@ module.exports = {
     announceText: '',
     announceEvery: 0, // phút (0 = tắt)
     paused: false, // tạm ngưng nhận lượt mới
+    minScore: fast ? 1 : 3, // điểm tương tác tối thiểu để được chọn (bình luận 1 điểm, !bai 3, chia sẻ 8, follow 6, quà 4)
     askInfo: true, // người được chọn phải bình luận họ tên, ngày/tháng/năm sinh, chuyện muốn xem
     collectSeconds: fast ? 4 : 60, // thời gian chờ người đó bình luận
     aiProvider: 'off', // off | claude | gemini (cần file ai-api-key.txt)
