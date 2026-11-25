@@ -8,7 +8,7 @@ const { Settings } = require('./settings');
 const { draw } = require('./deck');
 const { build, introText, TOPIC_LABEL, POS } = require('./reading');
 const ai = require('./ai');
-const { parseInfo, mergeInfo, findDate, ageOf, profile } = require('./info');
+const { parseInfo, mergeInfo, findDate, profile } = require('./info');
 const { parseRequest } = require('./parse');
 const { checkAnnouncement } = require('./safety');
 
@@ -157,9 +157,7 @@ class Hub {
   prepare(item, info, now) {
     const s = this.settings.v;
     const prof = info ? profile(info) : null;
-    let topic = item.topic !== 'general' ? item.topic : info ? info.topic : 'general';
-    const age = info && info.dob ? ageOf(info.dob) : null;
-    if (age != null && age < 18 && topic === 'love') topic = 'general'; // người dưới 18: không đọc chủ đề tình duyên
+    const topic = item.topic !== 'general' ? item.topic : info ? info.topic : 'general';
     const sensitive = !!item.sensitive || !!(info && info.sensitive);
     const name = (info && info.name) || item.name;
     const drawn = draw(item.spread, s.reverseChance);

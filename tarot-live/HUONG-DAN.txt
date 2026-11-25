@@ -62,7 +62,7 @@ Chi mang tinh GIAI TRI va goi mo. Game KHONG du doan suc khoe, tien bac, sinh tu
    - Cach bat: tao file  ai-api-key.txt  (cung thu muc voi CHAY-GAME.bat), chi dan 1 dong la khoa API (khong them chu nao khac).
      Roi vao bang dieu khien > Cai dat > "AI viet loi doc" chon Claude hoac Gemini. De trong "Ten mau AI" de dung mau mac dinh.
    - Game gui cho AI: ten, NGAY SINH DAY DU + so tuoi, cung hoang dao, so chu dao, chu de, chuyen muon xem (da loc), ten + vi tri + xuoi/nguoc cua cac la. AI viet hop lua tuoi (tre / lon tuoi).
-   - Nguoi duoi 18 tuoi: game tu bo chu de tinh duyen, doc thong diep chung (hoc tap, ban be, ban than).
+   - Nguoi tre (duoi 18 tuoi) van xem duoc tinh duyen va cong viec/hoc tap. Voi tinh cam, AI duoc dan noi kieu tinh cam hoc tro trong sang (khong noi chuyen nguoi lon).
      Xem mau form o file  MAU-FORM-AI.txt.
    - AI loi / cham qua 9 giay / tra ve noi dung la (link, so dien thoai, tu cam) -> game tu doc bang loi viet san, khong bi dung.
    - Chi phi: tinh theo luot, bang gia cua nha cung cap. Khoa bi lo thi doi khoa ngay. File ai-api-key.txt khong nam trong file zip / kho GitHub.
