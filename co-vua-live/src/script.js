@@ -45,11 +45,11 @@ const DEFAULTS = [
   { key: 'lobbyStart', group: 'Mở đầu', role: 'mc', label: 'Bắt đầu vòng mới', vars: ['giay'],
     text: 'Vòng mới bắt đầu! Hãy bình luận, thả tim hoặc tặng quà để giành suất lên bàn đấu. Chỉ còn {giay} giây!\nVòng mới tới rồi! Hai ghế đang trống, ai bình luận, thả tim, tặng quà nhiều nhất là ngồi vào. Còn {giay} giây!\nBàn cờ đã dọn xong, quân đã lau bóng. Ai muốn lên bàn thì tương tác ngay, còn {giay} giây thôi!' },
   { key: 'howTo', group: 'Mở đầu', role: 'mc', label: 'Giải thích cách chơi (lúc chờ)', vars: [],
-    text: 'Cách chơi rất dễ: khi đến lượt, người chơi bình luận nước đi, ví dụ e bốn, hoặc mã f ba. Chiếu hết vua đối phương là thắng. Muốn lên bàn đấu, hãy bình luận, thả tim và tặng quà!\nGõ ô quân đi tới, như e bốn, hoặc gõ tên quân rồi ô, như mã f ba. Chiếu hết là thắng. Bình luận nhiều, thả tim, tặng quà để được chọn lên bàn nhé!\nCách chơi dễ như ăn kẹo: tới lượt thì gõ nước đi như e bốn hoặc mã f ba. Chiếu hết là thắng, nhớ đừng để vua bị bắt nạt nhé!\nĐến lượt mình thì bình luận nước đi, ví dụ tốt e bốn. Gõ nhầm quân thì không sao, thử lại là được!' },
+    text: 'Cách chơi rất dễ: khi đến lượt, người chơi bình luận nước đi, ví dụ e bốn, hoặc mã f ba. Chiếu hết vua đối phương là thắng. Muốn lên bàn đấu, hãy bình luận, thả tim và tặng quà!\nGõ ô quân đi tới, như e bốn, hoặc gõ tên quân rồi ô, như mã f ba. Chiếu hết là thắng. Bình luận nhiều, thả tim, tặng quà để được chọn lên bàn nhé!\nCách chơi dễ như ăn kẹo: tới lượt thì gõ nước đi như e bốn hoặc mã f ba. Chiếu hết là thắng, nhớ giữ vua thật an toàn nhé!\nĐến lượt mình thì bình luận nước đi, ví dụ tốt e bốn. Gõ nhầm quân thì không sao, thử lại là được!' },
   { key: 'greet', group: 'Mở đầu', role: 'mc', label: 'Chào người mới vào', vars: ['ten'],
     text: 'Chào {ten} đã ghé xem! Bình luận hoặc thả tim để giành suất chơi nhé.\nXin chào {ten}! Chúc bạn xem live vui vẻ, nhớ bình luận để được chọn lên bàn đấu nha.\nÔi, {ten} vừa tới! Bình luận để được chọn lên bàn đánh cờ nào!\nChào {ten}! Ngồi xuống xem cờ đi, biết đâu hôm nay chính bạn là vua!\nXin chào {ten}, bạn đến đúng lúc bàn cờ đang nóng!' },
   { key: 'lobbyWarn', group: 'Mở đầu', role: 'mc', label: 'Sắp hết giờ đua tương tác', vars: ['ten', 'ten1', 'ten2'],
-    text: 'Còn mười giây! Đang dẫn đầu tương tác là {ten}.\nCòn mười giây thôi! {ten} đang dẫn đầu, ai muốn giành ghế thì nhanh tay lên!\nMười giây cuối cùng! {ten} đang cầm đầu bảng, các bạn ơi bám đuổi đi!' },
+    text: 'Còn mười giây! Đang dẫn đầu tương tác là {ten}.\nCòn mười giây thôi! {ten} đang dẫn đầu, ai muốn giành ghế thì nhanh tay lên!\nMười giây cuối cùng! {ten} đang cầm đầu bảng, các bạn ơi theo sát nhé!' },
   { key: 'lobbyEmpty', group: 'Mở đầu', role: 'mc', label: 'Chưa có ai lên bàn', vars: [],
     text: 'Chưa có ai lên bàn. Hãy bình luận hoặc thả tim để vào chơi nào!\nBàn cờ vắng hoe, quân cờ buồn ngủ cả rồi! Bình luận hoặc thả tim để vào chơi nào!\nChưa có ai lên bàn, vua trắng với vua đen đang ngồi nhìn nhau. Mau lên bàn đi các bạn!' },
   { key: 'pickedPair', group: 'Chọn người chơi', role: 'mc', label: 'Công bố 2 người chơi', vars: ['ten1', 'ten2'],
@@ -71,21 +71,21 @@ const DEFAULTS = [
   { key: 'timeoutAuto', group: 'Trong ván', role: 'ref', label: 'Hết giờ, đánh thay', vars: ['ten', 'oco'],
     text: '{ten} hết giờ. Hệ thống đi thay: {oco}.\n{ten} ngủ quên mất rồi, hệ thống đi thay: {oco}. Lần sau đừng để quân cờ chờ lâu nhé!\n{ten} hết giờ, hệ thống nhanh tay đi giúp: {oco}.' },
   { key: 'winGame', group: 'Kết quả', role: 'ref', label: 'Có người thắng', vars: ['ten', 'thua', 'so'],
-    text: 'Chiếu hết! {ten} chiến thắng.\nChiếu hết rồi! {ten} thắng thật bá đạo!\nKết thúc! {ten} đại thắng, khí thế ngút trời!\nChiếu hết! {ten} thắng, {thua} đã bị dồn vào góc không còn đường lui!\nChiếu hết rồi! {ten} thắng, {thua} nhìn bàn cờ mà chưa hiểu chuyện gì xảy ra!\nVua của {thua} hết chỗ chạy! {ten} chiến thắng!' },
+    text: 'Chiếu hết! {ten} chiến thắng.\nChiếu hết rồi! {ten} thắng thật xuất sắc!\nKết thúc! {ten} đại thắng, khí thế ngút trời!\nChiếu hết! {ten} thắng, {thua} đã hết nước đi an toàn!\nChiếu hết rồi! {ten} thắng, {thua} nhìn bàn cờ mà chưa hiểu chuyện gì xảy ra!\nVua của {thua} hết đường đi rồi! {ten} chiến thắng!' },
   { key: 'winForfeit', group: 'Kết quả', role: 'ref', label: 'Thắng do đối thủ bỏ cuộc / hết giờ', vars: ['ten', 'thua', 'lydo'],
-    text: '{thua} {lydo}. {ten} giành chiến thắng, bá khí lấn át tất cả!\n{thua} {lydo}. {ten} thắng không cần đánh hết, đúng là thắng nhàn!\n{thua} {lydo}, {ten} ngồi yên mà vẫn thắng, may mắn hay bản lĩnh đây?' },
+    text: '{thua} {lydo}. {ten} giành chiến thắng, khí chất vượt trội hơn tất cả!\n{thua} {lydo}. {ten} thắng không cần đánh hết, đúng là thắng nhàn!\n{thua} {lydo}, {ten} ngồi yên mà vẫn thắng, may mắn hay bản lĩnh đây?' },
   { key: 'congrats', group: 'Kết quả', role: 'mc', label: 'Chúc mừng người thắng', vars: ['ten'],
-    text: 'Xin chúc mừng {ten}! Quả là bá đạo, bá khí lộ rõ!\nChúc mừng {ten}! Bá khí ngút trời, không ai cản nổi!\nBội phục {ten}! Thật bá đạo, đúng là cao thủ cái thế!\n{ten} một nước định càn khôn, bá khí lẫm liệt. Chúc mừng!\nChúc mừng {ten}! Nước đi này xứng đáng được in vào sách cờ vua!\nCung hỉ {ten}! Đối thủ còn đang ngồi tự hỏi mình sai ở đâu, còn bạn đã bay lên tiên!\nQuá bá đạo! {ten} đi nước nào là đối thủ toát mồ hôi nước đó, chúc mừng!' },
+    text: 'Xin chúc mừng {ten}! Quả là xuất sắc, khí chất lộ rõ!\nChúc mừng {ten}! Khí thế ngút trời, không ai theo kịp!\nBội phục {ten}! Thật xuất sắc, đúng là cao thủ cái thế!\n{ten} một nước định càn khôn, khí chất rạng ngời. Chúc mừng!\nChúc mừng {ten}! Nước đi này xứng đáng được in vào sách cờ vua!\nCung hỉ {ten}! Đối thủ còn đang ngồi tự hỏi mình sai ở đâu, còn bạn đã bay lên tiên!\nQuá xuất sắc! {ten} đi nước nào là đối thủ toát mồ hôi nước đó, chúc mừng!' },
   { key: 'streak', group: 'Kết quả', role: 'mc', label: 'Thắng liên tiếp', vars: ['ten', 'so'],
-    text: '{ten} đã thắng {so} ván liên tiếp, bá đạo vô song!\n{ten} thắng {so} ván liền không thua, chắc có bí kíp gia truyền! Ai biết xin chia sẻ nhé!\n{so} ván liên tiếp! {ten} ơi, có ai cản nổi bạn không, hay chạy trốn hết rồi?' },
+    text: '{ten} đã thắng {so} ván liên tiếp, xuất sắc vô song!\n{ten} thắng {so} ván liền không thua, chắc có bí kíp gia truyền! Ai biết xin chia sẻ nhé!\n{so} ván liên tiếp! {ten} ơi, có ai theo kịp bạn không, hay đi đâu hết rồi?' },
   { key: 'rankUp', group: 'Kết quả', role: 'mc', label: 'Người thắng đột phá cảnh giới (rank)', vars: ['ten', 'canhgioi'],
-    text: 'Thiên địa dị tượng! {ten} đã đột phá, tiến nhập cảnh giới {canhgioi}, khung avatar thêm rực rỡ!\nChúc mừng {ten} đột phá thành công, bước vào cảnh giới {canhgioi}!\n{ten} đột phá lên {canhgioi}! Sấm sét đùng đùng, quân cờ cũng phải run rẩy, cung hỉ cung hỉ!\nChúc mừng {ten} lên {canhgioi}! Lên cấp nhanh như vậy chắc có uống đan dược trộm của sư phụ!\n{canhgioi}! {ten} đã bước vào cảnh giới mới, từ nay ra đường phải có người xách dép!' },
+    text: 'Thiên địa dị tượng! {ten} đã đột phá, tiến nhập cảnh giới {canhgioi}, khung avatar thêm rực rỡ!\nChúc mừng {ten} đột phá thành công, bước vào cảnh giới {canhgioi}!\n{ten} đột phá lên {canhgioi}! Mây lành tụ hội, quân cờ cũng phải cúi chào, cung hỉ cung hỉ!\nChúc mừng {ten} lên {canhgioi}! Lên cấp nhanh như vậy chắc có uống đan dược trộm của sư phụ!\n{canhgioi}! {ten} đã bước vào cảnh giới mới, từ nay ra đường phải có người xách dép!' },
   { key: 'rankDown', group: 'Kết quả', role: 'mc', label: 'Người thua độ kiếp thất bại (mất hết điểm)', vars: ['ten', 'canhgioi', 'diem'],
-    text: 'Thiên lôi giáng xuống! {ten} độ kiếp thất bại, mất sạch {diem} điểm đạo hạnh! Xin chia buồn, hôm nay không hợp độ kiếp!\nĐộ kiếp thất bại! {ten} bị sét đánh cháy đen, tu vi tiêu tan, về lại {canhgioi}! Đau lòng hơn cả bị mất xe lúc sắp chiếu hết!\n{ten} thua một ván, độ kiếp thất bại, {diem} điểm đạo hạnh bay theo mây khói! Không sao, ngã ở đâu đứng dậy ở đó!\nÔi không! Lôi kiếp quá mạnh, {ten} thất bại thảm hại, mất hết điểm, nay phải tu lại từ {canhgioi}! Tâm đừng loạn nhé!\nChia buồn cùng {ten}, độ kiếp thất bại, mất {diem} điểm rồi! Mau về bế quan luyện thêm, hoặc ăn đan dược vào cho khỏe!' },
+    text: 'Mây đen kéo tới! {ten} độ kiếp thất bại, mất sạch {diem} điểm đạo hạnh! Xin chia buồn, hôm nay chưa hợp độ kiếp!\nĐộ kiếp thất bại! {ten} độ kiếp chưa thành, mất {diem} điểm đạo hạnh, về lại {canhgioi}! Buồn hơn cả lỡ đi nhầm quân lúc sắp chiếu hết!\n{ten} thua một ván, độ kiếp thất bại, {diem} điểm đạo hạnh bay theo mây khói! Không sao, ngã ở đâu đứng dậy ở đó!\nÔi không! Kiếp nạn lần này hơi khó, {ten} độ kiếp chưa thành, mất hết điểm, nay phải tu lại từ {canhgioi}! Tâm đừng loạn nhé!\nChia buồn cùng {ten}, độ kiếp thất bại, mất {diem} điểm rồi! Mau về bế quan luyện thêm, hoặc ăn đan dược vào cho khỏe!' },
   { key: 'loseComfort', group: 'Kết quả', role: 'mc', label: 'Động viên người thua (chưa có điểm để mất)', vars: ['thua'],
-    text: '{thua} đừng buồn, thua keo này ta bày keo khác, đại kỳ thủ nào chẳng có lúc bị chiếu hết!\n{thua} thua rồi nhưng phong độ vẫn đẹp, đúng là thua mà không mất khí thế!\n{thua} cứ yên tâm, quân cờ thua chứ lòng người không thua, lần sau báo thù!\nThua một ván thôi mà, {thua} cứ uống chén trà cho tĩnh tâm, tu luyện lại là xong!' },
+    text: '{thua} đừng buồn, thua keo này ta bày keo khác, đại kỳ thủ nào chẳng có lúc bị chiếu hết!\n{thua} thua rồi nhưng phong độ vẫn đẹp, đúng là thua mà không mất khí thế!\n{thua} cứ yên tâm, quân cờ thua chứ lòng người không thua, lần sau gỡ lại!\nThua một ván thôi mà, {thua} cứ uống chén trà cho tĩnh tâm, tu luyện lại là xong!' },
   { key: 'stepDown', group: 'Kết quả', role: 'mc', label: 'Đủ chuỗi thắng, nhường chỗ', vars: ['ten'],
-    text: 'Đã đủ số ván liên tiếp, xin nhường chỗ cho người khác.\nThắng nhiều quá rồi, xin nhường bàn cho người khác ăn hành, à nhầm, ăn cơ hội!\nĐủ chuỗi thắng rồi, xuống bàn nghỉ chút đi, để người khác còn có cơ hội bị chiếu!' },
+    text: 'Đã đủ số ván liên tiếp, xin nhường chỗ cho người khác.\nThắng nhiều quá rồi, xin nhường bàn cho người khác thử sức nhé!\nĐủ chuỗi thắng rồi, xuống bàn nghỉ chút đi, để người khác còn có cơ hội thể hiện!' },
   { key: 'draw', group: 'Kết quả', role: 'ref', label: 'Hòa', vars: [],
     text: 'Ván đấu hòa!\nHòa! Hai bên đánh ngang tài ngang sức, không ai chịu nhường ai!\nHòa cờ! Hai vua nhìn nhau cười, bắt tay nhé!' },
   { key: 'hostReset', group: 'Khác', role: 'mc', label: 'Chủ phòng làm mới trận', vars: [],
@@ -118,6 +118,9 @@ const DEFAULTS = [
     text: 'Cảm ơn {ten} đã chia sẻ buổi LIVE!\nCảm ơn {ten} đã chia sẻ live, bạn tốt quá!\n{ten} chia sẻ live rồi, hội cờ vua sắp đông thêm rồi!' },
 ];
 
+// Câu thoại cũ (do người dùng đã lưu) có yếu tố bạo lực sẽ bị bỏ qua, game dùng câu gốc mới thay thế
+const VIOLENT = /sét đánh|thiên lôi|lôi kiếp|lôi đài|bá khí|bá đạo|mãnh hổ|báo thù|ăn hành|đánh cho|cắn quân|bắt nạt|chạy trốn|cướp ngôi|kiếm hiệp|luận võ|tan tác|cháy đen|thảm hại|dồn vào góc|chiến đấu|sấm sét/i;
+
 class Script {
   constructor(file) {
     this.file = file;
@@ -133,7 +136,10 @@ class Script {
       for (const [k, v] of Object.entries(saved)) {
         const it = this.items.get(k);
         if (!it || !v) continue;
-        if (typeof v.text === 'string') it.custom = v.text;
+        if (typeof v.text === 'string') {
+          const kept = v.text.split('\n').filter((l) => !VIOLENT.test(l));
+          it.custom = kept.length === v.text.split('\n').length ? v.text : kept.length ? kept.join('\n') : null;
+        }
         if (typeof v.enabled === 'boolean') it.enabled = v.enabled;
       }
     } catch (e) {

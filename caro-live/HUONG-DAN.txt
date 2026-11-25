@@ -239,3 +239,8 @@ TOA DO TRONG TUNG O VUONG (Caro)
 - Moi o trong cua ban co 2D deu ghi san toa do mo (A1, H8, O15...) de nguoi xem biet go gi. O da co quan thi toa do tu an.
 - Tat/bat: bang dieu khien > Cai dat > tick "Ghi toa do (A1, H8...) mo trong tung o vuong" (hoac showCellLabels trong config.js).
 
+LOI THOAI AN TOAN (DA LOAI CAU CO YEU TO BAO LUC)
+- Da doi toan bo cau noi, bang thong bao va bieu tuong co y bao luc (set danh, "danh cho tan tac", ba khi, bao thu, ⚔, 💥...) sang cach noi nhe nhang, vui ve.
+  Vi du: "Do kiep that bai" gio la may den/mua nhe, khong con set danh chay den; "loi dai" doi thanh "dai thi dau".
+- Neu truoc day ban tu sua loi thoai (data\thoai.json) thi cac cau cu van con: bam "Khoi phuc tat ca thoai goc" trong muc Loi thoai de nhan cau moi.
+

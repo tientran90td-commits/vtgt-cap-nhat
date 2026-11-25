@@ -616,7 +616,7 @@ class Match {
     const d = this.rankDownInfo;
     this.rankDownInfo = null;
     if (d) {
-      this.feed(`💥 Đạo hữu ${d.name} độ kiếp thất bại, mất ${d.lost} điểm đạo hạnh${d.tier < d.fromTier ? ', rớt xuống ' + d.tierName : ''}!`, 'info');
+      this.feed(`🌧️ Đạo hữu ${d.name} độ kiếp thất bại, mất ${d.lost} điểm đạo hạnh${d.tier < d.fromTier ? ', rớt xuống ' + d.tierName : ''}!`, 'info');
       if (this.voice.rankDown) this.voice.rankDown(d.name, d.tierName, now, d.lost);
     }
   }

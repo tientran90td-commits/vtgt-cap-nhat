@@ -15,7 +15,7 @@ const UP = V(0, 1, 0);
 const damp = (cur, goal, k, dt) => cur + (goal - cur) * (1 - Math.exp(-k * dt));
 const std = (color, o = {}) => new THREE.MeshStandardMaterial({ color, roughness: 0.62, metalness: 0, ...o });
 
-const THOUGHTS = ['Hmm…', 'Đánh đâu nhỉ?', '🤔', 'Chặn nó đã!', 'Nước này hay…', 'Tính kỹ nào…', '…', 'Ăn rồi nhé!'];
+const THOUGHTS = ['Hmm…', 'Đi đâu nhỉ?', '🤔', 'Phòng thủ đã!', 'Nước này hay…', 'Tính kỹ nào…', '…', 'Được quân rồi nhé!'];
 
 /** IK 2 đoạn: trả về vị trí khuỷu + cổ tay. */
 function solveArm(S, T, L1, L2, pole, outElbow, outWrist) {

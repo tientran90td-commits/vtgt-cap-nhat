@@ -226,3 +226,8 @@ CAU NOI HAI HUOC
 - Da them nhieu cau noi vui cho moi moc (chao, tung dong xu, di quan, chieu het, thua, cam on qua, follow, hoi thuc tha tim...) va cau dong vien nguoi thua.
   Neu truoc day ban tu sua loi thoai (data\thoai.json), bam "Khoi phuc tat ca thoai goc" de nhan cac cau moi. Moi cau toi da 4000 chu.
 
+LOI THOAI AN TOAN (DA LOAI CAU CO YEU TO BAO LUC)
+- Da doi toan bo cau noi, bang thong bao va bieu tuong co y bao luc (set danh, "danh cho tan tac", ba khi, bao thu, ⚔, 💥...) sang cach noi nhe nhang, vui ve.
+  Vi du: "Do kiep that bai" gio la may den/mua nhe, khong con set danh chay den; "loi dai" doi thanh "dai thi dau".
+- Neu truoc day ban tu sua loi thoai (data\thoai.json) thi cac cau cu van con: bam "Khoi phuc tat ca thoai goc" trong muc Loi thoai de nhan cau moi.
+

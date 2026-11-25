@@ -7,8 +7,8 @@ import { setFrame } from './rank.js';
 const SHOW_MS = 8000;
 const SHOW_DOWN_MS = 6500;
 // lời "tụt hạng" hài hước (chọn ngẫu nhiên)
-const DOWN_TITLES = ['💥 ĐỘ KIẾP THẤT BẠI! 💥', '⚡ ĐỘ KIẾP THẤT BẠI! ⚡', '☁️ ĐỘ KIẾP THẤT BẠI! ☁️'];
-const DOWN_SUBS = ['Lôi kiếp đánh cho tan tác, tu vi tiêu tan hết!', 'Ngã ở đâu đứng dậy ở đó, đạo hữu cố lên!', 'Thiên lôi quá mạnh, tu lại từ đầu nhé!', 'Thua keo này ta bày keo khác!', 'Đan dược hết date, cần đi mua thêm!'];
+const DOWN_TITLES = ['🌧️ ĐỘ KIẾP THẤT BẠI! 🌧️', '☁️ ĐỘ KIẾP THẤT BẠI! ☁️', '🍂 ĐỘ KIẾP THẤT BẠI! 🍂'];
+const DOWN_SUBS = ['Kiếp nạn lần này hơi khó, tu vi tạm thời về lại!', 'Ngã ở đâu đứng dậy ở đó, đạo hữu cố lên!', 'Đường tu còn dài, tu lại từ đầu nhé!', 'Thua keo này ta bày keo khác!', 'Đan dược hết date, cần đi mua thêm!'];
 const DOWN_COLORS = ['#7a8fb8', '#9aa7c8', '#5a6a94', '#c9d3ee'];
 const COLORS = ['#ffd54a', '#ff7ae8', '#5fd8ff', '#6dffb0', '#ffffff', '#ff8a5c'];
 

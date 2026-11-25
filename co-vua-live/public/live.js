@@ -72,7 +72,7 @@ director.onPlaced = (mv, shown) => {
     sfx.four();
     fx.showBanner('⚠ CHIẾU!', '');
   } else if (mv.cap) {
-    fx.showBanner('⚔ ĂN QUÂN!', '');
+    fx.showBanner('♟ ĂN QUÂN!', '');
   }
 };
 
@@ -180,7 +180,7 @@ function resultEffects(s) {
   if (w) {
     sfx.win();
     fx.fireworks(6500);
-    fx.showBanner('🏆 ' + w.name + ' ĐẠI THẮNG!', 'Bá đạo! Bá khí ngút trời!');
+    fx.showBanner('🏆 ' + w.name + ' ĐẠI THẮNG!', 'Xuất sắc! Khí thế ngút trời!');
     if (!(s.settings && s.settings.celebrateOn === false)) {
       celebrate.start(); // video ăn mừng (celebrate.js)
       celebStartedKey = fxKey;
@@ -248,7 +248,7 @@ function renderRank(s) {
       if (u.mark) {
         const tg = document.createElement('span');
         tg.className = 'tg';
-        tg.textContent = '⚔';
+        tg.textContent = '★';
         li.appendChild(tg);
       }
       const pts = document.createElement('span');

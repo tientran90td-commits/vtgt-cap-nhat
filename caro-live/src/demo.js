@@ -18,7 +18,7 @@ const FAKE = [
   ['trungkien', 'Trung Kiên'],
   ['phuongthao', 'Phương Thảo'],
 ];
-const CHAT = ['hay quá', 'cố lên', 'j9 đi', 'đánh k6 đi', 'xem vui ghê', 'chặn nó đi', 'ai thắng vậy', '🔥🔥', 'haha', 'đỉnh quá'];
+const CHAT = ['hay quá', 'cố lên', 'j9 đi', 'đánh k6 đi', 'xem vui ghê', 'chặn lại đi', 'ai thắng vậy', '🔥🔥', 'haha', 'đỉnh quá'];
 const GIFTS = [
   ['Hoa hồng', 1],
   ['Hoa hồng', 1],

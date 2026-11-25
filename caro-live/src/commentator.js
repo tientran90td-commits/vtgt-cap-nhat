@@ -107,7 +107,7 @@ class Commentator {
     if (champion) {
       this.say(
         'pickedChamp',
-        { ten1: this.nm(champion, 'thủ lôi'), ten2: this.nm(chosen[0], 'tân khách') },
+        { ten1: this.nm(champion, 'chủ đài'), ten2: this.nm(chosen[0], 'tân khách') },
         { at: now }
       );
     } else {
