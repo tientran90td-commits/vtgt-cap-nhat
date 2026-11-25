@@ -1,6 +1,10 @@
 package com.caro.helper;
 
 import android.app.Activity;
+import android.content.Intent;
+import android.os.Build;
+import android.provider.Settings;
+import android.webkit.JavascriptInterface;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
@@ -23,6 +27,50 @@ import java.util.Map;
 public class MainActivity extends Activity {
     private static final String HOST = "appassets.androidplatform.net";
     private WebView web;
+
+    /** Cầu nối cho trang web trong app điều khiển BONG BÓNG NỔI (xem BubbleService.java). Trang gọi: AndroidBubble.xxx() */
+    public class BubbleBridge {
+        /** "ok" = bật được; "need_overlay" = chưa cấp quyền hiển thị trên các ứng dụng khác (đã mở màn hình cấp quyền). */
+        @JavascriptInterface
+        public String enable() {
+            if (Build.VERSION.SDK_INT >= 23 && !Settings.canDrawOverlays(MainActivity.this)) {
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            startActivity(new Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, Uri.parse("package:" + getPackageName())));
+                        } catch (Exception e) { /* bỏ qua */ }
+                    }
+                });
+                return "need_overlay";
+            }
+            if (Build.VERSION.SDK_INT >= 33) {
+                try { requestPermissions(new String[] { "android.permission.POST_NOTIFICATIONS" }, 11); } catch (Exception e) { /* bỏ qua */ }
+            }
+            BubbleService.send(MainActivity.this, BubbleService.ACTION_VISIBLE, visible ? "1" : "0", null, null);
+            BubbleService.send(MainActivity.this, BubbleService.ACTION_IDLE, null, null, null);
+            return "ok";
+        }
+
+        @JavascriptInterface
+        public void disable() {
+            BubbleService.send(MainActivity.this, BubbleService.ACTION_STOP, null, null, null);
+        }
+
+        /** kind: me | nhay | info */
+        @JavascriptInterface
+        public void show(String small, String big, String kind) {
+            BubbleService.send(MainActivity.this, BubbleService.ACTION_SHOW, small, big, kind);
+        }
+
+        @JavascriptInterface
+        public void idle() {
+            BubbleService.send(MainActivity.this, BubbleService.ACTION_IDLE, null, null, null);
+        }
+    }
+
+    private boolean visible = true;
+    private boolean bubbleOn = false;
 
     private static String mimeOf(String path) {
         String p = path.toLowerCase();
@@ -66,8 +114,33 @@ public class MainActivity extends Activity {
                 }
             }
         });
+        web.addJavascriptInterface(new BubbleBridge(), "AndroidBubble");
         web.loadUrl("https://" + HOST + "/index.html");
         setContentView(web);
+    }
+
+    // Bong bóng chỉ hiện khi app đang ở nền; JS của trang vẫn phải chạy khi ở nền để nhận nước đi từ game.
+    @Override
+    protected void onResume() {
+        super.onResume();
+        visible = true;
+        if (web != null) web.onResume();
+        notifyVisible();
+    }
+
+    @Override
+    protected void onPause() {
+        visible = false;
+        if (web != null) web.resumeTimers(); // đừng cho trang ngủ khi sang app khác
+        notifyVisible();
+        super.onPause();
+    }
+
+    private void notifyVisible() {
+        try {
+            // chỉ báo cho bong bóng nếu nó đang chạy (tránh tự bật khi người dùng chưa cho phép)
+            if (BubbleService.running) BubbleService.send(this, BubbleService.ACTION_VISIBLE, visible ? "1" : "0", null, null);
+        } catch (Exception e) { /* bỏ qua */ }
     }
 
     @Override

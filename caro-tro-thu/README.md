@@ -28,3 +28,9 @@ Bộ não: chấm điểm theo các cửa sổ 5 ô, alpha-beta tăng dần đ�
 Khi máy tìm được thế thắng chắc (chuỗi tạo 4 liên tiếp), nút "😜 Nhây" sáng lên. Bấm để đổi gợi ý sang một nước trêu đối thủ
 (chặn trước điểm mạnh của họ, hoặc ép họ chặn một nước thừa). Mỗi nước nhây đều được máy kiểm chứng: dù đối thủ đáp thế nào
 bạn vẫn thắng. Không có nước nào chắc thắng thì nút tắt. Bấm tiếp để xem nước nhây khác, hết danh sách thì quay về gợi ý gốc.
+
+
+## Bong bóng nổi (bản 2.1)
+Bấm 🫧 "Bong bóng" trong tab Trợ thủ. Lần đầu app mở màn hình cài đặt: bật "Hiển thị trên các ứng dụng khác" cho Caro Trợ Thủ.
+Khi bạn chuyển sang TikTok, một nút tròn ♟ nổi trên màn hình; tới lượt bạn thì bật ra tin nhắn "👉 Bạn đánh ô G9" (rung nhẹ).
+Kéo nút để đổi chỗ, chạm để mở lại app. Mã: BubbleService.java + cầu nối AndroidBubble trong MainActivity.java.

@@ -3,6 +3,12 @@
 
     <!-- Cần để nối vào game Caro LIVE qua WiFi / cùng điện thoại -->
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Bong bóng nổi kiểu tin nhắn hiện toạ độ nước đi trên các app khác (TikTok...) -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.VIBRATE" />
 
     <application
         android:allowBackup="true"
@@ -20,6 +26,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+        <service
+            android:name=".BubbleService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Bong bóng nổi hiện toạ độ nước đi gợi ý" />
+        </service>
     </application>
 
 </manifest>

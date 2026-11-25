@@ -128,6 +128,7 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
       <button id="lkAlt" disabled>Gợi ý khác</button>
       <button id="lkNhay" class="nhay" disabled>😜 Nhây</button>
       <button id="lkZoom">🔍 Phóng to</button>
+      <button id="lkBubble" class="hidden">🫧 Bong bóng: Tắt</button>
     </div>
   </div>
   <div id="lkConn" class="overlay hidden">
@@ -1339,7 +1340,7 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
   };
   const cellName = (x, y) => String.fromCharCode(65 + x) + (y + 1);
 
-  let cfg = { addr: '', code: '', level: 'mid', me: null };
+  let cfg = { addr: '', code: '', level: 'mid', me: null, bubble: false };
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
 
@@ -1681,6 +1682,7 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
     $('lkPhase').textContent = st ? '#' + st.gameNo + ' · ' + (PHASE[st.phase] || st.phase) : '';
     $('lkMeHint').textContent = cfg.me ? (mm ? 'Bạn đang ở bên ' + (mm === 'X' ? '✕ đỏ' : '◯ xanh') : 'Bạn chưa vào bàn — khi được chọn app tự nhận ra.') : '';
     drawBoard();
+    syncBubble();
   }
   function altMove() {
     if (!hint || hint.busy || hint.alts.length < 2) return;
@@ -1695,6 +1697,50 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
     if (hint.nhay.idx >= hint.nhay.list.length) hint.nhay.idx = -1;
     render();
   }
+
+  // ---------- BONG BÓNG NỔI (chỉ có trong app Android: cầu nối AndroidBubble) ----------
+  // Tới lượt bạn: bong bóng bật ra "tin nhắn" hiện toạ độ, nổi trên TikTok/app khác. Tới lượt đối thủ thì thu lại.
+  let lastBubble = '';
+  function bubbleSend(kind, small, big) {
+    const nb = window.AndroidBubble;
+    if (!nb || !cfg.bubble) return;
+    const key = kind + '|' + small + '|' + big;
+    if (key === lastBubble) return;
+    lastBubble = key;
+    try { if (kind === 'idle') nb.idle(); else nb.show(small, big, kind); } catch (e) {}
+  }
+  function syncBubble() {
+    if (!window.AndroidBubble || !cfg.bubble) return;
+    const mm = st ? myMark() : null;
+    if (mm && st.phase === 'playing' && !st.result && st.turn === mm) {
+      if (!hint || hint.busy) { bubbleSend('info', 'Đang tính nước đi…', '⏳'); return; }
+      const nh = hint.nhay.idx >= 0 ? hint.nhay.list[hint.nhay.idx] : null;
+      const c = nh || hint.shown || hint;
+      bubbleSend(nh ? 'nhay' : 'me', nh ? '😜 Nhây: bạn đánh ô' : '👉 Bạn đánh ô', cellName(c.x, c.y));
+      return;
+    }
+    bubbleSend('idle', '', '');
+  }
+  function toggleBubble() {
+    const nb = window.AndroidBubble;
+    if (!nb) return;
+    if (cfg.bubble) {
+      cfg.bubble = false; save();
+      try { nb.disable(); } catch (e) {}
+    } else {
+      let r = 'fail';
+      try { r = nb.enable(); } catch (e) {}
+      if (r === 'ok') { cfg.bubble = true; lastBubble = ''; save(); }
+      else {
+        $('lkBig').className = 'big';
+        $('lkBig').textContent = 'Cần cấp quyền cho bong bóng';
+        $('lkSub').textContent = 'Màn hình cài đặt vừa mở: bật "Hiển thị trên các ứng dụng khác" cho Caro Trợ Thủ, rồi quay lại và bấm 🫧 lần nữa.';
+      }
+    }
+    bubbleLabel();
+    syncBubble();
+  }
+  function bubbleLabel() { $('lkBubble').textContent = '🫧 Bong bóng: ' + (cfg.bubble ? 'Bật' : 'Tắt'); }
 
   // ---------- khởi tạo ----------
   function bind() {
@@ -1722,6 +1768,12 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
       hint = null; reqId++;
       onState();
     };
+    if (window.AndroidBubble) {
+      $('lkBubble').classList.remove('hidden');
+      if (cfg.bubble) { let r = 'fail'; try { r = window.AndroidBubble.enable(); } catch (e) {} if (r !== 'ok') cfg.bubble = false; }
+      bubbleLabel();
+      $('lkBubble').onclick = toggleBubble;
+    }
     $('lkAlt').onclick = altMove;
     $('lkNhay').onclick = nhayPress;
     $('lkZoom').onclick = () => { zoom = !zoom; $('lkZoom').textContent = zoom ? '🔍 Thu nhỏ' : '🔍 Phóng to'; L = null; render(); };
