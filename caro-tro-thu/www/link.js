@@ -22,6 +22,7 @@
 
   let ws = null;
   let st = null; // trạng thái game mới nhất
+  let lastMsg = 0; // lần cuối nhận tin từ game (để phát hiện kết nối "treo" khi sang app khác rồi quay lại)
   let base = ''; // http://địa-chỉ:cổng
   let everOpen = false;
   let retry = null;
@@ -50,9 +51,11 @@
       ws = new WebSocket('ws://' + addr + '/' + (cfg.code ? '?code=' + encodeURIComponent(cfg.code) : ''));
     } catch (e) { setChip('off', 'Địa chỉ không đúng'); return; }
     const mine = ws;
-    ws.onopen = () => { everOpen = true; setChip('on', 'Đã nối game'); showConnect(false); };
+    lastMsg = Date.now();
+    ws.onopen = () => { everOpen = true; lastMsg = Date.now(); setChip('on', 'Đã nối game'); showConnect(false); };
     ws.onmessage = (e) => {
       if (mine !== ws) return;
+      lastMsg = Date.now();
       try { st = JSON.parse(e.data); } catch (err) { return; }
       onState();
     };
@@ -296,10 +299,12 @@
     ctx.strokeStyle = 'rgba(60,40,10,.75)';
     ctx.lineWidth = 1;
     const C = (v) => m + cell * v + cell / 2; // tâm ô theo chỉ số
+    // Lưới theo Ô VUÔNG (giống bàn trên màn hình LIVE): vạch kẻ là viền ô, quân cờ nằm GIỮA ô.
     ctx.beginPath();
-    for (let i = 0; i < n; i++) {
-      ctx.moveTo(C(i), C(0)); ctx.lineTo(C(i), C(n - 1));
-      ctx.moveTo(C(0), C(i)); ctx.lineTo(C(n - 1), C(i));
+    for (let i = 0; i <= n; i++) {
+      const e = m + cell * i;
+      ctx.moveTo(e, m); ctx.lineTo(e, m + cell * n);
+      ctx.moveTo(m, e); ctx.lineTo(m + cell * n, e);
     }
     ctx.stroke();
     ctx.fillStyle = 'rgba(40,25,5,.85)';
@@ -454,6 +459,12 @@
     $('lkNhay').onclick = nhayPress;
     $('lkZoom').onclick = () => { zoom = !zoom; $('lkZoom').textContent = zoom ? '🔍 Thu nhỏ' : '🔍 Phóng to'; L = null; render(); };
     window.addEventListener('resize', () => { L = null; if (st) drawBoard(); });
+    // Giữ kết nối "sống": game gửi tin ít nhất 1,5 giây/lần. Quá 5 giây im lặng (điện thoại ngủ, đổi mạng...) thì nối lại ngay.
+    const revive = () => { if (cfg.addr && ws && Date.now() - lastMsg > 5000) connect(); };
+    setInterval(revive, 2000);
+    document.addEventListener('visibilitychange', () => { if (!document.hidden) { lastMsg = 0; revive(); } });
+    window.addEventListener('online', () => { lastMsg = 0; revive(); });
+    window.addEventListener('focus', revive);
     const tick = (t) => { pulse = t / 1000; if (hint && !hint.busy && $('viewLink').classList.contains('on')) drawBoard(); requestAnimationFrame(tick); };
     requestAnimationFrame(tick);
     setInterval(() => { if (st && hint && !hint.busy && $('viewLink').classList.contains('on')) renderStatus(); }, 1000);
