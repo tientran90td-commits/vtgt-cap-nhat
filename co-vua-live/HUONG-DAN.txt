@@ -264,3 +264,6 @@ TINH NANG MOI: SO VAN THANG LIEN TIEP / THONG BAO LAP LAI / HEN TRUOC
 LOGO TEN KENH (MOI)
 - Tren man hinh LIVE co logo goc trai phia duoi: dong tren "Tran Quynh Chi", dong duoi "live chinh".
 - Doi chu / tat bat: bang dieu khien > Cai dat > "Hien logo ten kenh", "Logo - dong tren", "Logo - dong duoi" (doi la LIVE doi theo ngay, khong can mo lai game).
+- Dang chu cua logo: Cai dat > "Logo - kieu chu" (Arial, Segoe UI, Tahoma, Georgia, Times, Impact, Comic Sans...), "Logo - mau chu" (vang kim, trang, hong, do, cam, xanh...),
+  "Logo - co chu (%)" (50-250), tich "chu dam", "chu nghieng", "co khung nen mo + vien". Doi la man hinh LIVE doi theo ngay.
+  Luu y: kieu chu phai co san tren may tinh dang chay LIVE (cac kieu tren deu co san tren Windows). Chu co dau tieng Viet hien tot nhat voi Arial, Segoe UI, Tahoma, Georgia, Times.

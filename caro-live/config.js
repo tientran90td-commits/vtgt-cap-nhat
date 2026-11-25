@@ -84,6 +84,12 @@ module.exports = {
   logoOn: true,
   logoName: 'Trần Quỳnh Chi',
   logoSub: 'live chính',
+  logoFont: 'default', // kiểu chữ: default | arial | segoe | tahoma | trebuchet | verdana | georgia | times | palatino | impact | comic | courier
+  logoSize: 100, // cỡ chữ logo, % (100 = mặc định)
+  logoColor: 'gold', // màu chữ: 'gold' (vàng kim) hoặc mã màu #rrggbb
+  logoBold: true,
+  logoItalic: false,
+  logoFrame: true, // khung nền mờ + viền quanh logo
   showCellLabels: true, // ghi tọa độ (A1, H8, O15...) mờ trong từng ô vuông để người xem biết gõ gì
   themeAuto: true, // mỗi ván đổi màu bàn cờ, màu phòng, tóc/áo 2 nhân vật
   crowdMax: 10, // số khán giả (tên + ảnh đại diện) hiện thành nhân vật đứng quanh phòng, 0 = tắt

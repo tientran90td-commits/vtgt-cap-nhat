@@ -525,11 +525,25 @@ function themeTick(s) {
 }
 
 // ---------------------------------------------------------------- logo tên kênh
+const LOGO_FONTS = {
+  default: 'inherit',
+  arial: 'Arial, "Helvetica Neue", sans-serif',
+  segoe: '"Segoe UI", Roboto, sans-serif',
+  tahoma: 'Tahoma, Verdana, sans-serif',
+  trebuchet: '"Trebuchet MS", sans-serif',
+  verdana: 'Verdana, Geneva, sans-serif',
+  georgia: 'Georgia, serif',
+  times: '"Times New Roman", Times, serif',
+  palatino: '"Palatino Linotype", Palatino, serif',
+  impact: 'Impact, "Arial Black", sans-serif',
+  comic: '"Comic Sans MS", "Comic Neue", cursive',
+  courier: '"Courier New", monospace',
+};
 let logoKey = '';
 function renderLogo(s) {
   const st = (s && s.settings) || {};
   const on = st.logoOn !== false && !!(st.logoName || st.logoSub);
-  const key = on ? (st.logoName || '') + '|' + (st.logoSub || '') : '';
+  const key = on ? JSON.stringify([st.logoName, st.logoSub, st.logoFont, st.logoSize, st.logoColor, st.logoBold, st.logoItalic, st.logoFrame]) : '';
   if (key === logoKey) return;
   logoKey = key;
   const box = $('logo');
@@ -537,6 +551,14 @@ function renderLogo(s) {
   setText($('logoName'), st.logoName || '');
   setText($('logoSub'), st.logoSub || '');
   $('logoSub').style.display = st.logoSub ? '' : 'none';
+  box.style.fontFamily = LOGO_FONTS[st.logoFont] || LOGO_FONTS.default;
+  box.style.setProperty('--logo-scale', String((Number(st.logoSize) || 100) / 100));
+  box.style.fontWeight = st.logoBold === false ? '400' : '900';
+  box.style.fontStyle = st.logoItalic ? 'italic' : 'normal';
+  box.classList.toggle('noframe', st.logoFrame === false);
+  const solid = st.logoColor && st.logoColor !== 'gold' && /^#[0-9a-fA-F]{6}$/.test(st.logoColor) ? st.logoColor : '';
+  box.classList.toggle('solid', !!solid);
+  box.style.setProperty('--logo-color', solid || '#ffc94a');
 }
 
 // ---------------------------------------------------------------- vòng lặp

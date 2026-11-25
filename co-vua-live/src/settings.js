@@ -22,8 +22,10 @@ const NUMBERS = {
   idleHintSeconds: [0, 120],
   crowdMax: [0, 14],
   clockSeconds: [0, 60],
+  logoSize: [50, 250],
 };
-const BOOLS = ['winnerStays', 'hostCanPlay', 'autoNextGame', 'showSign', 'showCellLabels', 'themeAuto', 'celebrateOn', 'logoOn'];
+const BOOLS = ['winnerStays', 'hostCanPlay', 'autoNextGame', 'showSign', 'showCellLabels', 'themeAuto', 'celebrateOn', 'logoOn', 'logoBold', 'logoItalic', 'logoFrame'];
+const LOGO_FONTS = ['default', 'arial', 'segoe', 'tahoma', 'trebuchet', 'verdana', 'georgia', 'times', 'palatino', 'impact', 'comic', 'courier'];
 const TEXTS = { logoName: 40, logoSub: 40 }; // chữ tự gõ: tối đa bấy nhiêu ký tự
 
 class Settings {
@@ -57,6 +59,14 @@ class Settings {
         c[k] = v;
         changed.push(k);
       }
+    }
+    if (typeof patch.logoFont === 'string' && LOGO_FONTS.includes(patch.logoFont) && c.logoFont !== patch.logoFont) {
+      c.logoFont = patch.logoFont;
+      changed.push('logoFont');
+    }
+    if (typeof patch.logoColor === 'string' && (patch.logoColor === 'gold' || /^#[0-9a-fA-F]{6}$/.test(patch.logoColor)) && c.logoColor !== patch.logoColor) {
+      c.logoColor = patch.logoColor;
+      changed.push('logoColor');
     }
     for (const [k, max] of Object.entries(TEXTS)) {
       if (typeof patch[k] !== 'string') continue;
@@ -134,6 +144,8 @@ class Settings {
     for (const k of Object.keys(NUMBERS)) out[k] = c[k];
     for (const k of BOOLS) out[k] = c[k];
     for (const k of Object.keys(TEXTS)) out[k] = c[k] === undefined ? '' : c[k];
+    out.logoFont = c.logoFont || 'default';
+    out.logoColor = c.logoColor || 'gold';
     return out;
   }
 
