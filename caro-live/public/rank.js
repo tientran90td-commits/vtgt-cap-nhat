@@ -1,7 +1,7 @@
 /*
  * CẢNH GIỚI (RANK) - phần giao diện (module riêng):
  *  - frameFor(tier): đặt khung avatar theo cấp (đẹp dần từ Phàm Nhân tới Hóa Thần, giao diện ở rank.css)
- *  - renderRankBoard(state, setAvatar): vẽ bảng xếp hạng rank dưới bảng tu vi
+ *  - renderRankBoard(state, setAvatar): vẽ bảng xếp hạng rank dưới bảng cơ duyên
  * Dữ liệu cấp bậc do server tính (src/rank.js) và gửi kèm state: players[X|O].rank, rankBoard[].
  */
 export const TIER_NAMES = ['Phàm Nhân', 'Luyện Khí', 'Trúc Cơ', 'Kết Đan', 'Nguyên Anh', 'Hóa Thần'];

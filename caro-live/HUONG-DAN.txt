@@ -188,7 +188,7 @@ CANH GIOI (RANK) VA KHUNG AVATAR
 - 6 canh gioi: Pham Nhan -> Luyen Khi -> Truc Co -> Ket Dan -> Nguyen Anh -> Hoa Than. Rank tinh theo TONG SO VAN THANG.
 - So diem can de len tung bac: sua dong rankWins trong config.js. Mac dinh [2, 4, 6, 8, 12]
   (Pham Nhan thang 2 van len Luyen Khi, Luyen Khi thang them 4 van len Truc Co, ... tong 32 van la Hoa Than).
-- Bang CANH GIOI nam duoi bang tu vi: ten, avatar co khung, canh gioi, thang bao nhieu/bao nhieu tran de len cap ke.
+- Bang CANH GIOI nam duoi bang co duyen: ten, avatar co khung, canh gioi, thang bao nhieu/bao nhieu tran de len cap ke.
   So nguoi hien tren bang: dong rankBoardRows trong config.js (mac dinh 4).
 - Rank duoc luu trong data\thanh-tich.json (cung file thanh tich), nen tat game, nguoi choi thoat ra vao lai van con rank.
   Muon lam lai tu dau: xoa file data\thanh-tich.json khi da tat game.

@@ -740,7 +740,7 @@ class Match {
     if (this.phase !== 'playing') return null;
     const lines = ['⌨ Xuất chiêu bằng tọa độ: j9 · k6 · ca 6', '👻 Bình luận không hiện? Thêm @ hoặc @@ trước (vd @@j9)'];
     if ((Number(this.cfg.extraTimesPerGame) || 0) > 0) lines.push('⏳ Gõ !them để xin thêm thời gian');
-    lines.push('📊 Gõ !diem để xem tu vi (điểm) của đạo hữu');
+    lines.push('📊 Gõ !diem để xem cơ duyên (điểm) của đạo hữu');
     return { lines, pulse: now < (this.signPulseUntil || 0) };
   }
 

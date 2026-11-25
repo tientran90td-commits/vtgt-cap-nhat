@@ -1,5 +1,5 @@
 /* ===== CẢNH GIỚI (RANK): khung avatar + bảng xếp hạng rank. Module riêng (rank.js) ===== */
-/* cột bên phải: bảng tu vi (trên) + bảng rank (dưới) */
+/* cột bên phải: bảng cơ duyên (trên) + bảng rank (dưới) */
 #rightCol { position: absolute; right: 0.35rem; top: 0.4rem; z-index: 6; width: 10.4rem; display: flex; flex-direction: column; gap: 0.3rem; }
 #rightCol #rank { position: static; width: auto; }
 

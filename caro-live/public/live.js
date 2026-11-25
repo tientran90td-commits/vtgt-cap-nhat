@@ -231,13 +231,13 @@ function renderRank(s) {
   const key = JSON.stringify([s.top.map((u) => [u.id, u.points, u.name, u.mark]), s.phase, need]);
   if (key === rankKey) return;
   rankKey = key;
-  setText($('rankNote'), `Top ${need} đấu ván kế • gõ !diem xem hạng`);
+  setText($('rankNote'), 'Đủ tiên duyên lên đài đánh cờ');
   const ol = $('rankList');
   ol.replaceChildren();
   if (!s.top.length) {
     const li = document.createElement('li');
     li.className = 'hint';
-    li.textContent = 'Bình luận / thả tim / tặng quà để lên bảng tu vi!';
+    li.textContent = 'Bình luận / thả tim / tặng quà để lên bảng cơ duyên!';
     ol.appendChild(li);
     return;
   }
