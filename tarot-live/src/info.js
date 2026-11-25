@@ -126,6 +126,14 @@ function lifePath(dob) {
   return { n, trait: LIFE[n] };
 }
 
+/** Tuổi tính đến hôm nay. */
+function ageOf(dob, now = new Date()) {
+  if (!dob) return null;
+  let a = now.getFullYear() - dob.y;
+  if (now.getMonth() + 1 < dob.m || (now.getMonth() + 1 === dob.m && now.getDate() < dob.d)) a--;
+  return a;
+}
+
 /** Thông tin đã xử lý, an toàn để hiện lên màn hình (không có nguyên ngày sinh). */
 function profile(info) {
   if (!info) return null;
@@ -141,4 +149,4 @@ function profile(info) {
   };
 }
 
-module.exports = { parseInfo, mergeInfo, findDate, zodiacOf, lifePath, profile };
+module.exports = { parseInfo, mergeInfo, findDate, zodiacOf, lifePath, ageOf, profile };
