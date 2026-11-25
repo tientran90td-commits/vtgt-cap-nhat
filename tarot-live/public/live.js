@@ -121,7 +121,32 @@ function render() {
   const box = $('cards');
   const slots = [...box.children];
 
+  const cb = $('collectBox');
+  const col = !cur && S.collect;
+  const prep = !cur && S.preparing;
+  cb.classList.toggle('hidden', !col);
+  stage.classList.toggle('collecting', !!col);
+  if (col) {
+    $('cbName').textContent = S.collect.name;
+    $('cbSec').textContent = Math.max(0, Math.ceil((S.collect.until - now) / 1000));
+  }
+  if (!cur && (col || prep)) {
+    $('who').style.visibility = 'hidden';
+    box.classList.toggle('shuffle', !!prep);
+    const k = col ? 'collect' + S.collect.name : 'prep' + S.preparing.name;
+    if (lastStep !== k) {
+      lastStep = k;
+      if (col) setPanel('Chờ thông tin của bạn…', '', '', `${S.collect.name} ơi, hãy bình luận họ tên, ngày tháng năm sinh và chuyện bạn muốn xem.`);
+      else {
+        sfx.shuffle();
+        setPanel('Đang xáo bài…', '', '', `${S.preparing.name}, mình đang chuẩn bị lời đọc cho bạn…`);
+      }
+    }
+    return;
+  }
+
   if (!cur) {
+    box.classList.remove('shuffle');
     $('who').style.visibility = 'hidden';
     if (lastStep !== -2) {
       lastStep = -2;

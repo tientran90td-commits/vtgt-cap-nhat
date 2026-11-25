@@ -33,4 +33,11 @@ function parseRequest(text) {
   return { spread, topic, sensitive: SENSITIVE.test(f) };
 }
 
-module.exports = { parseRequest, fold };
+/** Đoán chủ đề từ 1 câu (dùng cho "chuyện muốn xem"). found = có nhắc tới chủ đề cụ thể. */
+function detectTopic(text) {
+  const f = fold(text);
+  const topic = LOVE.test(f) ? 'love' : WORK.test(f) ? 'work' : 'general';
+  return { topic, sensitive: SENSITIVE.test(f), found: topic !== 'general' || SENSITIVE.test(f) };
+}
+
+module.exports = { parseRequest, fold, detectTopic };

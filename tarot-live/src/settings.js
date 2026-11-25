@@ -13,8 +13,10 @@ const NUMBERS = {
   autoIdleSeconds: [10, 300],
   announceEvery: [0, 30],
   voiceVolume: [0, 1],
+  collectSeconds: [15, 180],
+  aiTimeout: [3, 25],
 };
-const BOOLS = ['allowThree', 'allowFive', 'autoDraw', 'giftPriority', 'voiceOn', 'paused'];
+const BOOLS = ['allowThree', 'allowFive', 'autoDraw', 'giftPriority', 'voiceOn', 'paused', 'askInfo'];
 const SPEEDS = ['slow', 'normal', 'fast'];
 
 class Settings {
@@ -40,6 +42,8 @@ class Settings {
     for (const k of BOOLS) if (patch[k] != null) this.v[k] = !!patch[k];
     if (patch.defaultSpread != null) this.v.defaultSpread = [3, 5].includes(Number(patch.defaultSpread)) ? Number(patch.defaultSpread) : 1;
     if (SPEEDS.includes(patch.readSpeed)) this.v.readSpeed = patch.readSpeed;
+    if (['off', 'claude', 'gemini'].includes(patch.aiProvider)) this.v.aiProvider = patch.aiProvider;
+    if (typeof patch.aiModel === 'string') this.v.aiModel = patch.aiModel.replace(/[^\w.\-]/g, '').slice(0, 60);
     for (const k of ['title', 'subtitle']) {
       if (typeof patch[k] === 'string') {
         const s = norm(patch[k]).slice(0, 40);

@@ -73,6 +73,10 @@
           <select id="drTopic"><option value="general">Tổng quát</option><option value="love">Tình duyên</option><option value="work">Công việc - học tập</option></select>
           <button id="btnDraw" class="primary">Rút ngay</button>
         </div>
+        <div class="row">
+          <input type="text" id="drDob" placeholder="Ngày sinh (không bắt buộc): 20/08/1998" maxlength="12">
+          <input type="text" id="drQuestion" placeholder="Chuyện muốn xem (không bắt buộc)" maxlength="100">
+        </div>
         <div class="btnrow small"><button id="btnTest1">🎲 Chạy thử 1 lá</button><button id="btnTest3">🎲 Chạy thử 3 lá</button><button id="btnTest5">🎲 Chạy thử 5 lá</button><button id="btnVoice">🔊 Thử giọng đọc</button></div>
         <p class="hint tiny" id="voiceInfo"></p>
       </div>
@@ -101,6 +105,13 @@
           <label class="chk"><input type="checkbox" id="autoDraw"> Không ai xin thì tự rút “thông điệp cho cả phòng”</label>
           <label>Sau bao nhiêu giây vắng người thì tự rút<input type="number" id="autoIdleSeconds" min="10" max="300"></label>
           <label class="chk"><input type="checkbox" id="giftPriority"> Người từng tặng quà được xếp lên trước trong hàng chờ</label>
+          <label class="chk"><input type="checkbox" id="askInfo"> Người được chọn phải bình luận họ tên, ngày/tháng/năm sinh, chuyện muốn xem</label>
+          <label>Thời gian chờ người đó bình luận (giây)<input type="number" id="collectSeconds" min="15" max="180"></label>
+          <label>AI viết lời đọc
+            <select id="aiProvider"><option value="off">Tắt (dùng lời viết sẵn)</option><option value="claude">Claude</option><option value="gemini">Gemini</option></select></label>
+          <label>Tên mẫu AI (để trống = mặc định)<input type="text" id="aiModel" maxlength="60" placeholder="claude-haiku-5-5 hoặc gemini-2.5-flash"></label>
+          <label>Chờ AI tối đa (giây)<input type="number" id="aiTimeout" min="3" max="25"></label>
+          <p class="hint tiny" id="aiKeyInfo"></p>
           <label class="chk"><input type="checkbox" id="voiceOn"> Bật giọng đọc (MC)</label>
           <label>Âm lượng giọng đọc (0 - 1)<input type="number" id="voiceVolume" min="0" max="1" step="0.1"></label>
         </form>

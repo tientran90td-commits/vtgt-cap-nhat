@@ -64,8 +64,10 @@ $('btnClear').onclick = () => {
 };
 $('btnPause').onclick = () => cmd('set', { values: { paused: !(S && S.settings.paused) } });
 $('btnDraw').onclick = () => {
-  cmd('draw', { name: $('drName').value, spread: $('drSpread').value, topic: $('drTopic').value });
+  cmd('draw', { name: $('drName').value, spread: $('drSpread').value, topic: $('drTopic').value, dob: $('drDob').value, question: $('drQuestion').value });
   $('drName').value = '';
+  $('drDob').value = '';
+  $('drQuestion').value = '';
 };
 $('btnTest1').onclick = () => cmd('testDraw', { spread: 1 });
 $('btnTest3').onclick = () => cmd('testDraw', { spread: 3 });
@@ -80,7 +82,7 @@ $('btnAnnounce').onclick = () => {
 };
 
 // ------------------------------------------------------------ cài đặt (tự lưu)
-const FIELDS = ['title', 'subtitle', 'defaultSpread', 'allowThree', 'allowFive', 'reverseChance', 'userCooldown', 'maxQueue', 'readSpeed', 'autoDraw', 'autoIdleSeconds', 'giftPriority', 'voiceOn', 'voiceVolume', 'announceText', 'announceEvery'];
+const FIELDS = ['title', 'subtitle', 'defaultSpread', 'allowThree', 'allowFive', 'reverseChance', 'userCooldown', 'maxQueue', 'readSpeed', 'autoDraw', 'autoIdleSeconds', 'giftPriority', 'voiceOn', 'voiceVolume', 'announceText', 'announceEvery', 'askInfo', 'collectSeconds', 'aiProvider', 'aiModel', 'aiTimeout'];
 
 function fillForm(set) {
   for (const k of FIELDS) {
@@ -126,9 +128,13 @@ function render(s) {
   tt.textContent = 'TikTok: ' + (s.connection.text || '…');
   tt.className = 'chip ' + (s.connection.status === 'connected' || s.connection.status === 'demo' ? 'on' : s.connection.status === 'error' ? 'err' : 'wait');
   const ph = $('chipPhase');
-  ph.textContent = s.current ? '🎴 Đang bói' : s.settings.paused ? '⏸ Tạm ngưng' : '⏳ Đang chờ';
+  ph.textContent = s.current ? '🎴 Đang bói' : s.collect ? '📝 Chờ thông tin' : s.preparing ? '🤖 AI đang viết' : s.settings.paused ? '⏸ Tạm ngưng' : '⏳ Đang chờ';
   $('btnPause').textContent = s.settings.paused ? '▶ Mở lại nhận lượt mới' : '⏸ Tạm ngưng nhận lượt mới';
   $('voiceInfo').textContent = voice.describe();
+  const ki = $('aiKeyInfo');
+  if (s.ai.provider === 'off') ki.textContent = 'AI đang tắt: game đọc bằng lời viết sẵn.';
+  else if (!s.ai.hasKey) ki.textContent = '⚠️ Chưa thấy file ai-api-key.txt cạnh file CHAY-GAME.bat nên game vẫn đọc bằng lời viết sẵn.';
+  else ki.textContent = '✅ Đã thấy khóa AI. Nếu AI lỗi hoặc quá chậm, game tự đọc bằng lời viết sẵn.';
 
   const c = s.current;
   if (!c) setHtml('cur', 'Chưa có lượt nào đang chạy. Khi có người xin bài, lượt sẽ tự bắt đầu.');

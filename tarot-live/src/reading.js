@@ -53,8 +53,18 @@ function roleText(c, rev, topic, pos) {
   return cardText(c, rev, topic);
 }
 
+/** Lời chào đầu buổi: có thể kèm cung hoàng đạo, số chủ đạo, chuyện muốn xem (nếu người xem đã cung cấp). */
+function introText(name, profile, sensitive, rnd = Math.random) {
+  let t = pick(INTRO, rnd)(name);
+  if (profile && profile.zodiac) t += ` Bạn thuộc cung ${profile.zodiac}, thường được mô tả là ${profile.zodiacTrait}.`;
+  if (profile && profile.lifeNo) t += ` Số chủ đạo của bạn là ${profile.lifeNo}, gắn với tính cách ${profile.lifeTrait}.`;
+  if (profile && profile.question && !sensitive) t += ` Chuyện bạn muốn xem: ${profile.question}.`;
+  if (sensitive) t += ' ' + SENSITIVE_NOTE;
+  return t;
+}
+
 /**
- * drawn: [{card, rev}]  user: {name, avatar}  opts: { topic, sensitive, speed, number (đếm lượt để thỉnh thoảng nhắc lưu ý), rng }
+ * drawn: [{card, rev}]  user: {name, avatar}  opts: { profile, ai: {cards, summary}, skipIntro, { topic, sensitive, speed, number (đếm lượt để thỉnh thoảng nhắc lưu ý), rng }
  */
 function build(drawn, user, opts = {}) {
   const rnd = opts.rng || Math.random;
@@ -72,13 +82,15 @@ function build(drawn, user, opts = {}) {
     rev: d.rev,
     pos: positions[i],
     kw: d.rev ? d.card.kRev : d.card.kUp,
-    text: roleText(d.card, d.rev, topic, positions[i]),
+    text: opts.ai && opts.ai.cards[i] ? opts.ai.cards[i] : roleText(d.card, d.rev, topic, positions[i]),
   }));
 
   const steps = [];
-  let intro = pick(INTRO, rnd)(user.name);
-  if (opts.sensitive) intro += ' ' + SENSITIVE_NOTE;
-  steps.push({ kind: 'shuffle', say: intro, dur: dur(intro, 5000) });
+  if (opts.skipIntro) steps.push({ kind: 'shuffle', say: '', dur: fast ? 1200 : 1800 }); // lời chào đã nói ở bước chuẩn bị
+  else {
+    const intro = introText(user.name, opts.profile, opts.sensitive, rnd);
+    steps.push({ kind: 'shuffle', say: intro, dur: dur(intro, 5000) });
+  }
 
   const flipAll = spread > 1; // 3 / 5 lá: luôn úp cả bài, lật hết 1 lượt rồi mới đọc từng lá
   if (flipAll) {
@@ -95,7 +107,7 @@ function build(drawn, user, opts = {}) {
   if (spread > 1) {
     const kws = cards.map((c) => c.kw.split(',')[0].trim());
     const list = kws.slice(0, -1).join(', ') + ' và ' + kws[kws.length - 1];
-    const sum = `Tổng kết: ${spread === 3 ? 'ba' : 'năm'} từ khóa dành cho bạn là ${list}. Hãy xem ${spread === 3 ? 'ba' : 'năm'} lá bài như một câu chuyện gợi mở để suy ngẫm, quyết định luôn nằm ở bạn.`;
+    const sum = opts.ai && opts.ai.summary ? `Tổng kết: ${opts.ai.summary}` : `Tổng kết: ${spread === 3 ? 'ba' : 'năm'} từ khóa dành cho bạn là ${list}. Hãy xem ${spread === 3 ? 'ba' : 'năm'} lá bài như một câu chuyện gợi mở để suy ngẫm, quyết định luôn nằm ở bạn.`;
     steps.push({ kind: 'sum', say: sum, dur: dur(sum, 4500) });
   }
   let out = pick(OUTRO, rnd);
@@ -107,7 +119,7 @@ function build(drawn, user, opts = {}) {
     s.at = at;
     at += s.dur;
   }
-  return { cards, steps, total: at, flipAll, topic, topicLabel: TOPIC_LABEL[topic], spread };
+  return { cards, steps, total: at, flipAll, ai: !!opts.ai, profile: opts.profile || null, topic, topicLabel: TOPIC_LABEL[topic], spread };
 }
 
-module.exports = { build, TOPIC_LABEL, DISCLAIMER };
+module.exports = { build, introText, TOPIC_LABEL, DISCLAIMER, POS };

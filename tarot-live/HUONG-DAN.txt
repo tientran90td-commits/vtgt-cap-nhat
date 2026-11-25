@@ -48,3 +48,21 @@ Chi mang tinh GIAI TRI va goi mo. Game KHONG du doan suc khoe, tien bac, sinh tu
    - Mat ket noi TikTok / TikFinity thi game tu noi lai.
    - Cap nhat: bang dieu khien -> "Kiem tra ban moi" -> "Cap nhat ngay" (giu nguyen cai dat va ID TikTok).
    - Xem them TIEU-CHUAN-TIKTOK.txt.
+
+7) HOI THONG TIN NGUOI DUOC CHON (mac dinh BAT)
+   - Den luot ai, man hinh hien khung dem nguoc (60 giay): nguoi do binh luan  ho ten, ngay/thang/nam sinh, chuyen muon xem.
+     Vi du:  Lan, 20/08/1998, tinh duyen   hoac   Ten Minh sinh ngay 3 thang 8 nam 1990 muon xem cong viec
+     Co the chia lam nhieu binh luan. Du ngay sinh + (ten hoac chuyen muon xem) thi game bat dau sau 3 giay. Het gio ma chua gui thi doc thong diep chung.
+   - Game tinh CUNG HOANG DAO va SO CHU DAO tu ngay sinh, MC noi trong loi chao. Man hinh KHONG hien ngay sinh, game KHONG luu ngay sinh / cau hoi ra file.
+   - Tat o Cai dat: bo dau "Nguoi duoc chon phai binh luan...". Chu phong tu rut cung co o nhap ngay sinh / chuyen muon xem.
+   - Cau hoi ve suc khoe, tien bac, kien tung, co bac...: van doc nhung chi thong diep chung.
+
+8) AI VIET LOI DOC (khong bat buoc, mac dinh TAT)
+   - Dung de moi lan rut deu co loi doc rieng theo ten, cung, chuyen muon xem va dung cac la da rut. Trai 5 la doc khoang 2 phut.
+   - Cach bat: tao file  ai-api-key.txt  (cung thu muc voi CHAY-GAME.bat), chi dan 1 dong la khoa API (khong them chu nao khac).
+     Roi vao bang dieu khien > Cai dat > "AI viet loi doc" chon Claude hoac Gemini. De trong "Ten mau AI" de dung mau mac dinh.
+   - Game gui cho AI: ten, cung hoang dao, so chu dao, chu de, chuyen muon xem (da loc), ten + vi tri + xuoi/nguoc cua cac la. KHONG gui ngay sinh day du.
+     Xem mau form o file  MAU-FORM-AI.txt.
+   - AI loi / cham qua 9 giay / tra ve noi dung la (link, so dien thoai, tu cam) -> game tu doc bang loi viet san, khong bi dung.
+   - Chi phi: tinh theo luot, bang gia cua nha cung cap. Khoa bi lo thi doi khoa ngay. File ai-api-key.txt khong nam trong file zip / kho GitHub.
+   - Goi Gemini mien phi co the bi Google dung du lieu de cai thien san pham: nen biet truoc khi dung.

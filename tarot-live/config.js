@@ -48,5 +48,10 @@ module.exports = {
     announceText: '',
     announceEvery: 0, // phút (0 = tắt)
     paused: false, // tạm ngưng nhận lượt mới
+    askInfo: true, // người được chọn phải bình luận họ tên, ngày/tháng/năm sinh, chuyện muốn xem
+    collectSeconds: fast ? 4 : 60, // thời gian chờ người đó bình luận
+    aiProvider: 'off', // off | claude | gemini (cần file ai-api-key.txt)
+    aiModel: '', // để trống = dùng mẫu mặc định
+    aiTimeout: 9, // giây chờ AI, quá hạn thì dùng lời đọc viết sẵn
   },
 };

@@ -22,3 +22,9 @@ CHU PHONG NEN LAM
 CHUA THE DAM BAO
 - Khong the cam ket TikTok se khong nhac nho. Game doc binh luan qua thu vien khong chinh thuc (tiktok-live-connector) hoac TikFinity.
 - Game chua duoc thu tren LIVE that qua nhieu gio; hay theo doi 1-2 buoi dau.
+
+LUU Y RIENG TU KHI HOI NGAY SINH / DUNG AI
+   - Khong yeu cau gui ngay sinh o cho khac, chi binh luan trong phong. Khong doc to ngay sinh day du len man hinh.
+   - Neu nguoi xem tu xung duoi 18 tuoi, nen noi ro "ban co the bo qua ngay sinh, chi can ten va chuyen muon xem".
+   - Khi dung AI nen noi o phan mo ta: "loi doc co ho tro boi AI, chi mang tinh giai tri".
+   - Chua kiem tra chinh sach TikTok ve noi dung boi toan / Tarot: ban tu doc muc quy dinh cong dong truoc khi phat.

@@ -96,3 +96,12 @@ body.nobg #stars { display: none; }
 #announce { position: absolute !important; left: 1.6rem; right: 1.6rem; top: 7.2rem; padding: .9rem 1.2rem; border-radius: 1rem; z-index: 5; text-align: center;
   background: #1b103dee; border: .12rem solid var(--gold); font-size: 1.5rem; box-shadow: 0 0 1.6rem #000a; animation: fadein .6s ease; }
 #unlock { position: absolute !important; left: 50%; bottom: 4rem; transform: translateX(-50%); background: #c4402ddd; padding: .6rem 1.2rem; border-radius: 99rem; font-size: 1.3rem; z-index: 9; cursor: pointer; }
+
+/* hỏi thông tin người được chọn */
+#collectBox { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 6; width: 90%; text-align: center; padding: 1.6rem 1.2rem; border-radius: 1.6rem; background: rgba(20, 10, 45, .88); border: .15rem solid rgba(255, 215, 120, .7); box-shadow: 0 0 3rem rgba(160, 100, 255, .5); }
+#collectBox.hidden { display: none; }
+#collectBox .cbTitle { font-size: 2.6rem; color: #ffe29a; }
+#collectBox .cbAsk { font-size: 2rem; margin-top: .8rem; color: #fff; }
+#collectBox .cbEx { font-size: 1.6rem; margin-top: .6rem; color: #cbb8ff; }
+#collectBox .cbTime { font-size: 3rem; margin-top: .8rem; color: #ffd36b; font-weight: 700; }
+#stage.collecting #idleMsg { display: none; }

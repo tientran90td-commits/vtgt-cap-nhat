@@ -6,7 +6,9 @@
 const path = require('path');
 const { Settings } = require('./settings');
 const { draw } = require('./deck');
-const { build } = require('./reading');
+const { build, introText, TOPIC_LABEL, POS } = require('./reading');
+const ai = require('./ai');
+const { parseInfo, mergeInfo, findDate, profile } = require('./info');
 const { parseRequest } = require('./parse');
 const { checkAnnouncement } = require('./safety');
 
@@ -32,6 +34,7 @@ class Hub {
     this.lastAnnounce = Date.now();
     this.announceShow = null;
     this.users = new Map(); // người xem đã thấy (để hiện số người tương tác)
+    this.phase = null; // giai đoạn trước khi bói: {kind:'collect'|'prepare', ...}
     this.interaction = null; // (tiktok.js hỏi, không dùng ở game này)
   }
 
@@ -54,6 +57,7 @@ class Hub {
   onComment(user, text, now = Date.now()) {
     this.users.set(user.id, now);
     const req = parseRequest(text);
+    if (!req && this.phase && this.phase.kind === 'collect' && this.phase.item.userId === user.id) return this.onInfo(user, text, now);
     if (!req) return null;
     return this.request(user, req, now);
   }
@@ -121,26 +125,101 @@ class Hub {
     this.feed(`➕ ${user.name} đã follow, chào mừng!`, 'gift');
   }
 
-  // ---------------------------------------------------------------- chạy buổi bói
-  start(item, now) {
+  // ---------------------------------------------------------------- nhận thông tin người được chọn
+  /** Người được chọn bình luận họ tên / ngày sinh / chuyện muốn xem. */
+  onInfo(user, text, now) {
+    const ph = this.phase;
+    const got = parseInfo(text, user.name);
+    if (!got.dob && !got.name && !got.question) return null;
+    ph.info = ph.info ? mergeInfo(ph.info, got) : got;
+    const i = ph.info;
+    if (!ph.ack) {
+      ph.ack = true;
+      this.feed(`📝 Đã nhận thông tin của ${user.name}`, 'req');
+    }
+    // đủ ngày sinh + (tên hoặc chuyện muốn xem) thì chốt sau 3 giây (chờ thêm bình luận bổ sung)
+    if (i.dob && (i.name || i.question)) ph.until = Math.min(ph.until, now + (this.cfg.fast ? 300 : 3000));
+    return { ok: true };
+  }
+
+  /** Bắt đầu 1 lượt: hỏi thông tin (nếu bật) -> nhờ AI viết lời đọc (nếu bật) -> bói. */
+  begin(item, now) {
     const s = this.settings.v;
+    const manual = !item.userId; // chủ phòng tự rút, hoặc lượt tự động
+    if (s.askInfo && !manual && !item.info) {
+      this.phase = { kind: 'collect', item, info: null, until: now + s.collectSeconds * 1000, startedAt: now };
+      this.cue(`${item.name} ơi, đến lượt bạn rồi. Bạn hãy bình luận họ tên, ngày tháng năm sinh và chuyện muốn xem nhé. Ví dụ: ${item.name}, 20 tháng 8 năm 1998, tình duyên.`, 3);
+      return;
+    }
+    this.prepare(item, item.info || null, now);
+  }
+
+  prepare(item, info, now) {
+    const s = this.settings.v;
+    const prof = info ? profile(info) : null;
+    const topic = item.topic !== 'general' ? item.topic : info ? info.topic : 'general';
+    const sensitive = !!item.sensitive || !!(info && info.sensitive);
+    const name = (info && info.name) || item.name;
     const drawn = draw(item.spread, s.reverseChance);
-    const reading = build(drawn, { name: item.name }, {
-      topic: item.topic,
-      sensitive: item.sensitive,
+    const job = { item, info, prof, topic, sensitive, name, drawn };
+    const useAi = (s.aiProvider === 'claude' || s.aiProvider === 'gemini') && ai.hasKey();
+    if (!useAi) return this.start(job, now, null, false);
+    // AI đang viết: MC nói lời chào trong lúc chờ
+    const intro = introText(name, prof, sensitive);
+    this.cue(intro, 3);
+    const positions = POS[item.spread][sensitive ? 'general' : topic];
+    const req = {
+      name,
+      profile: prof,
+      sensitive,
+      topicLabel: TOPIC_LABEL[sensitive ? 'general' : topic],
+      cards: drawn.map((d, i) => ({ pos: positions[i], vi: d.card.vi, rev: d.rev, kw: d.rev ? d.card.kRev : d.card.kUp })),
+    };
+    const ph = { kind: 'prepare', job, until: now + (Number(s.aiTimeout) + 3) * 1000, startedAt: now, result: undefined };
+    this.phase = ph;
+    ai.generate(req, s).then(
+      (r) => { ph.result = r; },
+      (e) => { ph.result = null; this.feed(`⚠️ AI không dùng được (${String(e.message).slice(0, 60)}), đọc bằng lời viết sẵn`, 'warn'); },
+    );
+  }
+
+  // ---------------------------------------------------------------- chạy buổi bói
+  start(job, now, aiResult, skipIntro) {
+    const s = this.settings.v;
+    const reading = build(job.drawn, { name: job.name }, {
+      topic: job.topic,
+      sensitive: job.sensitive,
       speed: s.readSpeed,
       number: this.count,
       fast: this.cfg.fast,
+      profile: job.prof,
+      ai: aiResult || null,
+      skipIntro: !!skipIntro,
     });
     this.count++;
+    this.phase = null;
+    const item = job.item;
     this.current = {
       id: ++this.seq,
       userId: item.userId || '',
-      user: { name: item.name, avatar: item.avatar || '' },
+      user: { name: job.name, avatar: item.avatar || '' },
       auto: !!item.auto,
       startedAt: now,
       ...reading,
     };
+  }
+
+  /** Chuyển giai đoạn: hết giờ hỏi thông tin -> chuẩn bị; AI xong hoặc quá hạn -> bói. */
+  phaseTick(now) {
+    const ph = this.phase;
+    if (!ph) return;
+    if (ph.kind === 'collect') {
+      if (now < ph.until) return;
+      this.prepare(ph.item, ph.info, now);
+    } else if (ph.kind === 'prepare') {
+      if (ph.result === undefined && now < ph.until) return;
+      this.start(ph.job, now, ph.result || null, true);
+    }
   }
 
   finish(now) {
@@ -160,15 +239,16 @@ class Hub {
   tick(now = Date.now()) {
     const s = this.settings.v;
     if (this.current && now >= this.current.startedAt + this.current.total) this.finish(now);
-    if (!this.current && now >= this.nextAt) {
+    if (!this.current && this.phase) this.phaseTick(now);
+    if (!this.current && !this.phase && now >= this.nextAt) {
       if (this.queue.length) {
-        this.start(this.queue.shift(), now);
+        this.begin(this.queue.shift(), now);
       } else if (s.autoDraw && now - this.idleSince >= s.autoIdleSeconds * 1000) {
-        this.start({ name: 'Cả phòng', spread: 1, topic: 'general', auto: true }, now);
+        this.begin({ name: 'Cả phòng', spread: 1, topic: 'general', auto: true }, now);
       }
     }
     // nhắc khán giả cách gõ lệnh khi màn hình đang chờ
-    if (!this.current && !s.paused && now >= this.nextInvite) {
+    if (!this.current && !this.phase && !s.paused && now >= this.nextInvite) {
       this.nextInvite = now + 60000;
       this.cue('Bạn nào muốn rút bài Tarot thì gõ chữ !bai vào bình luận nhé. Gõ !bai 3 để rút ba lá.', 1);
     }
@@ -195,6 +275,7 @@ class Hub {
       case 'set':
         return this.settings.apply(msg.values || {});
       case 'skip':
+        if (this.phase) this.phase = null;
         if (this.current) this.finish(now);
         return { ok: true };
       case 'clear':
@@ -217,14 +298,18 @@ class Hub {
         const name = String(msg.name || '').trim().slice(0, 30) || 'Bạn';
         const spread = [3, 5].includes(Number(msg.spread)) ? Number(msg.spread) : 1;
         const topic = ['love', 'work'].includes(msg.topic) ? msg.topic : 'general';
-        this.queue.unshift({ id: ++this.seq, userId: '', name, avatar: '', spread, topic, sensitive: false, vip: true, at: 0 });
+        const dob = findDate(String(msg.dob || ''));
+        const q = parseInfo(String(msg.question || ''), name);
+        const info = dob || q.question ? { name: '', dob: dob ? { d: dob.d, m: dob.m, y: dob.y } : null, question: q.question, topic: q.topic, sensitive: q.sensitive } : null;
+        this.queue.unshift({ id: ++this.seq, userId: '', name, avatar: '', spread, topic, sensitive: false, vip: true, at: 0, info });
         return { ok: true };
       }
       case 'announce':
         return this.announceNow(now);
       case 'testDraw':
         this.current = null;
-        this.start({ name: 'Bạn', spread: [3, 5].includes(Number(msg.spread)) ? Number(msg.spread) : 1, topic: 'general' }, now);
+        this.phase = null;
+        this.prepare({ name: 'Bạn', spread: [3, 5].includes(Number(msg.spread)) ? Number(msg.spread) : 1, topic: 'general' }, null, now);
         return { ok: true };
       default:
         return { ok: false, msg: 'Lệnh lạ' };
@@ -240,6 +325,9 @@ class Hub {
       demo: !!this.cfg.demo,
       settings: s,
       current: this.current,
+      collect: this.phase && this.phase.kind === 'collect' ? { name: this.phase.item.name, avatar: this.phase.item.avatar || '', until: this.phase.until, got: !!this.phase.info } : null,
+      preparing: this.phase && this.phase.kind === 'prepare' ? { name: this.phase.job.name, avatar: this.phase.job.item.avatar || '', until: this.phase.until } : null,
+      ai: { provider: this.settings.v.aiProvider, hasKey: ai.hasKey() },
       queue: this.queue.slice(0, 20).map((q) => ({ id: q.id, name: q.name, avatar: q.avatar, spread: q.spread, topic: q.topic, vip: q.vip })),
       queueTotal: this.queue.length,
       history: this.history,
