@@ -194,7 +194,7 @@
         mine.busy = false;
         mine.x = r.x; mine.y = r.y; mine.alts = r.alts || [{ x: r.x, y: r.y }]; mine.altIdx = 0;
         mine.shown = { x: r.x, y: r.y };
-        mine.brain = (r.why === 'Rapfi' ? 'Rapfi (mạnh)' : 'bộ não nội bộ' + (window.RapfiBridge ? (RapfiBridge.state === 'ready' ? (strict ? ', luật chặn 2 đầu' : '') : ', Rapfi ' + (RapfiBridge.state === 'loading' ? 'đang tải' : 'không chạy được')) : '')) + ' · ' + Math.round((Date.now() - t0) / 100) / 10 + 's';
+        mine.brain = (r.why === 'Rapfi' ? 'Rapfi (mạnh)' : 'bộ não nội bộ' + (window.RapfiBridge ? (RapfiBridge.state === 'ready' ? (strict ? ', luật chặn 2 đầu' : '') : ', Rapfi ' + (RapfiBridge.state === 'loading' ? 'đang tải' : 'không chạy được')) : '')) + ' · ' + Math.round((Date.now() - t0) / 100) / 10 + 's · tính trên ' + moves.length + ' quân';
         if (navigator.vibrate) { try { navigator.vibrate(80); } catch (e) {} }
         render();
         let lastOpp = -1;
