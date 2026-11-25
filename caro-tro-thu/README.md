@@ -34,3 +34,7 @@ bạn vẫn thắng. Không có nước nào chắc thắng thì nút tắt. B�
 Bấm 🫧 "Bong bóng" trong tab Trợ thủ. Lần đầu app mở màn hình cài đặt: bật "Hiển thị trên các ứng dụng khác" cho Caro Trợ Thủ.
 Khi bạn chuyển sang TikTok, một nút tròn ♟ nổi trên màn hình; tới lượt bạn thì bật ra tin nhắn "👉 Bạn đánh ô G9" (rung nhẹ).
 Kéo nút để đổi chỗ, chạm để mở lại app. Mã: BubbleService.java + cầu nối AndroidBubble trong MainActivity.java.
+
+## Gợi ý không bị dừng khi sang TikTok (bản 2.4)
+Khi bong bóng đang bật và app ra nền, WebView được chuyển sang một cửa sổ nổi 1x1 điểm ảnh (vô hình) để Android không làm chậm/đóng băng trang
+(trước đây gợi ý chỉ chạy được 2-3 lần rồi dừng). Mở lại app thì WebView về chỗ cũ. Xem MainActivity.moveToOverlay / moveBack.

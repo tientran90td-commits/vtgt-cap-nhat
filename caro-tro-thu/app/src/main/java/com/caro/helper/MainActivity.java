@@ -8,7 +8,10 @@ import android.webkit.JavascriptInterface;
 import android.graphics.Color;
 import android.net.Uri;
 import android.os.Bundle;
+import android.view.ViewGroup;
 import android.view.WindowManager;
+import android.widget.FrameLayout;
+import android.graphics.PixelFormat;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -69,6 +72,8 @@ public class MainActivity extends Activity {
         }
     }
 
+    private FrameLayout container;
+    private boolean inOverlay = false;
     private boolean visible = true;
     private boolean bubbleOn = false;
 
@@ -118,7 +123,9 @@ public class MainActivity extends Activity {
         // giữ trang "sống" khi sang app khác (TikTok...) để vẫn nhận nước đi từ game
         if (Build.VERSION.SDK_INT >= 26) web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
         web.loadUrl("https://" + HOST + "/index.html");
-        setContentView(web);
+        container = new FrameLayout(this);
+        container.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        setContentView(container);
     }
 
     // Bong bóng chỉ hiện khi app đang ở nền; JS của trang vẫn phải chạy khi ở nền để nhận nước đi từ game.
@@ -145,8 +152,59 @@ public class MainActivity extends Activity {
         } catch (Exception e) { /* bỏ qua */ }
     }
 
+    /*
+     * GIỮ TRANG SỐNG KHI SANG TIKTOK: Android làm chậm/đóng băng WebView của app đang ở nền, khiến gợi ý chỉ chạy 2-3 lần rồi dừng.
+     * Cách chữa: khi app ra nền (và bong bóng đang bật) thì chuyển WebView sang một cửa sổ nổi 1x1 điểm ảnh (vô hình, không chạm được);
+     * hệ thống coi đó là trang đang hiển thị nên không làm chậm. Mở lại app thì chuyển WebView về chỗ cũ.
+     */
+    private WindowManager appWm() {
+        return (WindowManager) getApplicationContext().getSystemService(WINDOW_SERVICE);
+    }
+
+    private void moveToOverlay() {
+        if (inOverlay || web == null || !BubbleService.running) return;
+        if (Build.VERSION.SDK_INT >= 23 && !Settings.canDrawOverlays(this)) return;
+        try {
+            container.removeView(web);
+            WindowManager.LayoutParams lp = new WindowManager.LayoutParams(1, 1,
+                    Build.VERSION.SDK_INT >= 26 ? WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY : WindowManager.LayoutParams.TYPE_PHONE,
+                    WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE | WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE | WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    PixelFormat.TRANSLUCENT);
+            lp.gravity = android.view.Gravity.TOP | android.view.Gravity.START;
+            appWm().addView(web, lp);
+            inOverlay = true;
+        } catch (Exception e) {
+            // không chuyển được thì trả WebView về app như cũ
+            try { if (web.getParent() == null) container.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)); } catch (Exception e2) { /* bỏ qua */ }
+            inOverlay = false;
+        }
+    }
+
+    private void moveBack() {
+        if (!inOverlay || web == null) return;
+        try { appWm().removeView(web); } catch (Exception e) { /* bỏ qua */ }
+        inOverlay = false;
+        try {
+            if (web.getParent() == null) container.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+        } catch (Exception e) { /* bỏ qua */ }
+    }
+
+    @Override
+    protected void onStart() {
+        super.onStart();
+        moveBack();
+    }
+
+    @Override
+    protected void onStop() {
+        if (!isChangingConfigurations()) moveToOverlay();
+        super.onStop();
+    }
+
     @Override
     protected void onDestroy() {
+        moveBack();
+        if (isFinishing() && BubbleService.running) BubbleService.send(this, BubbleService.ACTION_STOP, null, null, null); // app bị vuốt tắt thì bong bóng cũng tắt (hết dữ liệu mới)
         if (web != null) web.destroy();
         super.onDestroy();
     }
