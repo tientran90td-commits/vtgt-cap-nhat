@@ -104,10 +104,11 @@ const NUM_KEYS = ['lobbySeconds', 'nextLobbySeconds', 'coinSeconds', 'turnSecond
 let savedTimer = null;
 function flashSaved() {
   $('saved').textContent = '✓ đã lưu';
+  if ($('logoSaved')) $('logoSaved').textContent = '✓ đã lưu';
   clearTimeout(savedTimer);
-  savedTimer = setTimeout(() => ($('saved').textContent = ''), 1800);
+  savedTimer = setTimeout(() => { $('saved').textContent = ''; if ($('logoSaved')) $('logoSaved').textContent = ''; }, 1800);
 }
-document.querySelectorAll('#setForm [data-k]').forEach((el) => {
+document.querySelectorAll('#setForm [data-k], #logoForm [data-k]').forEach((el) => {
   el.onchange = () => {
     const k = el.dataset.k;
     const v = el.type === 'checkbox' ? el.checked : el.tagName === 'SELECT' || el.type === 'text' ? el.value : Number(el.value);
@@ -117,7 +118,7 @@ document.querySelectorAll('#setForm [data-k]').forEach((el) => {
 });
 function fillSettings(st) {
   if (!st) return;
-  document.querySelectorAll('#setForm [data-k]').forEach((el) => {
+  document.querySelectorAll('#setForm [data-k], #logoForm [data-k]').forEach((el) => {
     if (document.activeElement === el) return;
     const v = st[el.dataset.k];
     if (el.type === 'checkbox') el.checked = !!v;

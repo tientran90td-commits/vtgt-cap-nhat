@@ -295,3 +295,5 @@ LOGO TEN KENH (MOI)
 - Dang chu cua logo: Cai dat > "Logo - kieu chu" (Arial, Segoe UI, Tahoma, Georgia, Times, Impact, Comic Sans...), "Logo - mau chu" (vang kim, trang, hong, do, cam, xanh...),
   "Logo - co chu (%)" (50-250), tich "chu dam", "chu nghieng", "co khung nen mo + vien". Doi la man hinh LIVE doi theo ngay.
   Luu y: kieu chu phai co san tren may tinh dang chay LIVE (cac kieu tren deu co san tren Windows). Chu co dau tieng Viet hien tot nhat voi Arial, Segoe UI, Tahoma, Georgia, Times.
+
+- (Cap nhat) Cac muc Logo nam trong THE RIENG "Logo ten kenh", ngay duoi the "Thong bao cho nguoi xem" o dau trang bang dieu khien (khong phai tim trong Cai dat van dau nua).

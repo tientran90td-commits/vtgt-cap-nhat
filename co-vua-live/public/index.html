@@ -89,6 +89,45 @@
         <div id="annRecent" class="btnrow small"></div>
       </div>
 
+      <div class="card" id="logoCard">
+        <h2>🏷️ Logo tên kênh <small id="logoSaved" class="ok"></small></h2>
+        <p class="hint tiny">Chữ logo hiện ở góc trái phía dưới màn hình LIVE. Đổi xong màn hình LIVE đổi theo ngay.</p>
+        <div class="form" id="logoForm">
+          <label class="chk"><input type="checkbox" data-k="logoOn"> Hiện logo tên kênh trên màn hình LIVE</label>
+          <label>Logo - dòng trên (tên) <input type="text" data-k="logoName" maxlength="40"></label>
+          <label>Logo - dòng dưới <input type="text" data-k="logoSub" maxlength="40"></label>
+          <label>Logo - kiểu chữ <select data-k="logoFont">
+            <option value="default" style="font-family:inherit">Mặc định của game</option>
+            <option value="arial" style="font-family:Arial">Arial</option>
+            <option value="segoe" style="font-family:'Segoe UI'">Segoe UI</option>
+            <option value="tahoma" style="font-family:Tahoma">Tahoma</option>
+            <option value="trebuchet" style="font-family:'Trebuchet MS'">Trebuchet MS</option>
+            <option value="verdana" style="font-family:Verdana">Verdana</option>
+            <option value="georgia" style="font-family:Georgia">Georgia (có chân, sang)</option>
+            <option value="times" style="font-family:'Times New Roman'">Times New Roman</option>
+            <option value="palatino" style="font-family:'Palatino Linotype'">Palatino</option>
+            <option value="impact" style="font-family:Impact">Impact (to, dày)</option>
+            <option value="comic" style="font-family:'Comic Sans MS'">Comic Sans (vui)</option>
+            <option value="courier" style="font-family:'Courier New'">Courier (máy chữ)</option>
+          </select></label>
+          <label>Logo - màu chữ <select data-k="logoColor">
+            <option value="gold">Vàng kim (mặc định)</option>
+            <option value="#ffffff">Trắng</option>
+            <option value="#ff8fb8">Hồng</option>
+            <option value="#ff5a5a">Đỏ</option>
+            <option value="#ffa94d">Cam</option>
+            <option value="#7fe3a0">Xanh lá</option>
+            <option value="#6ec8ff">Xanh dương</option>
+            <option value="#c59bff">Tím</option>
+            <option value="#3de0e0">Xanh ngọc</option>
+          </select></label>
+          <label>Logo - cỡ chữ (%) <input type="number" data-k="logoSize" min="50" max="250" step="10"></label>
+          <label class="chk"><input type="checkbox" data-k="logoBold"> Logo - chữ đậm</label>
+          <label class="chk"><input type="checkbox" data-k="logoItalic"> Logo - chữ nghiêng</label>
+          <label class="chk"><input type="checkbox" data-k="logoFrame"> Logo - có khung nền mờ + viền</label>
+        </div>
+      </div>
+
       <div class="card">
         <h2>👥 Tất cả người xem <small id="vwCount" class="ok"></small></h2>
         <p class="hint tiny">Bấm vào tên để chọn đúng 2 người, rồi bấm "Cho 2 người đấu" để họ solo với nhau (tung đồng xu chọn bên đi trước).</p>
@@ -179,38 +218,6 @@
           <label>Tiếng tích tắc khi còn … giây (0 = tắt) <input type="number" data-k="clockSeconds" min="0" max="60"></label>
           <label class="chk"><input type="checkbox" data-k="showSign"> Hiện biển báo nhỏ ở góc màn hình live</label>
           <label class="chk"><input type="checkbox" data-k="themeAuto"> Mỗi ván đổi màu bàn cờ, màu phòng, tóc và áo nhân vật</label>
-          <label class="chk"><input type="checkbox" data-k="logoOn"> Hiện logo tên kênh trên màn hình LIVE</label>
-          <label>Logo - dòng trên (tên) <input type="text" data-k="logoName" maxlength="40"></label>
-          <label>Logo - dòng dưới <input type="text" data-k="logoSub" maxlength="40"></label>
-          <label>Logo - kiểu chữ <select data-k="logoFont">
-            <option value="default" style="font-family:inherit">Mặc định của game</option>
-            <option value="arial" style="font-family:Arial">Arial</option>
-            <option value="segoe" style="font-family:'Segoe UI'">Segoe UI</option>
-            <option value="tahoma" style="font-family:Tahoma">Tahoma</option>
-            <option value="trebuchet" style="font-family:'Trebuchet MS'">Trebuchet MS</option>
-            <option value="verdana" style="font-family:Verdana">Verdana</option>
-            <option value="georgia" style="font-family:Georgia">Georgia (có chân, sang)</option>
-            <option value="times" style="font-family:'Times New Roman'">Times New Roman</option>
-            <option value="palatino" style="font-family:'Palatino Linotype'">Palatino</option>
-            <option value="impact" style="font-family:Impact">Impact (to, dày)</option>
-            <option value="comic" style="font-family:'Comic Sans MS'">Comic Sans (vui)</option>
-            <option value="courier" style="font-family:'Courier New'">Courier (máy chữ)</option>
-          </select></label>
-          <label>Logo - màu chữ <select data-k="logoColor">
-            <option value="gold">Vàng kim (mặc định)</option>
-            <option value="#ffffff">Trắng</option>
-            <option value="#ff8fb8">Hồng</option>
-            <option value="#ff5a5a">Đỏ</option>
-            <option value="#ffa94d">Cam</option>
-            <option value="#7fe3a0">Xanh lá</option>
-            <option value="#6ec8ff">Xanh dương</option>
-            <option value="#c59bff">Tím</option>
-            <option value="#3de0e0">Xanh ngọc</option>
-          </select></label>
-          <label>Logo - cỡ chữ (%) <input type="number" data-k="logoSize" min="50" max="250" step="10"></label>
-          <label class="chk"><input type="checkbox" data-k="logoBold"> Logo - chữ đậm</label>
-          <label class="chk"><input type="checkbox" data-k="logoItalic"> Logo - chữ nghiêng</label>
-          <label class="chk"><input type="checkbox" data-k="logoFrame"> Logo - có khung nền mờ + viền</label>
           <label class="chk"><input type="checkbox" data-k="showCellLabels"> Ghi ký hiệu (a1, e4...) mờ trong từng ô cờ</label>
           <label class="chk"><input type="checkbox" data-k="winnerStays"> Người thắng ở lại đấu tiếp</label>
           <label class="chk"><input type="checkbox" data-k="hostCanPlay"> Chủ phòng được chơi</label>
