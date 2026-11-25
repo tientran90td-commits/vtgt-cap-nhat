@@ -250,3 +250,13 @@ KHAN GIA TANG QUA (NGOAI TRAN)
 - Nguoi vua tang qua luon co mat trong phong du so khan gia dang bi gioi han. Nguoi dang ngoi o ban thi khong zoom.
 - Tat tinh nang nay: dat "So khan gia dung quanh phong" = 0 trong Cai dat.
 
+
+TINH NANG MOI: SO VAN THANG LIEN TIEP / THONG BAO LAP LAI / HEN TRUOC
+- So van thang lien tiep: Cai dat van dau > "So van thang lien tiep toi da roi phai nhuong cho". Dat 3 thi thang 3 van la phai nhuong cho.
+  Dat 0 = khong gioi han (nguoi thang o lai mai cho toi khi thua). Phai bat "Nguoi thang o lai dau tiep".
+- Thong bao lap lai: the "Thong bao cho nguoi xem" > o "Lap lai" chon moi 30 giay / 1 phut / ... / 30 phut (hoac "Tu nhap so giay").
+  Bam "Phat thong bao" thi bang thong bao hien ngay, roi cu het chu ky la hien lai. Bam "Tat" de dung han.
+  Mac dinh MC chi doc lan dau; tich "MC doc to ca nhung lan lap lai" neu muon doc moi lan.
+- Hen truoc: the "Tat ca nguoi xem" > bam chon dung 2 nguoi > bam "Hen truoc (van ke tiep)". Van dang choi van tiep tuc;
+  het van thi van sau chinh la 2 nguoi do (khong tinh chuoi thang cu). Hen chi dung 1 lan, bam "Huy hen" de bo.
+  Neu tich "Bat 2 nguoi tha tim xac nhan" thi luc toi luot ho van phai tha tim xac nhan.

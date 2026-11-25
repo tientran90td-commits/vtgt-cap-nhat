@@ -15,7 +15,7 @@ const NUMBERS = {
   extraTimesPerGame: [0, 5],
   resultSeconds: [5, 60],
   maxTimeouts: [1, 5],
-  maxWinStreak: [1, 20],
+  maxWinStreak: [0, 50], // 0 = không giới hạn (người thắng ở lại mãi tới khi thua)
   minPointsToPlay: [0, 100000],
   reminderSeconds: [0, 1800],
   confirmSeconds: [0, 120],

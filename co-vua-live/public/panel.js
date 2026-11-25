@@ -332,6 +332,16 @@ function render(s) {
   }
   $('chipPhase').textContent = PHASE[s.phase] || s.phase;
   $('demoToggle').checked = !!s.demo;
+  const bk = $('vwBooked');
+  bk.classList.toggle('hidden', !s.booked);
+  if (s.booked) {
+    const html = '📌 Đã hẹn ván kế tiếp: <b>' + esc(s.booked[0]) + '</b> vs <b>' + esc(s.booked[1]) + '</b> <button id="vwBookClear" type="button">Huỷ hẹn</button>';
+    if (bk.dataset.html !== html) { // chỉ vẽ lại khi đổi, để nút bấm được ổn định
+      bk.dataset.html = html;
+      bk.innerHTML = html;
+      $('vwBookClear').onclick = () => cmd('bookClear');
+    }
+  }
 
   const X = s.players && s.players.X;
   const O = s.players && s.players.O;
@@ -422,6 +432,12 @@ $('vwList').onclick = (e) => {
     picked.push(id);
     if (picked.length > 2) picked.shift();
   }
+  renderViewers();
+};
+$('vwBook').onclick = () => {
+  if (picked.length !== 2) return toast('Hãy chọn đủ 2 người trước.', 'warn');
+  cmd('book', { ids: picked.slice(), confirmLike: $('vwLike').checked });
+  picked.length = 0;
   renderViewers();
 };
 $('vwSearch').oninput = renderViewers;

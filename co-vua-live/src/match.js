@@ -36,6 +36,7 @@ class Match {
     this.gameNo = 0;
     this.champion = null; // { ...player, streak }
     this.excludeNext = new Set();
+    this.booked = null; // cặp đã HẸN TRƯỚC cho ván kế tiếp: { ids:[a,b], confirmLike }
     this.firstLobby = true;
     this.confirm = null; // { slots:[{user,done}], round, warned } trong pha xác nhận thả tim
     this.confirmFailed = new Set();
@@ -86,7 +87,33 @@ class Match {
     return !(this.isHost(u) && !this.cfg.hostCanPlay) && !(this.champion && u.id === this.champion.id);
   }
 
+  /** Cặp chủ phòng đã hẹn trước (nếu cả 2 vẫn còn trong danh sách người xem). */
+  bookedList() {
+    if (!this.booked) return null;
+    const list = this.booked.ids.map((id) => this.interaction.users.get(id)).filter(Boolean);
+    return list.length === 2 ? list : null;
+  }
+
+  /** Hẹn trước: hết ván hiện tại, ván kế tiếp sẽ là 2 người này (không cần đủ điểm, không tính chuỗi thắng). */
+  bookNext(ids, opt = {}, now = Date.now()) {
+    const uniq = [...new Set(Array.isArray(ids) ? ids.map(String) : [])];
+    const list = uniq.map((id) => this.interaction.users.get(id)).filter(Boolean);
+    if (uniq.length !== 2 || list.length !== 2) return { ok: false, msg: 'Cần chọn đúng 2 người (người này phải đã tương tác trong live).' };
+    this.booked = { ids: uniq, confirmLike: !!opt.confirmLike };
+    this.feed(`📌 Đã hẹn trước: đạo hữu ${list[0].name} và ${list[1].name} sẽ đấu ván kế tiếp`, 'info');
+    return { ok: true };
+  }
+
+  cancelBooked() {
+    if (!this.booked) return { ok: true };
+    this.booked = null;
+    this.feed('📌 Chủ phòng đã huỷ lịch hẹn trước', 'info');
+    return { ok: true };
+  }
+
   chooseCandidates() {
+    const bl = this.bookedList();
+    if (bl) return { need: 2, list: bl, ok: true, booked: true };
     const need = this.champion ? 1 : 2;
     const min = this.cfg.minPointsToPlay;
     const base = (u) => this.eligible(u);
@@ -129,7 +156,16 @@ class Match {
 
   /** Chọn xong người chơi: nếu bật xác nhận thì sang pha "thả tim", không thì tung đồng xu luôn. */
   beginSelection(c, now) {
-    if (this.cfg.confirmSeconds > 0) this.startConfirm(c, now);
+    let confirmLike = this.cfg.confirmSeconds > 0;
+    if (c.booked) {
+      // tới lượt cặp đã hẹn: bỏ chuỗi thắng cũ, dùng lịch hẹn một lần
+      confirmLike = !!(this.booked && this.booked.confirmLike) && this.cfg.confirmSeconds > 0;
+      this.champion = null;
+      this.excludeNext.clear();
+      this.booked = null;
+      this.feed(`📌 Tới lượt cặp đã hẹn trước: ${c.list[0].name} gặp ${c.list[1].name}`, 'info');
+    }
+    if (confirmLike) this.startConfirm(c, now);
     else this.startCoin(c, now);
   }
 
@@ -549,7 +585,7 @@ class Match {
     let steppedDown = false;
     if (this.cfg.winnerStays) {
       streak = (this.champion && this.champion.id === winner.id ? this.champion.streak : 0) + 1;
-      if (streak >= this.cfg.maxWinStreak) {
+      if (this.cfg.maxWinStreak > 0 && streak >= this.cfg.maxWinStreak) {
         steppedDown = true;
         this.champion = null;
         this.excludeNext = new Set([winner.id, loser.id]);
@@ -742,7 +778,7 @@ class Match {
       mark: this.markOf(u.id),
     }));
     const preview = [];
-    if (this.champion) preview.push({ ...this.champion, champion: true });
+    if (this.champion && !c.booked) preview.push({ ...this.champion, champion: true });
     for (const u of c.list) preview.push(brief(u));
 
     return {
@@ -770,6 +806,7 @@ class Match {
       turnColor: this.game.turn,
       result: this.result,
       champion: this.champion ? { name: this.champion.name, streak: this.champion.streak } : null,
+      booked: this.bookedList() ? this.bookedList().map((u) => u.name) : null,
       lobby: { need: c.need, waiting: this.waiting, preview },
       confirm: this.phase === 'confirm' && this.confirm ? this.confirmView() : null,
       sign: this.signView(now),

@@ -56,6 +56,8 @@
       <div class="card" id="annCard">
         <h2>📢 Thông báo cho người xem</h2>
         <p class="hint tiny">Gõ nội dung rồi bấm phát: màn hình LIVE hiện bảng thông báo nhỏ và MC đọc to lên. Không được kèm link, số điện thoại, Zalo/Facebook, mời mua hàng (TikTok không cho phép).</p>
+        <div id="annRepeatState" class="status hidden"></div>
+        <label class="chk"><input type="checkbox" id="annSpeakRepeat"> MC đọc to cả những lần lặp lại (mặc định chỉ đọc lần đầu)</label>
         <textarea id="annText" rows="2" maxlength="220" placeholder="Ví dụ: Chào mừng các bạn mới! Thả tim để lên bảng tu vi nhé"></textarea>
         <div class="row">
           <label>Hiện
@@ -67,6 +69,20 @@
               <option value="60">1 phút</option>
             </select>
           </label>
+          <label>Lặp lại
+            <select id="annEvery">
+              <option value="0">Không lặp (1 lần)</option>
+              <option value="30">Mỗi 30 giây</option>
+              <option value="60">Mỗi 1 phút</option>
+              <option value="120">Mỗi 2 phút</option>
+              <option value="300">Mỗi 5 phút</option>
+              <option value="600">Mỗi 10 phút</option>
+              <option value="900">Mỗi 15 phút</option>
+              <option value="1800">Mỗi 30 phút</option>
+              <option value="-1">Tự nhập số giây…</option>
+            </select>
+          </label>
+          <input id="annEveryCustom" type="number" min="10" max="7200" placeholder="giây" style="width:90px;display:none">
           <button id="annSend">📢 Phát thông báo</button>
           <button id="annClear" class="danger">Tắt</button>
         </div>
@@ -84,6 +100,11 @@
           <button id="vwGo" class="big primary">🎮 Cho 2 người đấu</button>
           <button id="vwClear">Bỏ chọn</button>
         </div>
+        <div class="btnrow">
+          <button id="vwBook">📌 Hẹn trước (ván kế tiếp)</button>
+        </div>
+        <p class="hint tiny">"Hẹn trước": chọn đủ 2 người rồi bấm — ván đang chơi vẫn tiếp tục, hết ván thì 2 người này đấu ván sau.</p>
+        <div id="vwBooked" class="status hidden"></div>
       </div>
 
       <div class="card">
@@ -158,7 +179,7 @@
           <label>Xin thêm giờ: số lần mỗi người/ván (0 = tắt) <input type="number" data-k="extraTimesPerGame" min="0" max="5"></label>
           <label>Giây hiện kết quả <input type="number" data-k="resultSeconds" min="5" max="60"></label>
           <label>Hết giờ tối đa (xử thua) <input type="number" data-k="maxTimeouts" min="1" max="5"></label>
-          <label>Số ván thắng liên tiếp tối đa <input type="number" data-k="maxWinStreak" min="1" max="20"></label>
+          <label>Số ván thắng liên tiếp tối đa rồi phải nhường chỗ (0 = không giới hạn) <input type="number" data-k="maxWinStreak" min="0" max="50"></label>
           <label>Điểm tối thiểu để được chơi <input type="number" data-k="minPointsToPlay" min="0"></label>
           <label>Nhắc follow/chia sẻ mỗi … giây (0 = tắt) <input type="number" data-k="reminderSeconds" min="0" max="1800"></label>
           <label>Giây để 2 người được chọn THẢ TIM xác nhận (0 = tắt) <input type="number" data-k="confirmSeconds" min="0" max="120"></label>

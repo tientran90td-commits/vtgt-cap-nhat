@@ -4,7 +4,12 @@
  */
 import { connect } from './net.js';
 const $ = (id) => document.getElementById(id);
-const net = connect(() => {}, null);
+const net = connect((s) => {
+  const box = $('annRepeatState');
+  const r = s && s.announceRepeat;
+  box.classList.toggle('hidden', !r);
+  if (r) box.textContent = '🔁 Đang lặp lại mỗi ' + (r.every >= 60 ? (r.every % 60 ? r.every + ' giây' : r.every / 60 + ' phút') : r.every + ' giây') + ' — bấm "Tắt" để dừng.';
+}, null);
 const KEY = 'caro.announce.recent';
 
 function recent() {
@@ -31,9 +36,12 @@ function drawRecent() {
 $('annSend').onclick = () => {
   const text = $('annText').value.trim();
   if (!text) { $('annText').focus(); return; }
-  net.command('announce', { text, seconds: Number($('annSecs').value) || 0 });
+  let every = Number($('annEvery').value) || 0;
+  if (every < 0) every = Number($('annEveryCustom').value) || 0;
+  net.command('announce', { text, seconds: Number($('annSecs').value) || 0, every, speakRepeat: $('annSpeakRepeat').checked });
   remember(text);
 };
+$('annEvery').onchange = () => { $('annEveryCustom').style.display = Number($('annEvery').value) < 0 ? '' : 'none'; };
 $('annClear').onclick = () => net.command('announceClear');
 $('annText').addEventListener('keydown', (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); $('annSend').click(); } });
 drawRecent();

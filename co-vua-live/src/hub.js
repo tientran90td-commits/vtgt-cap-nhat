@@ -130,7 +130,7 @@ class Hub {
   }
 
   /** Thông báo của chủ phòng: hiện bảng nhỏ trên màn hình live + MC đọc lên. */
-  announce(text, seconds, now = Date.now()) {
+  announce(text, seconds, now = Date.now(), opt = {}) {
     const t = String(text || '').replace(/\s+/g, ' ').trim().slice(0, 220);
     if (!t) return { ok: false, msg: 'Chưa gõ nội dung thông báo.' };
     const chk = checkAnnouncement(t); // không cho dẫn người xem ra ngoài TikTok / từ thô tục
@@ -139,6 +139,14 @@ class Hub {
     if (!(secs > 0)) secs = Math.min(30, Math.max(8, 5 + t.length * 0.1)); // tự tính theo độ dài chữ
     secs = Math.min(120, Math.max(3, secs));
     this.announcement = { id: now, text: t, until: now + secs * 1000 };
+    // lặp lại: cứ sau `every` giây (tính từ lúc bắt đầu hiện) thì hiện lại. 0/bỏ trống = chỉ hiện 1 lần.
+    let every = Number(opt.every) || 0;
+    this.annRepeat = null;
+    if (every > 0) {
+      every = Math.min(7200, Math.max(10, Math.round(every)));
+      if (every < secs + 3) every = Math.ceil(secs + 3); // không cho chồng lên nhau
+      this.annRepeat = { text: t, secs, every, nextAt: now + every * 1000, speak: !!opt.speakRepeat };
+    }
     const cue = this.match.voice.push('mc', 'Thông báo từ chủ phòng. ' + t, { at: now, prio: 3 });
     if (cue) cue.noCaption = true;
     return { ok: true };
@@ -181,9 +189,14 @@ class Hub {
         return done(ok ? { ok: true } : { ok: false, msg: 'Không tìm thấy câu thoại này.' });
       }
       case 'announce':
-        return done(this.announce(msg.text, msg.seconds, now));
+        return done(this.announce(msg.text, msg.seconds, now, { every: msg.every, speakRepeat: !!msg.speakRepeat }));
+      case 'book':
+        return done(m.bookNext(msg.ids, { confirmLike: !!msg.confirmLike }, now));
+      case 'bookClear':
+        return done(m.cancelBooked());
       case 'announceClear':
         this.announcement = null;
+        this.annRepeat = null;
         return done({ ok: true });
       case 'scriptReset':
         if (msg.key === '*') this.script.resetAll();
@@ -263,6 +276,15 @@ class Hub {
       this.likeIgnoredAt = now;
     }
     this.commentator.flushDeferred(now);
+    const ar = this.annRepeat;
+    if (ar && now >= ar.nextAt) {
+      ar.nextAt = now + ar.every * 1000;
+      this.announcement = { id: now, text: ar.text, until: now + ar.secs * 1000 };
+      if (ar.speak) {
+        const cue = this.match.voice.push('mc', 'Thông báo từ chủ phòng. ' + ar.text, { at: now, prio: 3 });
+        if (cue) cue.noCaption = true;
+      }
+    }
     const kind = this.reminder.tick(now, this.match.phase);
     if (kind) {
       const cue = this.match.voice.remind(kind, now);
@@ -278,6 +300,7 @@ class Hub {
     s.giftSpot = this.giftSpot && now < this.giftSpot.until && !this.match.markOf(this.giftSpot.userId) ? this.giftSpot : null;
     s.notice = this.notice;
     s.announce = this.announcement && now < this.announcement.until ? { id: this.announcement.id, text: this.announcement.text, until: this.announcement.until } : null;
+    s.announceRepeat = this.annRepeat ? { every: this.annRepeat.every, text: this.annRepeat.text } : null;
     s.promo = this.promo && now < this.promo.until ? this.promo : null;
     s.demo = !!this.demo;
     s.script = this.script.list();
