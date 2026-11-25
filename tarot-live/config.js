@@ -46,12 +46,12 @@ module.exports = {
     voiceOn: true,
     voiceVolume: 1,
     // 2 giọng: ĐIỀU PHỐI (mời người xem, chia / lật bài, đọc tên lá) và NGƯỜI ĐỌC TAROT (chào, đọc ý nghĩa từng lá, tổng kết, lời chúc)
-    voiceName: '', // giọng điều phối; để trống = tự chọn giọng nữ tiếng Việt tự nhiên nhất (ví dụ Microsoft HoaiMy)
+    voiceName: '', // giọng điều phối; để trống = tự chọn giọng nam tiếng Việt (ví dụ Microsoft NamMinh)
     voiceRate: 1.0, // tốc độ điều phối
-    voicePitch: 1.05,
-    readerVoice: '', // giọng người đọc Tarot; để trống = tự chọn giọng nam (ví dụ Microsoft NamMinh)
+    voicePitch: 1.0,
+    readerVoice: '', // giọng người đọc Tarot; để trống = tự chọn giọng nữ tiếng Việt (ví dụ Microsoft HoaiMy)
     readerRate: 0.9, // người đọc Tarot: chậm, trầm
-    readerPitch: 0.9,
+    readerPitch: 0.95,
     announceText: '',
     announceEvery: 0, // phút (0 = tắt)
     paused: false, // tạm ngưng nhận lượt mới

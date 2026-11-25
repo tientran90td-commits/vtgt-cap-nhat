@@ -71,15 +71,15 @@ Chi mang tinh GIAI TRI va goi mo. Game KHONG du doan suc khoe, tien bac, sinh tu
    - Goi Gemini mien phi co the bi Google dung du lieu de cai thien san pham: nen biet truoc khi dung.
 
 9) GIONG DOC HOP VOI TAROT
-   - Nen dung giong NU, am, cham, hoi tram. Tren Windows dung Microsoft Edge: giong "Microsoft HoaiMy Online (Natural) - Vietnamese" (nu, tu nhien nhat).
-     Giong nam: "Microsoft NamMinh Online (Natural)". Game tu chon HoaiMy neu co. Muon doi: Cai dat > "Giong doc".
+   - Nguoi doc Tarot nen la giong NU, am, cham. Tren Windows dung Microsoft Edge: "Microsoft HoaiMy Online (Natural) - Vietnamese" (nu, tu nhien nhat).
+     Dieu phoi la giong nam "Microsoft NamMinh Online (Natural)". Game tu chon nhu vay neu co. Muon doi: Cai dat > "Giong doc".
    - Mac dinh: toc do 0,9 va cao do 0,95 (cham, tram, hop khong khi Tarot). Cai dat > Toc do doc / Cao do. Bam "Thu giong doc" de nghe thu.
    - Giong do TRINH DUYET MO MAN HINH LIVE quyet dinh (khong phai may chu). Termux: dung Chrome tren dien thoai, giong Google tieng Viet
      (Cai dat Android > Chuyen van ban thanh giong noi > Google > tai goi tieng Viet). Danh sach giong hien trong bang dieu khien la cua trinh duyet dang mo no.
    - Giong cua OBS / TikTok LIVE Studio: neu nguon hinh la trinh duyet tich hop, giong co the khac Edge; hay thu truoc khi LIVE.
 
 10) HAI GIONG: DIEU PHOI + NGUOI DOC TAROT
-   - Dieu phoi (mac dinh giong nu, HoaiMy): moi nguoi duoc chon, nhac ghi thong tin, chia bai, lat bai, doc ten tung la, bao dang cho AI, cam on qua tang.
-   - Nguoi doc Tarot (mac dinh giong nam, NamMinh, cham va tram): chao nguoi xem + cung hoang dao, doc y nghia tung la, tong ket, loi chuc.
+   - Dieu phoi (mac dinh giong NAM, NamMinh): moi nguoi duoc chon, nhac ghi thong tin, chia bai, lat bai, doc ten tung la, bao dang cho AI, cam on qua tang.
+   - Nguoi doc Tarot (mac dinh giong NU, HoaiMy, cham va am): chao nguoi xem + cung hoang dao, doc y nghia tung la, tong ket, loi chuc.
    - Doi giong, toc do, cao do cua tung vai trong Cai dat. Bam "Thu giong dieu phoi" / "Thu giong nguoi doc Tarot" de nghe.
-   - May chi co 1 giong tieng Viet (vi du dien thoai): hai vai van khac nhau nho toc do va cao do (dieu phoi cao hon, nguoi doc Tarot tram hon).
+   - May chi co 1 giong tieng Viet (vi du dien thoai): hai vai van khac nhau nho toc do va cao do (nguoi doc Tarot cham va am hon).

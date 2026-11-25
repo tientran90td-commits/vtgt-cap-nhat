@@ -52,8 +52,9 @@ export class Voice {
       const pool = vi.filter((v) => /natural|online/i.test(v.name)).length ? vi.filter((v) => /natural|online/i.test(v.name)) : vi;
       const female = pool.find((v) => /hoaimy|hoài my|linh|female|nữ/i.test(v.name));
       const male = pool.find((v) => /namminh|nam minh|male|nam\b/i.test(v.name));
-      mc = mc || female || pool[0];
-      ref = ref || male || pool.find((v) => v !== mc) || pool[0];
+      // Điều phối = giọng nam (NamMinh), Người đọc Tarot = giọng nữ (HoaiMy)
+      mc = mc || male || pool.find((v) => v !== female) || pool[0];
+      ref = ref || female || pool.find((v) => v !== mc) || pool[0];
     }
     this.pick = { mc, ref, distinct: !!(mc && ref && mc !== ref) };
   }
