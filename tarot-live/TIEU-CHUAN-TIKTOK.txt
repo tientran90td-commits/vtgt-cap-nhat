@@ -1,0 +1,24 @@
+TIEU CHUAN LIVE TIKTOK VA CACH TAROT LIVE TRANH VI PHAM
+(Ban dich ngan; TikTok hay doi luat, hay xem lai trong ung dung: TikTok > Cai dat > LIVE Safety / Trung tam an toan LIVE.
+ Luu y: game CHUA duoc kiem tra rieng voi chinh sach cua TikTok ve noi dung boi toan/tarot. Hay tu doc lai truoc khi LIVE.)
+
+DA LAM GI DE GIAM RUI RO
+- Noi dung ghi ro "chi mang tinh giai tri, khong thay the loi khuyen chuyen mon" o chan man hinh LIVE (luon hien) va MC nhac dinh ky.
+- Loi doc khong du doan suc khoe, benh tat, tien bac, dau tu, co bac, sinh tu, phap ly, mang thai/ly hon. Neu khan gia hoi ve cac chu de nay,
+  game van rut bai nhung chi doc thong diep chung va noi ro la khong xem muc do (file src\parse.js).
+- Khong hua hen chac chan ("chac chan se", "nhat dinh se"); giong goi mo, khuyen can nhac.
+- Ten khan gia hien tren man hinh va duoc MC doc: tu dong bo link, che tu tho tuc (src\safety.js).
+- Thong bao cua chu phong: game tu choi neu co link, so dien thoai, Zalo/Facebook/Telegram, moi mua hang / kiem tien / dau tu.
+- Che do DEMO luon hien dai do "CHE DO THU" tren man hinh live.
+- Khong thu tien, khong ban co hoi, khong co giai thuong. Mac dinh KHONG uu tien nguoi tang qua trong hang cho (co the bat o Cai dat; neu bat,
+  dung quang cao "tang qua de duoc boi truoc").
+
+CHU PHONG NEN LAM
+- Khong bat che do DEMO khi dang LIVE that. Phai co nguoi that dang LIVE, dung treo tu dong 24/7.
+- Dung nan ni tang qua / follow. Dung noi nhung cau cam ket ket qua cho khan gia.
+- Anh bai (Rider-Waite 1909) la tai san cong cong. Loi doc do tac gia game tu viet. Neu ban tu them noi dung, dung chep tu sach/trang khac.
+- Chay thu 10-15 phut va xem LIVE Safety Center.
+
+CHUA THE DAM BAO
+- Khong the cam ket TikTok se khong nhac nho. Game doc binh luan qua thu vien khong chinh thuc (tiktok-live-connector) hoac TikFinity.
+- Game chua duoc thu tren LIVE that qua nhieu gio; hay theo doi 1-2 buoi dau.

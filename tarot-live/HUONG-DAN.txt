@@ -1,0 +1,49 @@
+TAROT LIVE v1.0 - HUONG DAN NHANH (Vietnamese, khong dau de tranh loi font)
+====================================================================
+Game boi bai Tarot cho TikTok LIVE: khan gia binh luan de rut bai, la bai lat len man hinh (co anh), MC doc y nghia.
+Chi mang tinh GIAI TRI va goi mo. Game KHONG du doan suc khoe, tien bac, sinh tu, phap ly.
+
+1) CAI DAT (chi lam 1 lan)
+   - Bam dup  CAI-MOI-TRUONG.bat  -> tu tai va cai Node.js + thu vien (can Internet). Cac file CHAY-*.bat cung tu goi file nay.
+   - Giai nen thu muc game ra o dia, vi du D:\tarot-live.
+
+2) CHAY THU (khong can LIVE that)
+   - Bam dup  CHAY-THU-DEMO.bat -> Edge mo bang dieu khien (http://localhost:3002). Khan gia ao tu binh luan xin bai.
+   - Man hinh live luon hien dai do "CHE DO THU". KHONG phat che do nay len LIVE that.
+   - Game dung cong 3002 (Caro la 3000) nen chay chung 2 game cung luc duoc.
+
+3) CHAY THAT
+   - Bam dup  CHAY-GAME.bat, nhap ID TikTok (khong co @). Tai khoan phai DANG LIVE.
+   - Hoac dung TikFinity Desktop: mo TikFinity, ket noi, roi bam dup  CHAY-TIKFINITY.bat.
+
+4) CACH KHAN GIA CHOI (go vao binh luan)
+   - !bai            rut 1 la (so la mac dinh sua duoc trong Cai dat)
+   - !bai 3          rut 3 la (Qua khu - Hien tai - Tuong lai gan)
+   - !bai 5          rut 5 la (Tinh huong - Nguyen nhan - Tro ngai - Loi khuyen - Ket qua co the), moi luot khoang 1,5 phut
+   - !bai tinh yeu / !bai cong viec (hoac hoc tap)   chon chu de. Vi du:  !bai 3 tinh yeu   |   boi bai cong viec 5 la
+   - Cung hieu: "rut bai", "xem bai", "boi bai", "xem tarot", "!tarot".
+   - Hoi ve suc khoe / tien bac / kien tung / co bac...: game van rut nhung chi doc thong diep chung va noi ro la khong xem muc do.
+   - Moi nguoi 1 luot trong hang cho; xong phai cho (mac dinh 90 giay) moi xin lai (sua trong Cai dat).
+
+5) BANG DIEU KHIEN (http://localhost:3002)
+   - "MO MAN HINH LIVE DOC": mo 1 tab sach (9:16). Dung tab do lam nguon hinh cho OBS / TikTok LIVE Studio.
+     OBS Browser Source:  http://localhost:3002/live.html?layout=portrait   (ngang: layout=landscape)
+   - Giong doc phat ra tu TAB MAN HINH LIVE; bam chuot vao tab do 1 lan. Dung Microsoft Edge de co giong tieng Viet tu nhien.
+     Phim tat trong tab live: F toan man hinh, M tat/bat giong, P doc, L ngang.
+   - Hang cho: nut "Uu tien" day nguoi len dau, "Xoa" bo nguoi do. "Bo qua luot nay", "Tam ngung nhan luot moi", "Xoa hang cho".
+   - "Tu rut cho mot nguoi": ban tu nhap ten va rut ngay. "Chay thu 1/3/5 la" de xem truoc.
+   - Cai dat tu luu: ten chuong trinh, dong phu, so la mac dinh, cho phep 3 la / 5 la, ti le la nguoc, thoi gian cho, tu rut khi vang nguoi, giong doc.
+   - Thong bao chu phong: co the lap lai moi N phut; game tu choi neu co link, so dien thoai, Zalo/Facebook, moi mua hang...
+   - Muon thu nhanh khong can khan gia: mo trinh duyet vao  http://localhost:3002/test?u=An&c=!bai%203
+
+6) BO BAI VA LOI DOC
+   - Anh: bo Rider-Waite-Smith (1909) cua Pamela Colman Smith, da het ban quyen (public domain). Xem public\cards\NGUON-ANH.txt.
+   - Loi doc 78 la (xuoi / nguoc, tong quat / tinh duyen / cong viec) va loi khuyen rieng cho tung la do tac gia game tu viet bang tieng Viet.
+   - Moi vi tri trong trai bai co cach doc rieng (vi du "Tro ngai" doc mat can luu y cua la, "Loi khuyen" doc loi khuyen rieng).
+   - Muon sua chu: mo src\cards\*.js (major, wands, cups, swords, pents) va src\cards\advice.js bang Notepad, giu nguyen dau nhay va dau phay.
+
+7) LUU Y
+   - Muon phat len TikTok tu may tinh can phan mem LIVE (OBS / TikTok LIVE Studio).
+   - Mat ket noi TikTok / TikFinity thi game tu noi lai.
+   - Cap nhat: bang dieu khien -> "Kiem tra ban moi" -> "Cap nhat ngay" (giu nguyen cai dat va ID TikTok).
+   - Xem them TIEU-CHUAN-TIKTOK.txt.

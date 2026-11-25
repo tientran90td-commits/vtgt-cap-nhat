@@ -1,0 +1,5 @@
+BO ANH TAROT RIDER-WAITE-SMITH (1909)
+- Hoa si: Pamela Colman Smith (1878-1951). Thiet ke: Arthur Edward Waite. Nha xuat ban: Rider & Company, 1909.
+- Tac pham da het thoi han ban quyen (public domain).
+- Ban quet da duoc lam sach boi Steve P. (steve-p.org), tai tu kho https://github.com/mixvlad/TarotCards (giay phep MIT cho kho ma, anh la public domain).
+- Anh trong thu muc nay da duoc thu nho (400x667) de nhe va tai nhanh.

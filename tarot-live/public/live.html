@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tarot LIVE - màn hình phát</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="live.css">
+</head>
+<body>
+  <!--
+    MÀN HÌNH LIVE SẠCH: không có nút bấm, dùng làm nguồn hình để phát.
+    Địa chỉ:  /live.html?layout=portrait (dọc 9:16)  |  /live.html?layout=landscape (ngang 16:9)
+    Thêm &bg=none để nền trong suốt, &mute=1 để tắt giọng đọc (khung xem trước).
+    Phím tắt: F = toàn màn hình, P = dọc, L = ngang, M = tắt/bật giọng.
+  -->
+  <div id="stage" data-layout="portrait">
+    <div id="stars"></div>
+    <header id="top">
+      <div id="title">🔮 Tarot LIVE</div>
+      <div id="hint">Gõ !bai để rút lá bài của bạn</div>
+    </header>
+
+    <section id="table">
+      <div id="cards"></div>
+      <div id="idleMsg">
+        <div class="big">✨ Gõ <b>!bai</b> để rút bài ✨</div>
+        <div class="sm"><b>!bai 3</b> 3 lá &nbsp;•&nbsp; <b>!bai 5</b> 5 lá &nbsp;•&nbsp; <b>!bai tình yêu</b> &nbsp;•&nbsp; <b>!bai công việc</b></div>
+      </div>
+    </section>
+
+    <section id="reading">
+      <div id="who"><img id="whoImg" alt=""><span id="whoName"></span><span id="whoTopic"></span></div>
+      <div id="cname"></div>
+      <div id="ckw"></div>
+      <div id="ctext"></div>
+    </section>
+
+    <section id="queueBar"><span class="lbl">Tiếp theo</span><div id="queueList"></div></section>
+    <div id="ticker"></div>
+    <footer id="disc">✨ Tarot chỉ mang tính giải trí và gợi mở, không thay thế lời khuyên của chuyên gia</footer>
+    <div id="demoRibbon" class="hidden">CHẾ ĐỘ THỬ - khán giả ảo, KHÔNG phát lên LIVE thật</div>
+    <div id="announce" class="hidden"></div>
+    <div id="unlock" class="hidden">🔊 Bấm vào trang một lần để bật giọng đọc</div>
+  </div>
+  <script type="module" src="live.js"></script>
+</body>
+</html>

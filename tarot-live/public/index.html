@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Tarot LIVE - Bảng điều khiển</title>
+  <link rel="icon" href="data:,">
+  <link rel="stylesheet" href="panel.css">
+  <style>
+    .cur { background: #151a28; border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; min-height: 64px; }
+    .cur .nm { font-weight: 700; color: #ffd98a; }
+    .cardsmini { display: flex; gap: 8px; margin-top: 8px; }
+    .cardsmini img { height: 90px; border-radius: 5px; border: 1px solid #f8f0d8; }
+    .cardsmini img.rev { transform: rotate(180deg); }
+    .ql { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+    .ql li { display: flex; gap: 8px; align-items: center; padding: 5px 8px; background: #1a2238; border-radius: 8px; font-size: 14px; }
+    .ql .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .ql button { padding: 2px 8px; font-size: 12.5px; }
+    .ql .vip { color: #ffd166; font-size: 12px; }
+    .saved { color: var(--ok); font-size: 13px; margin-left: 8px; opacity: 0; transition: opacity .3s; }
+    .saved.on { opacity: 1; }
+    .hl { color: #ffd98a; }
+  </style>
+</head>
+<body>
+  <header class="bar">
+    <h1>🔮 Tarot LIVE <small>Bảng điều khiển</small></h1>
+    <div class="chips">
+      <span id="chipWs" class="chip off">● Mất kết nối game</span>
+      <span id="chipTt" class="chip">TikTok: …</span>
+      <span id="chipPhase" class="chip">…</span>
+    </div>
+  </header>
+
+  <main class="grid">
+    <section class="col">
+      <div class="card hero">
+        <h2>📺 Màn hình để phát LIVE</h2>
+        <p class="hint">Bấm nút dưới đây: một <b>tab mới</b> mở ra với màn hình sạch (không nút bấm). Dùng tab đó làm nguồn hình cho phần mềm phát (OBS, TikTok LIVE Studio…).</p>
+        <div class="btnrow">
+          <button id="btnPortrait" class="big primary">📱 MỞ MÀN HÌNH LIVE DỌC (9:16)</button>
+          <button id="btnLandscape" class="big">🖥️ Mở màn hình ngang (16:9)</button>
+        </div>
+        <div class="btnrow small">
+          <button id="copyPortrait">Chép link dọc</button>
+          <button id="copyLandscape">Chép link ngang</button>
+          <span id="popupWarn" class="warn hidden">Trình duyệt chặn cửa sổ mới — hãy cho phép “pop-up” cho trang này rồi bấm lại.</span>
+        </div>
+        <p class="hint tiny">Mẹo: trong tab live bấm <kbd>F</kbd> toàn màn hình, <kbd>M</kbd> tắt/bật giọng đọc. Lần đầu hãy bấm chuột 1 lần vào tab live để trình duyệt cho phép phát tiếng.</p>
+      </div>
+
+      <div class="card">
+        <h2>🎴 Đang bói</h2>
+        <div id="cur" class="cur">Chưa có lượt nào.</div>
+        <div class="btnrow">
+          <button id="btnSkip">⏭ Bỏ qua lượt này</button>
+          <button id="btnPause">⏸ Tạm ngưng nhận lượt mới</button>
+          <button id="btnClear" class="danger">🗑 Xóa hàng chờ</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>📋 Hàng chờ <small id="qCount"></small></h2>
+        <ul id="queue" class="ql"></ul>
+        <p class="hint tiny">Khán giả gõ <kbd>!bai</kbd>, <kbd>!bai 3</kbd>, <kbd>!bai tình yêu</kbd>, <kbd>!bai công việc</kbd>… để vào hàng chờ. “Ưu tiên” đẩy người đó lên đầu.</p>
+      </div>
+
+      <div class="card">
+        <h2>🪄 Tự rút cho một người</h2>
+        <div class="row">
+          <input type="text" id="drName" placeholder="Tên (ví dụ: Lan)" maxlength="30">
+          <select id="drSpread"><option value="1">1 lá</option><option value="3">3 lá</option><option value="5">5 lá</option></select>
+          <select id="drTopic"><option value="general">Tổng quát</option><option value="love">Tình duyên</option><option value="work">Công việc - học tập</option></select>
+          <button id="btnDraw" class="primary">Rút ngay</button>
+        </div>
+        <div class="btnrow small"><button id="btnTest1">🎲 Chạy thử 1 lá</button><button id="btnTest3">🎲 Chạy thử 3 lá</button><button id="btnTest5">🎲 Chạy thử 5 lá</button><button id="btnVoice">🔊 Thử giọng đọc</button></div>
+        <p class="hint tiny" id="voiceInfo"></p>
+      </div>
+
+      <div class="card">
+        <h2>🕘 Vừa bói xong</h2>
+        <ul id="hist" class="chatlist"></ul>
+      </div>
+    </section>
+
+    <section class="col">
+      <div class="card">
+        <h2>⚙️ Cài đặt <span id="saved" class="saved">✓ đã lưu</span></h2>
+        <form id="setForm" class="form" onsubmit="return false">
+          <label>Tên chương trình (hiện trên cùng)<input type="text" id="title" maxlength="40"></label>
+          <label>Dòng phụ<input type="text" id="subtitle" maxlength="40"></label>
+          <label>Số lá mặc định khi chỉ gõ !bai
+            <select id="defaultSpread"><option value="1">1 lá</option><option value="3">3 lá</option><option value="5">5 lá</option></select></label>
+          <label class="chk"><input type="checkbox" id="allowThree"> Cho khán giả xin 3 lá</label>
+          <label class="chk"><input type="checkbox" id="allowFive"> Cho khán giả xin 5 lá (mỗi lượt ~1,5 phút)</label>
+          <label>Tỉ lệ lá ngược (%) <input type="number" id="reverseChance" min="0" max="100"></label>
+          <label>Chờ giữa 2 lượt của cùng 1 người (giây, 0 = không giới hạn)<input type="number" id="userCooldown" min="0" max="900"></label>
+          <label>Hàng chờ tối đa (người)<input type="number" id="maxQueue" min="1" max="60"></label>
+          <label>Tốc độ chuyển lá
+            <select id="readSpeed"><option value="slow">Chậm (đọc kỹ)</option><option value="normal">Vừa</option><option value="fast">Nhanh</option></select></label>
+          <label class="chk"><input type="checkbox" id="autoDraw"> Không ai xin thì tự rút “thông điệp cho cả phòng”</label>
+          <label>Sau bao nhiêu giây vắng người thì tự rút<input type="number" id="autoIdleSeconds" min="10" max="300"></label>
+          <label class="chk"><input type="checkbox" id="giftPriority"> Người từng tặng quà được xếp lên trước trong hàng chờ</label>
+          <label class="chk"><input type="checkbox" id="voiceOn"> Bật giọng đọc (MC)</label>
+          <label>Âm lượng giọng đọc (0 - 1)<input type="number" id="voiceVolume" min="0" max="1" step="0.1"></label>
+        </form>
+        <p class="hint tiny">Thay đổi được lưu tự động và có hiệu lực ngay.</p>
+      </div>
+
+      <div class="card">
+        <h2>📣 Thông báo của chủ phòng</h2>
+        <input type="text" id="announceText" maxlength="140" placeholder="Ví dụ: Chào mừng cả nhà đến với phòng Tarot!">
+        <div class="row" style="margin-top:8px">
+          <label>Lặp lại mỗi (phút, 0 = không lặp)<input type="number" id="announceEvery" min="0" max="30"></label>
+          <button id="btnAnnounce">Đọc ngay</button>
+        </div>
+        <p class="hint tiny">Không được kèm link, số điện thoại, Zalo/Facebook, mời mua hàng… (TikTok không cho LIVE dẫn người xem ra ngoài). Game sẽ báo lỗi nếu vi phạm.</p>
+      </div>
+
+      <div class="card">
+        <h2>👀 Xem trước (dọc)</h2>
+        <div class="preview"><iframe id="previewFrame" title="xem trước" loading="lazy"></iframe></div>
+      </div>
+
+      <div class="card">
+        <h2>💬 Bình luận mới</h2>
+        <ul id="feed" class="chatlist"></ul>
+      </div>
+
+      <div class="card" id="updCard">
+        <h2>⬆️ Cập nhật phần mềm <small id="updVer" class="ok"></small></h2>
+        <p class="hint tiny" id="updMsg">Bấm "Kiểm tra" để xem có bản mới trên GitHub không. Cài đặt và ID TikTok của bạn được giữ nguyên.</p>
+        <div class="btnrow">
+          <button id="updCheck">🔎 Kiểm tra bản mới</button>
+          <button id="updGo" class="primary hidden">⬆ Cập nhật ngay</button>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>ℹ️ Về bộ bài</h2>
+        <p class="hint tiny">Ảnh bài: bộ Rider-Waite-Smith (1909) của Pamela Colman Smith, đã hết bản quyền. Lời đọc do tác giả game tự viết, chỉ mang tính giải trí và gợi mở; game không dự đoán chuyện sức khỏe, tiền bạc, sinh tử hay pháp lý. Màn hình live luôn có dòng nhắc “chỉ mang tính giải trí” ở chân trang.</p>
+      </div>
+    </section>
+  </main>
+  <script type="module" src="panel.js"></script>
+  <script type="module" src="update-panel.js"></script>
+</body>
+</html>
