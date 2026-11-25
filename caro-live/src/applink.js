@@ -101,4 +101,14 @@ function info(port) {
   return { wifi: wifiOn(), code: code(), addresses: lanAddresses(port), local: `127.0.0.1:${port}` };
 }
 
-module.exports = { wifiOn, setWifi, code, newCode, isLoopback, allowWs, lanAddresses, info, APP_ORIGIN };
+/**
+ * Cho trang bảng điều khiển (mở trong app Caro Trợ Thủ qua WiFi/Tailscale) lấy danh sách người xem.
+ * Từ chính máy này: như cũ. Từ máy khác: phải bật WiFi và gửi đúng mã (?code=...).
+ */
+function allowHttpRemote(req, url) {
+  if (isLoopback(req.socket && req.socket.remoteAddress)) return true;
+  if (!wifiOn()) return false;
+  return sameCode(url.searchParams.get('code') || '', code());
+}
+
+module.exports = { allowHttpRemote, wifiOn, setWifi, code, newCode, isLoopback, allowWs, lanAddresses, info, APP_ORIGIN };

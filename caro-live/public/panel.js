@@ -2,7 +2,7 @@
  * BẢNG ĐIỀU KHIỂN (trang chủ http://localhost:3000)
  * Chỉ điều khiển game qua WebSocket - không chứa luật chơi. Màn hình phát nằm ở live.html.
  */
-import { connect } from './net.js';
+import { connect, codeQuery } from './net.js';
 import { Voice } from './voice.js';
 import { Sfx } from './sfx.js';
 import { avatarSrc } from './avatar.js';
@@ -439,7 +439,7 @@ $('vwGo').onclick = () => {
 };
 async function pollViewers() {
   try {
-    const r = await fetch('/viewers', { cache: 'no-store' });
+    const r = await fetch('/viewers' + codeQuery(), { cache: 'no-store' });
     if (r.ok) {
       const data = await r.json();
       const sig = JSON.stringify(data);

@@ -115,6 +115,8 @@ public class MainActivity extends Activity {
             }
         });
         web.addJavascriptInterface(new BubbleBridge(), "AndroidBubble");
+        // giữ trang "sống" khi sang app khác (TikTok...) để vẫn nhận nước đi từ game
+        if (Build.VERSION.SDK_INT >= 26) web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
         web.loadUrl("https://" + HOST + "/index.html");
         setContentView(web);
     }

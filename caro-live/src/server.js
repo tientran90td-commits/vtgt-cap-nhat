@@ -118,8 +118,10 @@ const server = http.createServer((req, res) => {
   if (url.pathname.startsWith('/update/') && updater.handle(req, res, url, { log })) return;
   if (url.pathname === '/viewers') {
     // chỉ trả cho trang chạy trên chính máy này
+    // (hoặc từ app Caro Trợ Thủ qua WiFi/Tailscale, có đúng mã kết nối)
     const host = String(req.headers.host || '').replace(/:\d+$/, '');
-    if (!['localhost', '127.0.0.1', '[::1]'].includes(host)) {
+    const localHost = ['localhost', '127.0.0.1', '[::1]'].includes(host);
+    if (!localHost && !applink.allowHttpRemote(req, url)) {
       res.writeHead(403);
       return res.end('Forbidden');
     }

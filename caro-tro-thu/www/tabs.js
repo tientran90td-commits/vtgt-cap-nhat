@@ -4,7 +4,16 @@
   let loadedUrl = '';
   function show(id) {
     for (const v of document.querySelectorAll('.view')) v.classList.toggle('on', v.id === id);
-    for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('on', b.dataset.tab === id);
+    // bảng điều khiển (trong khung) báo đã nối được game chưa; chưa nối thì hiện cảnh báo + nút tải lại
+  window.addEventListener('message', (e) => {
+    const d = e.data;
+    if (d && d.caroPanel === 'ws') $('pnWarn').classList.toggle('hidden', !!d.ok);
+  });
+  $('pnReload').addEventListener('click', () => {
+    const u = window.LinkApp ? LinkApp.panelUrl() : '';
+    if (u) { $('pnWarn').classList.add('hidden'); $('pnFrame').src = u + (u.includes('?') ? '&' : '?') + 't=' + Date.now(); }
+  });
+  for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('on', b.dataset.tab === id);
     if (id === 'viewPanel') {
       const url = window.LinkApp ? LinkApp.panelUrl() : '';
       $('viewPanel').classList.toggle('has', !!url);

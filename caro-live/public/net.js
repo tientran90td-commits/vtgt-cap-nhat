@@ -1,6 +1,26 @@
 /*
  * KẾT NỐI REALTIME với server (WebSocket). Dùng chung cho trang LIVE và bảng điều khiển.
  */
+/** Mã kết nối (nếu trang được mở từ app Caro Trợ Thủ qua WiFi) để gắn vào các yêu cầu HTTP. */
+export function codeQuery() {
+  let code = new URLSearchParams(location.search).get('code') || '';
+  try {
+    if (!code) code = sessionStorage.getItem('caroCode') || '';
+  } catch (e) {
+    /* bỏ qua */
+  }
+  return code ? '?code=' + encodeURIComponent(code) : '';
+}
+
+/** Báo cho app Caro Trợ Thủ (khung chứa bảng điều khiển) biết bảng đã nối được game chưa. */
+function tellParent(ok) {
+  try {
+    if (window.parent && window.parent !== window) window.parent.postMessage({ caroPanel: 'ws', ok: !!ok }, '*');
+  } catch (e) {
+    /* bỏ qua */
+  }
+}
+
 export function connect(onState, onStatus) {
   let ws = null;
   const api = {
@@ -26,6 +46,7 @@ export function connect(onState, onStatus) {
     ws = new WebSocket(`${proto}://${location.host}/${code ? '?code=' + encodeURIComponent(code) : ''}`);
     ws.onopen = () => {
       api.connected = true;
+      tellParent(true);
       if (onStatus) onStatus(true);
     };
     ws.onmessage = (e) => {
@@ -37,6 +58,7 @@ export function connect(onState, onStatus) {
     };
     ws.onclose = () => {
       api.connected = false;
+      tellParent(false);
       if (onStatus) onStatus(false);
       setTimeout(open, 1500);
     };

@@ -76,6 +76,8 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
 .overlay { position:absolute; inset:0; background:rgba(5,8,18,.94); display:flex; align-items:center; justify-content:center; padding:14px; z-index:5; overflow:auto; }
 #pnFrame { width:100%; height:100%; border:0; background:#10162a; display:none; }
 #viewPanel.has #pnFrame { display:block; } #viewPanel.has #pnNone { display:none; }
+
+.pnwarn { background:#5a2020; color:#ffd9d9; padding:8px 12px; font-size:13px; display:flex; gap:8px; align-items:center; } .pnwarn.hidden { display:none; } .pnwarn button { flex:none; padding:6px 12px; border:0; border-radius:8px; background:#e9edf8; color:#112; font-weight:700; }
 </style>
 </head>
 <body>
@@ -146,6 +148,7 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
 
 <div id="viewPanel" class="view">
   <div id="pnNone" class="pad note">Chưa có địa chỉ game. Vào tab "Nối game" nhập địa chỉ trước, bảng điều khiển sẽ hiện ở đây.</div>
+  <div id="pnWarn" class="pnwarn hidden"><span>Bảng điều khiển chưa nối được game (kiểm tra game đang chạy, đã bật WiFi, đúng mã 6 số).</span> <button id="pnReload">Tải lại</button></div>
   <iframe id="pnFrame" title="Bảng điều khiển game"></iframe>
 </div>
 </div>
@@ -1811,7 +1814,16 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
   let loadedUrl = '';
   function show(id) {
     for (const v of document.querySelectorAll('.view')) v.classList.toggle('on', v.id === id);
-    for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('on', b.dataset.tab === id);
+    // bảng điều khiển (trong khung) báo đã nối được game chưa; chưa nối thì hiện cảnh báo + nút tải lại
+  window.addEventListener('message', (e) => {
+    const d = e.data;
+    if (d && d.caroPanel === 'ws') $('pnWarn').classList.toggle('hidden', !!d.ok);
+  });
+  $('pnReload').addEventListener('click', () => {
+    const u = window.LinkApp ? LinkApp.panelUrl() : '';
+    if (u) { $('pnWarn').classList.add('hidden'); $('pnFrame').src = u + (u.includes('?') ? '&' : '?') + 't=' + Date.now(); }
+  });
+  for (const b of document.querySelectorAll('#tabs button')) b.classList.toggle('on', b.dataset.tab === id);
     if (id === 'viewPanel') {
       const url = window.LinkApp ? LinkApp.panelUrl() : '';
       $('viewPanel').classList.toggle('has', !!url);
