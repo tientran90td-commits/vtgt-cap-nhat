@@ -80,7 +80,7 @@ function build(drawn, user, opts = {}) {
   if (opts.sensitive) intro += ' ' + SENSITIVE_NOTE;
   steps.push({ kind: 'shuffle', say: intro, dur: dur(intro, 5000) });
 
-  const flipAll = !!opts.flipAll && spread > 1;
+  const flipAll = spread > 1; // 3 / 5 lá: luôn úp cả bài, lật hết 1 lượt rồi mới đọc từng lá
   if (flipAll) {
     const rv = `Mình lật cả ${spread === 3 ? 'ba' : 'năm'} lá cùng lúc nhé. Giờ cùng xem từng lá một.`;
     steps.push({ kind: 'reveal', say: rv, dur: dur(rv, 4500) });

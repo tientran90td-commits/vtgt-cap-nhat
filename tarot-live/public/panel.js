@@ -80,7 +80,7 @@ $('btnAnnounce').onclick = () => {
 };
 
 // ------------------------------------------------------------ cài đặt (tự lưu)
-const FIELDS = ['title', 'subtitle', 'defaultSpread', 'flipAll', 'allowThree', 'allowFive', 'reverseChance', 'userCooldown', 'maxQueue', 'readSpeed', 'autoDraw', 'autoIdleSeconds', 'giftPriority', 'voiceOn', 'voiceVolume', 'announceText', 'announceEvery'];
+const FIELDS = ['title', 'subtitle', 'defaultSpread', 'allowThree', 'allowFive', 'reverseChance', 'userCooldown', 'maxQueue', 'readSpeed', 'autoDraw', 'autoIdleSeconds', 'giftPriority', 'voiceOn', 'voiceVolume', 'announceText', 'announceEvery'];
 
 function fillForm(set) {
   for (const k of FIELDS) {
