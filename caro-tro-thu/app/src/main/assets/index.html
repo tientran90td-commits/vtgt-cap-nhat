@@ -78,6 +78,8 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
 #viewPanel.has #pnFrame { display:block; } #viewPanel.has #pnNone { display:none; }
 
 .pnwarn { background:#5a2020; color:#ffd9d9; padding:8px 12px; font-size:13px; display:flex; gap:8px; align-items:center; } .pnwarn.hidden { display:none; } .pnwarn button { flex:none; padding:6px 12px; border:0; border-radius:8px; background:#e9edf8; color:#112; font-weight:700; }
+
+.mode { display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-bottom:8px; }
 </style>
 </head>
 <body>
@@ -136,9 +138,17 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
   <div id="lkConn" class="overlay hidden">
     <div class="card">
       <h2>🔗 Nối vào game</h2>
-      <div class="note">Mở bảng điều khiển game, xem thẻ "Kết nối app Caro Trợ Thủ" để lấy địa chỉ (và mã nếu dùng điện thoại khác).</div>
-      <label>Địa chỉ game<input id="lkAddr" placeholder="192.168.1.5:3000 hoặc 127.0.0.1:3000" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
-      <label>Mã kết nối (6 số, bỏ trống nếu game chạy ngay trên điện thoại này)<input id="lkCode" inputmode="numeric" maxlength="6" placeholder="123456"></label>
+      <div class="mode"><button id="lkModeAcct" class="small primary">👤 Tài khoản</button><button id="lkModeLan" class="small">🌐 Địa chỉ trực tiếp</button></div>
+      <div id="lkAcctBox">
+        <div class="note">Nhập đúng tài khoản + mật khẩu bạn đã đặt trong app Caro LIVE trên máy tính. Ở đâu cũng nối được (WiFi hay 4G), không cần nhập IP.</div>
+        <label>Tài khoản<input id="lkAcc" placeholder="tên tài khoản" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
+        <label>Mật khẩu<input id="lkPw" type="password" placeholder="mật khẩu (app không lưu mật khẩu)" autocomplete="off"></label>
+      </div>
+      <div id="lkLanBox" class="hidden">
+        <div class="note">Dùng khi điện thoại và máy tính cùng WiFi/Tailscale. Xem địa chỉ + mã ở bảng điều khiển, thẻ "Kết nối app Caro Trợ Thủ".</div>
+        <label>Địa chỉ game<input id="lkAddr" placeholder="192.168.1.5:3000 hoặc 127.0.0.1:3000" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
+        <label>Mã kết nối (6 số, bỏ trống nếu game chạy ngay trên điện thoại này)<input id="lkCode" inputmode="numeric" maxlength="6" placeholder="123456"></label>
+      </div>
       <label>Mức nghĩ<select id="lkLevel"><option value="fast">Nhanh (0,7 giây)</option><option value="mid" selected>Vừa (2 giây)</option><option value="deep">Sâu (6 giây)</option></select></label>
       <div id="lkConnMsg" class="note"></div>
       <button id="lkGo" class="primary">Kết nối</button>
@@ -912,6 +922,94 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
   root.RapfiBridge = B;
 })(typeof self !== 'undefined' ? self : this);
 </script>
+<script>'use strict';
+/*
+ * TÀI KHOẢN KẾT NỐI (dùng chung cho app PC và app điện thoại - cùng một đoạn mã chạy ở cả 2 nơi).
+ * Từ "tài khoản + mật khẩu" tạo ra 3 thứ (không thể đoán ngược lại mật khẩu):
+ *   - token : mã vào cửa. App điện thoại gửi mã này khi nối vào máy tính qua Internet.
+ *   - topic : tên "hòm thư" công khai để 2 bên gặp nhau (máy tính để lại địa chỉ, điện thoại đến lấy).
+ *   - key   : khóa AES-256 để mã hóa địa chỉ trong hòm thư (người ngoài chỉ thấy chuỗi vô nghĩa).
+ * Cần môi trường có WebCrypto (Node >= 20, Electron, Chrome / WebView Android).
+ */
+(function (root, factory) {
+  if (typeof module === 'object' && module.exports) module.exports = factory(globalThis.crypto);
+  else root.CaroAccount = factory(root.crypto);
+})(typeof self !== 'undefined' ? self : this, function (crypto) {
+  const subtle = crypto.subtle;
+  const enc = new TextEncoder();
+  const dec = new TextDecoder();
+  const ITER = 120000;
+
+  const hex = (u8) => Array.from(u8, (b) => b.toString(16).padStart(2, '0')).join('');
+  const b64 = (u8) => {
+    let s = '';
+    for (let i = 0; i < u8.length; i += 0x8000) s += String.fromCharCode.apply(null, u8.subarray(i, i + 0x8000));
+    return btoa(s).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  };
+  const unb64 = (s) => {
+    const t = String(s).replace(/-/g, '+').replace(/_/g, '/');
+    const bin = atob(t + '='.repeat((4 - (t.length % 4)) % 4));
+    const u8 = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) u8[i] = bin.charCodeAt(i);
+    return u8;
+  };
+
+  /** Tên tài khoản không phân biệt hoa thường / dấu cách thừa. */
+  function normAccount(a) {
+    return String(a || '').normalize('NFC').trim().toLowerCase().replace(/\s+/g, ' ');
+  }
+
+  /** Kiểm tra tài khoản + mật khẩu có đủ dài không. Trả về chuỗi lỗi hoặc ''. */
+  function check(account, password) {
+    if (normAccount(account).length < 3) return 'Tên tài khoản cần ít nhất 3 ký tự.';
+    if (String(password || '').length < 6) return 'Mật khẩu cần ít nhất 6 ký tự.';
+    return '';
+  }
+
+  async function derive(account, password) {
+    const bad = check(account, password);
+    if (bad) throw new Error(bad);
+    const base = await subtle.importKey('raw', enc.encode(String(password)), 'PBKDF2', false, ['deriveBits']);
+    const bits = await subtle.deriveBits(
+      { name: 'PBKDF2', hash: 'SHA-256', iterations: ITER, salt: enc.encode('caro-live/v1/' + normAccount(account)) },
+      base,
+      96 * 8,
+    );
+    const u8 = new Uint8Array(bits);
+    const keyBytes = u8.slice(64, 96);
+    const key = await keyFrom(b64(keyBytes));
+    return { token: hex(u8.slice(0, 24)), topic: 'cl-' + hex(u8.slice(32, 48)), key, keyB64: b64(keyBytes) };
+  }
+
+  /** Dựng lại khóa mã hóa từ chuỗi đã lưu (để máy tính không phải giữ mật khẩu). */
+  function keyFrom(keyB64) {
+    return subtle.importKey('raw', unb64(keyB64), 'AES-GCM', false, ['encrypt', 'decrypt']);
+  }
+
+  /** Mã hóa 1 đối tượng JSON thành chuỗi gọn (an toàn để gửi qua HTTP). */
+  async function seal(key, obj) {
+    const iv = crypto.getRandomValues(new Uint8Array(12));
+    const ct = new Uint8Array(await subtle.encrypt({ name: 'AES-GCM', iv }, key, enc.encode(JSON.stringify(obj))));
+    const out = new Uint8Array(12 + ct.length);
+    out.set(iv, 0);
+    out.set(ct, 12);
+    return b64(out);
+  }
+
+  /** Giải mã; sai khóa / bị sửa đổi thì trả về null. */
+  async function open(key, text) {
+    try {
+      const u8 = unb64(text);
+      const pt = await subtle.decrypt({ name: 'AES-GCM', iv: u8.slice(0, 12) }, key, u8.slice(12));
+      return JSON.parse(dec.decode(pt));
+    } catch (e) {
+      return null;
+    }
+  }
+
+  return { derive, keyFrom, seal, open, check, normAccount, hex, b64, unb64 };
+});
+</script>
 <script>/* GIAO DIỆN: nhập nước đi của ĐỐI THỦ (chạm vào bàn cờ) -> app tính và tự đặt nước của BẠN, tô sáng ô bạn cần đánh. */
 (function () {
   const $ = (id) => document.getElementById(id);
@@ -1343,7 +1441,7 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
   };
   const cellName = (x, y) => String.fromCharCode(65 + x) + (y + 1);
 
-  let cfg = { addr: '', code: '', level: 'mid', me: null, bubble: false };
+  let cfg = { addr: '', code: '', level: 'mid', me: null, bubble: false, mode: 'acct', acct: null };
   try { Object.assign(cfg, JSON.parse(localStorage.getItem(KEY) || '{}')); } catch (e) {}
   const save = () => { try { localStorage.setItem(KEY, JSON.stringify(cfg)); } catch (e) {} };
 
@@ -1367,19 +1465,94 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
     if (a && !/:\d+$/.test(a)) a += ':3000';
     return a;
   }
+  // ---------- tìm máy tính qua tài khoản ----------
+  // Máy tính để lại địa chỉ (đã mã hóa) trong "hòm thư" ntfy; ở đây lấy về và giải mã bằng khóa tính từ tài khoản + mật khẩu.
+  const MAILBOX = window.CARO_MAILBOX || 'https://ntfy.sh'; // (CARO_MAILBOX chỉ dùng khi kiểm tra tự động)
+  const URL_OK = window.CARO_MAILBOX ? /^https:\/\/[\w.-]+$/ : /^https:\/\/[a-z0-9-]+\.trycloudflare\.com$/i;
+  let netId = 0;
+  const netWait = {};
+  window.__netDone = (id, status, text) => { const f = netWait[id]; if (f) { delete netWait[id]; f({ status, text }); } };
+  function fetchText(url) {
+    // Trong app dùng cầu nối Java (không bị giới hạn CORS); trên trình duyệt thử nghiệm dùng fetch thường.
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error('quá thời gian chờ')), 20000);
+      const done = (r) => { clearTimeout(timer); resolve(r); };
+      if (window.AndroidNet) { const id = ++netId; netWait[id] = done; try { window.AndroidNet.get(id, url); } catch (e) { clearTimeout(timer); reject(e); } return; }
+      fetch(url, { cache: 'no-store' }).then(async (r) => done({ status: r.status, text: await r.text() })).catch((e) => { clearTimeout(timer); reject(e); });
+    });
+  }
+  let tunnelUrl = '';
+  let resolvedAt = 0;
+  let resolving = false;
+  let failCount = 0;
+  async function resolveTunnel() {
+    const a = cfg.acct;
+    if (!a) throw new Error('Chưa nhập tài khoản.');
+    let r;
+    try { r = await fetchText(MAILBOX + '/' + encodeURIComponent(a.topic) + '/json?poll=1&since=all'); }
+    catch (e) { throw new Error('Không vào được dịch vụ trung gian. Kiểm tra điện thoại có mạng không.'); }
+    if (r.status !== 200) throw new Error('Dịch vụ trung gian đang bận (mã ' + r.status + '), thử lại sau ít phút.');
+    const msgs = [];
+    for (const line of String(r.text).split('\n')) {
+      if (!line.trim()) continue;
+      try { const m = JSON.parse(line); if (m.event === 'message' && typeof m.message === 'string') msgs.push(m); } catch (e) {}
+    }
+    msgs.sort((x, y) => (x.time || 0) - (y.time || 0));
+    const key = await CaroAccount.keyFrom(a.keyB64);
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const o = await CaroAccount.open(key, msgs[i].message);
+      if (o && URL_OK.test(String(o.url || ''))) return o.url;
+    }
+    throw new Error('Chưa thấy máy tính nào đang bật kết nối cho tài khoản này. Kiểm tra: app trên máy tính đang chạy, đã bấm "Bật kết nối", đúng tài khoản + mật khẩu.');
+  }
+  /** Xác định địa chỉ đích { base, wsUrl } theo chế độ đang dùng. */
+  async function target() {
+    if (cfg.mode === 'acct') {
+      if (!cfg.acct) return null;
+      if (!tunnelUrl || (failCount >= 2 && Date.now() - resolvedAt > 15000)) {
+        if (resolving) return null;
+        resolving = true;
+        try { tunnelUrl = await resolveTunnel(); resolvedAt = Date.now(); failCount = 0; }
+        finally { resolving = false; }
+      }
+      return { base: tunnelUrl, wsUrl: 'wss://' + tunnelUrl.replace(/^https:\/\//, '') + '/?code=' + cfg.acct.token, panel: tunnelUrl + '/?code=' + cfg.acct.token };
+    }
+    const addr = normAddr(cfg.addr);
+    if (!addr) return null;
+    const q = cfg.code ? '?code=' + encodeURIComponent(cfg.code) : '';
+    return { base: 'http://' + addr, wsUrl: 'ws://' + addr + '/' + q, panel: 'http://' + addr + '/' + q };
+  }
+  const hasTarget = () => (cfg.mode === 'acct' ? !!cfg.acct : !!cfg.addr);
+  let curTarget = null;
+  let connSeq = 0;
+
   function connect() {
     clearTimeout(retry);
     if (ws) { try { ws.onclose = null; ws.close(); } catch (e) {} ws = null; }
-    const addr = normAddr(cfg.addr);
-    if (!addr) { showConnect(true, 'Nhập địa chỉ máy đang chạy game.'); return; }
-    base = 'http://' + addr;
-    setChip('off', 'Đang nối…');
-    try {
-      ws = new WebSocket('ws://' + addr + '/' + (cfg.code ? '?code=' + encodeURIComponent(cfg.code) : ''));
-    } catch (e) { setChip('off', 'Địa chỉ không đúng'); return; }
+    const seq = ++connSeq;
+    setChip('off', cfg.mode === 'acct' ? 'Đang tìm máy tính…' : 'Đang nối…');
+    target().then((t) => {
+      if (seq !== connSeq) return;
+      if (!t) {
+        if (!hasTarget()) { showConnect(true, cfg.mode === 'acct' ? 'Nhập tài khoản + mật khẩu (giống bên app máy tính).' : 'Nhập địa chỉ máy đang chạy game.'); return; }
+        retry = setTimeout(connect, 2500);
+        return;
+      }
+      curTarget = t;
+      base = t.base;
+      open(t, seq);
+    }).catch((e) => {
+      if (seq !== connSeq) return;
+      setChip('off', 'Chưa nối được');
+      if (!everOpen) showConnect(true, e.message);
+      retry = setTimeout(connect, 8000);
+    });
+  }
+  function open(t, seq) {
+    try { ws = new WebSocket(t.wsUrl); } catch (e) { setChip('off', 'Địa chỉ không đúng'); return; }
     const mine = ws;
     lastMsg = Date.now();
-    ws.onopen = () => { everOpen = true; lastMsg = Date.now(); setChip('on', 'Đã nối game'); showConnect(false); };
+    ws.onopen = () => { everOpen = true; failCount = 0; lastMsg = Date.now(); setChip('on', cfg.mode === 'acct' ? 'Đã nối máy tính' : 'Đã nối game'); showConnect(false); };
     ws.onmessage = (e) => {
       if (mine !== ws) return;
       lastMsg = Date.now();
@@ -1388,8 +1561,11 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
     };
     ws.onclose = () => {
       if (mine !== ws) return;
+      failCount++;
       setChip('off', 'Mất kết nối, đang thử lại…');
-      if (!everOpen) showConnect(true, 'Chưa nối được. Kiểm tra: game đang chạy? điện thoại cùng WiFi (hoặc cùng Tailscale)? đã bấm "Bật kết nối qua WiFi" trong bảng điều khiển và mở lại game? đúng mã 6 số?');
+      if (!everOpen) showConnect(true, cfg.mode === 'acct'
+        ? 'Tìm thấy máy tính nhưng chưa nối được. Kiểm tra game trên máy tính đang chạy và kết nối vẫn "đã mở". Nếu máy tính vừa khởi động lại, đợi vài chục giây rồi thử lại.'
+        : 'Chưa nối được. Kiểm tra: game đang chạy? điện thoại cùng WiFi (hoặc cùng Tailscale)? đã bấm "Bật kết nối qua WiFi" trong bảng điều khiển và mở lại game? đúng mã 6 số?');
       retry = setTimeout(connect, 2500);
     };
     ws.onerror = () => { try { ws.close(); } catch (e) {} };
@@ -1757,11 +1933,37 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
     $('lkAddr').value = cfg.addr;
     $('lkCode').value = cfg.code;
     $('lkLevel').value = cfg.level;
-    $('lkGo').onclick = () => {
-      cfg.addr = normAddr($('lkAddr').value);
-      cfg.code = $('lkCode').value.trim();
+    $('lkAcc').value = cfg.acct ? cfg.acct.name : '';
+    const showMode = () => {
+      $('lkAcctBox').classList.toggle('hidden', cfg.mode !== 'acct');
+      $('lkLanBox').classList.toggle('hidden', cfg.mode === 'acct');
+      $('lkModeAcct').classList.toggle('primary', cfg.mode === 'acct');
+      $('lkModeLan').classList.toggle('primary', cfg.mode !== 'acct');
+    };
+    $('lkModeAcct').onclick = () => { cfg.mode = 'acct'; showMode(); };
+    $('lkModeLan').onclick = () => { cfg.mode = 'lan'; showMode(); };
+    showMode();
+    $('lkGo').onclick = async () => {
       cfg.level = $('lkLevel').value;
-      $('lkAddr').value = cfg.addr;
+      if (cfg.mode === 'acct') {
+        const name = $('lkAcc').value, pw = $('lkPw').value;
+        const bad = CaroAccount.check(name, pw);
+        if (bad && !(cfg.acct && !pw && CaroAccount.normAccount(name) === cfg.acct.name)) { showConnect(true, bad); return; }
+        if (pw) {
+          $('lkGo').disabled = true; showConnect(true, 'Đang kiểm tra tài khoản…');
+          try {
+            const d = await CaroAccount.derive(name, pw);
+            cfg.acct = { name: CaroAccount.normAccount(name), token: d.token, topic: d.topic, keyB64: d.keyB64 };
+          } catch (e) { showConnect(true, e.message); $('lkGo').disabled = false; return; }
+          $('lkGo').disabled = false;
+          $('lkPw').value = '';
+        }
+        tunnelUrl = ''; failCount = 0;
+      } else {
+        cfg.addr = normAddr($('lkAddr').value);
+        cfg.code = $('lkCode').value.trim();
+        $('lkAddr').value = cfg.addr;
+      }
       save();
       everOpen = false;
       connect();
@@ -1789,7 +1991,7 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
     $('lkZoom').onclick = () => { zoom = !zoom; $('lkZoom').textContent = zoom ? '🔍 Thu nhỏ' : '🔍 Phóng to'; L = null; render(); };
     window.addEventListener('resize', () => { L = null; if (st) drawBoard(); });
     // Giữ kết nối "sống": game gửi tin ít nhất 1,5 giây/lần. Quá 5 giây im lặng (điện thoại ngủ, đổi mạng...) thì nối lại ngay.
-    const revive = () => { if (cfg.addr && ws && Date.now() - lastMsg > 5000) connect(); };
+    const revive = () => { if (hasTarget() && ws && Date.now() - lastMsg > 5000) connect(); };
     setInterval(revive, 2000);
     document.addEventListener('visibilitychange', () => { if (!document.hidden) { lastMsg = 0; revive(); } });
     window.addEventListener('online', () => { lastMsg = 0; revive(); });
@@ -1800,12 +2002,13 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
     // bảng điều khiển trong app
     window.LinkApp = {
       panelUrl() {
+        if (cfg.mode === 'acct') return cfg.acct && tunnelUrl ? tunnelUrl + '/?code=' + cfg.acct.token : '';
         const a = normAddr(cfg.addr);
         return a ? 'http://' + a + '/' + (cfg.code ? '?code=' + encodeURIComponent(cfg.code) : '') : '';
       },
       relayout() { L = null; if (st) render(); },
     };
-    if (cfg.addr) { showConnect(false); connect(); } else showConnect(true, 'Nhập địa chỉ máy đang chạy game (xem trong bảng điều khiển, thẻ "Kết nối app Caro Trợ Thủ").');
+    if (hasTarget()) { showConnect(false); connect(); } else showConnect(true, 'Nhập tài khoản + mật khẩu giống bên app Caro LIVE trên máy tính để xem và điều khiển game.');
   }
   bind();
 })();

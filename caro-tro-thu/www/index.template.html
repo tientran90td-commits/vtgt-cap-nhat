@@ -63,9 +63,17 @@
   <div id="lkConn" class="overlay hidden">
     <div class="card">
       <h2>🔗 Nối vào game</h2>
-      <div class="note">Mở bảng điều khiển game, xem thẻ "Kết nối app Caro Trợ Thủ" để lấy địa chỉ (và mã nếu dùng điện thoại khác).</div>
-      <label>Địa chỉ game<input id="lkAddr" placeholder="192.168.1.5:3000 hoặc 127.0.0.1:3000" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
-      <label>Mã kết nối (6 số, bỏ trống nếu game chạy ngay trên điện thoại này)<input id="lkCode" inputmode="numeric" maxlength="6" placeholder="123456"></label>
+      <div class="mode"><button id="lkModeAcct" class="small primary">👤 Tài khoản</button><button id="lkModeLan" class="small">🌐 Địa chỉ trực tiếp</button></div>
+      <div id="lkAcctBox">
+        <div class="note">Nhập đúng tài khoản + mật khẩu bạn đã đặt trong app Caro LIVE trên máy tính. Ở đâu cũng nối được (WiFi hay 4G), không cần nhập IP.</div>
+        <label>Tài khoản<input id="lkAcc" placeholder="tên tài khoản" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
+        <label>Mật khẩu<input id="lkPw" type="password" placeholder="mật khẩu (app không lưu mật khẩu)" autocomplete="off"></label>
+      </div>
+      <div id="lkLanBox" class="hidden">
+        <div class="note">Dùng khi điện thoại và máy tính cùng WiFi/Tailscale. Xem địa chỉ + mã ở bảng điều khiển, thẻ "Kết nối app Caro Trợ Thủ".</div>
+        <label>Địa chỉ game<input id="lkAddr" placeholder="192.168.1.5:3000 hoặc 127.0.0.1:3000" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
+        <label>Mã kết nối (6 số, bỏ trống nếu game chạy ngay trên điện thoại này)<input id="lkCode" inputmode="numeric" maxlength="6" placeholder="123456"></label>
+      </div>
       <label>Mức nghĩ<select id="lkLevel"><option value="fast">Nhanh (0,7 giây)</option><option value="mid" selected>Vừa (2 giây)</option><option value="deep">Sâu (6 giây)</option></select></label>
       <div id="lkConnMsg" class="note"></div>
       <button id="lkGo" class="primary">Kết nối</button>
@@ -88,6 +96,7 @@
 
 <script id="engine">/*ENGINE*/</script>
 <script>/*RAPFI*/</script>
+<script>/*ACCOUNT*/</script>
 <script>/*APP*/</script>
 <script>/*LINK*/</script>
 <script>/*TABS*/</script>

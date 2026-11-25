@@ -32,6 +32,47 @@ public class MainActivity extends Activity {
     private WebView web;
 
     /** Cầu nối cho trang web trong app điều khiển BONG BÓNG NỔI (xem BubbleService.java). Trang gọi: AndroidBubble.xxx() */
+    /** Lấy chữ từ địa chỉ https (dùng để tìm máy tính qua tài khoản). Chạy nền, trả kết quả về trang bằng __netDone. */
+    public class NetBridge {
+        @JavascriptInterface
+        public void get(final int id, final String url) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    int status = 0;
+                    String body = "";
+                    try {
+                        if (url == null || !url.startsWith("https://")) throw new Exception("chỉ nhận https");
+                        java.net.HttpURLConnection c = (java.net.HttpURLConnection) new java.net.URL(url).openConnection();
+                        c.setConnectTimeout(10000);
+                        c.setReadTimeout(15000);
+                        c.setRequestProperty("User-Agent", "CaroTroThu");
+                        status = c.getResponseCode();
+                        InputStream in = status >= 400 ? c.getErrorStream() : c.getInputStream();
+                        if (in != null) {
+                            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+                            byte[] buf = new byte[8192];
+                            int n;
+                            while ((n = in.read(buf)) > 0 && out.size() < 400000) out.write(buf, 0, n);
+                            in.close();
+                            body = out.toString("UTF-8");
+                        }
+                        c.disconnect();
+                    } catch (Exception e) {
+                        status = 0;
+                    }
+                    final String js = "window.__netDone(" + id + "," + status + "," + org.json.JSONObject.quote(body) + ")";
+                    runOnUiThread(new Runnable() {
+                        @Override
+                        public void run() {
+                            if (web != null) web.evaluateJavascript(js, null);
+                        }
+                    });
+                }
+            }).start();
+        }
+    }
+
     public class BubbleBridge {
         /** "ok" = bật được; "need_overlay" = chưa cấp quyền hiển thị trên các ứng dụng khác (đã mở màn hình cấp quyền). */
         @JavascriptInterface
@@ -120,6 +161,7 @@ public class MainActivity extends Activity {
             }
         });
         web.addJavascriptInterface(new BubbleBridge(), "AndroidBubble");
+        web.addJavascriptInterface(new NetBridge(), "AndroidNet");
         // giữ trang "sống" khi sang app khác (TikTok...) để vẫn nhận nước đi từ game
         if (Build.VERSION.SDK_INT >= 26) web.setRendererPriorityPolicy(WebView.RENDERER_PRIORITY_IMPORTANT, false);
         web.loadUrl("https://" + HOST + "/index.html");
