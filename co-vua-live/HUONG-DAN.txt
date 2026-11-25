@@ -260,3 +260,7 @@ TINH NANG MOI: SO VAN THANG LIEN TIEP / THONG BAO LAP LAI / HEN TRUOC
 - Hen truoc: the "Tat ca nguoi xem" > bam chon dung 2 nguoi > bam "Hen truoc (van ke tiep)". Van dang choi van tiep tuc;
   het van thi van sau chinh la 2 nguoi do (khong tinh chuoi thang cu). Hen chi dung 1 lan, bam "Huy hen" de bo.
   Neu tich "Bat 2 nguoi tha tim xac nhan" thi luc toi luot ho van phai tha tim xac nhan.
+
+LOGO TEN KENH (MOI)
+- Tren man hinh LIVE co logo goc trai phia duoi: dong tren "Tran Quynh Chi", dong duoi "live chinh".
+- Doi chu / tat bat: bang dieu khien > Cai dat > "Hien logo ten kenh", "Logo - dong tren", "Logo - dong duoi" (doi la LIVE doi theo ngay, khong can mo lai game).

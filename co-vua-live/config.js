@@ -39,6 +39,10 @@ module.exports = {
   celebrateOn: true, // có người thắng -> phát video ăn mừng (public/media/celebrate.mp4): có tiếng ngay, 4 giây sau mới hiện hình thế chỗ 2 nhân vật
   celebrateMinSeconds: Number(process.env.CARO_CELEB_MIN) || (fast ? 0 : 28), // màn hình kết quả giữ ít nhất bấy nhiêu giây để video chạy hết (video ~10,4 giây + vài giây quân cuối còn đang đặt xuống)
   themeAuto: true, // mỗi ván đổi màu bàn cờ, màu phòng, tóc/áo 2 nhân vật (chống nhàm chán)
+  // ===== LOGO TÊN KÊNH trên màn hình LIVE (đổi trong bảng điều khiển, không cần sửa file) =====
+  logoOn: true,
+  logoName: 'Trần Quỳnh Chi',
+  logoSub: 'live chính',
   showCellLabels: true, // ghi ký hiệu (a1, e4...) mờ mờ trong từng ô để người xem biết gõ gì
 
   // ===== CHỌN NGƯỜI CHƠI =====

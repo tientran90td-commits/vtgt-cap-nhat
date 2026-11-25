@@ -23,7 +23,8 @@ const NUMBERS = {
   crowdMax: [0, 14],
   clockSeconds: [0, 60],
 };
-const BOOLS = ['winnerStays', 'hostCanPlay', 'autoNextGame', 'showSign', 'showCellLabels', 'themeAuto', 'celebrateOn'];
+const BOOLS = ['winnerStays', 'hostCanPlay', 'autoNextGame', 'showSign', 'showCellLabels', 'themeAuto', 'celebrateOn', 'logoOn'];
+const TEXTS = { logoName: 40, logoSub: 40 }; // chữ tự gõ: tối đa bấy nhiêu ký tự
 
 class Settings {
   constructor(cfg, file) {
@@ -52,6 +53,14 @@ class Settings {
       const n = Math.round(Number(patch[k]));
       if (!Number.isFinite(n)) continue;
       const v = Math.min(hi, Math.max(lo, n));
+      if (c[k] !== v) {
+        c[k] = v;
+        changed.push(k);
+      }
+    }
+    for (const [k, max] of Object.entries(TEXTS)) {
+      if (typeof patch[k] !== 'string') continue;
+      const v = patch[k].replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
       if (c[k] !== v) {
         c[k] = v;
         changed.push(k);
@@ -124,6 +133,7 @@ class Settings {
     const out = { voice: { ...c.voice }, sfx: { ...(c.sfx || { on: true, volume: 0.7 }) }, music: { ...(c.music || { on: true, volume: 0.3 }) } };
     for (const k of Object.keys(NUMBERS)) out[k] = c[k];
     for (const k of BOOLS) out[k] = c[k];
+    for (const k of Object.keys(TEXTS)) out[k] = c[k] === undefined ? '' : c[k];
     return out;
   }
 

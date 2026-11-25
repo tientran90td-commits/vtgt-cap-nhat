@@ -524,6 +524,21 @@ function themeTick(s) {
   applyTheme(t, boardView, scene);
 }
 
+// ---------------------------------------------------------------- logo tên kênh
+let logoKey = '';
+function renderLogo(s) {
+  const st = (s && s.settings) || {};
+  const on = st.logoOn !== false && !!(st.logoName || st.logoSub);
+  const key = on ? (st.logoName || '') + '|' + (st.logoSub || '') : '';
+  if (key === logoKey) return;
+  logoKey = key;
+  const box = $('logo');
+  box.classList.toggle('hidden', !on);
+  setText($('logoName'), st.logoName || '');
+  setText($('logoSub'), st.logoSub || '');
+  $('logoSub').style.display = st.logoSub ? '' : 'none';
+}
+
 // ---------------------------------------------------------------- vòng lặp
 let last = performance.now();
 function frame(t) {
@@ -535,6 +550,7 @@ function frame(t) {
   const ledOn = !(state && state.settings && state.settings.ledOn === false);
   boardView.ledOn = ledOn;
   boardView.labelsOn = !(state && state.settings && state.settings.showCellLabels === false);
+  renderLogo(state);
   if (scene.tickLed) scene.tickLed(time, ledOn);
   boardView.draw(director.view, time);
   scene.render();

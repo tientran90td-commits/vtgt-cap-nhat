@@ -80,6 +80,10 @@ module.exports = {
   // ===== BIỂN BÁO NHỎ Ở GÓC MÀN HÌNH =====
   // Ghi sẵn các điều cần thiết (gõ tọa độ, nếu bình luận bị ẩn thì thêm @, xin thêm giờ...). Không đọc thành tiếng.
   showSign: true,
+  // ===== LOGO TÊN KÊNH trên màn hình LIVE (đổi trong bảng điều khiển, không cần sửa file) =====
+  logoOn: true,
+  logoName: 'Trần Quỳnh Chi',
+  logoSub: 'live chính',
   showCellLabels: true, // ghi tọa độ (A1, H8, O15...) mờ trong từng ô vuông để người xem biết gõ gì
   themeAuto: true, // mỗi ván đổi màu bàn cờ, màu phòng, tóc/áo 2 nhân vật
   crowdMax: 10, // số khán giả (tên + ảnh đại diện) hiện thành nhân vật đứng quanh phòng, 0 = tắt

@@ -110,7 +110,7 @@ function flashSaved() {
 document.querySelectorAll('#setForm [data-k]').forEach((el) => {
   el.onchange = () => {
     const k = el.dataset.k;
-    const v = el.type === 'checkbox' ? el.checked : el.tagName === 'SELECT' ? el.value : Number(el.value);
+    const v = el.type === 'checkbox' ? el.checked : el.tagName === 'SELECT' || el.type === 'text' ? el.value : Number(el.value);
     cmd('settings', { patch: { [k]: v } });
     flashSaved();
   };

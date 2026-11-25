@@ -23,7 +23,8 @@ const NUMBERS = {
   crowdMax: [0, 14],
   clockSeconds: [0, 60],
 };
-const BOOLS = ['blockBothEnds', 'winnerStays', 'hostCanPlay', 'autoNextGame', 'showSign', 'themeAuto', 'ledOn', 'showCellLabels', 'celebrateOn'];
+const BOOLS = ['blockBothEnds', 'winnerStays', 'hostCanPlay', 'autoNextGame', 'showSign', 'themeAuto', 'ledOn', 'showCellLabels', 'celebrateOn', 'logoOn'];
+const TEXTS = { logoName: 40, logoSub: 40 }; // chữ tự gõ: tối đa bấy nhiêu ký tự
 
 class Settings {
   constructor(cfg, file) {
@@ -60,6 +61,14 @@ class Settings {
     if (typeof patch.boardSkin === 'string' && /^(auto|wood|[a-z0-9-]{1,20})$/.test(patch.boardSkin) && c.boardSkin !== patch.boardSkin) {
       c.boardSkin = patch.boardSkin;
       changed.push('boardSkin');
+    }
+    for (const [k, max] of Object.entries(TEXTS)) {
+      if (typeof patch[k] !== 'string') continue;
+      const v = patch[k].replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, max);
+      if (c[k] !== v) {
+        c[k] = v;
+        changed.push(k);
+      }
     }
     for (const k of BOOLS) {
       if (patch[k] === undefined) continue;
@@ -129,6 +138,7 @@ class Settings {
     for (const k of Object.keys(NUMBERS)) out[k] = c[k];
     for (const k of BOOLS) out[k] = c[k];
     out.boardSkin = c.boardSkin || 'auto';
+    for (const k of Object.keys(TEXTS)) out[k] = c[k] === undefined ? '' : c[k];
     return out;
   }
 
