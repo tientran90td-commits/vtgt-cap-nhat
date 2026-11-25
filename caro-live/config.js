@@ -24,7 +24,7 @@ module.exports = {
   tikfinityUrl: 'ws://127.0.0.1:21213/', // dùng khi chạy với --tikfinity (nhận sự kiện từ TikFinity Desktop)
 
   // ===== MÁY CHỦ =====
-  host: '127.0.0.1',
+  host: readTextFile('data/app-wifi.txt') === '1' ? '0.0.0.0' : '127.0.0.1', // 0.0.0.0 = cho app Trợ Thủ nối qua WiFi (bật ở bảng điều khiển)
   port: Number(process.env.CARO_PORT) || 3000,
   testApi: true, // cho phép tự gõ thử bình luận bằng trình duyệt (xem HUONG-DAN.txt)
 

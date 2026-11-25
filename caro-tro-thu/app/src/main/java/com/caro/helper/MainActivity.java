@@ -18,6 +18,7 @@ import java.util.Map;
 /**
  * Vỏ app: mở trang assets/index.html qua địa chỉ ảo https://appassets.androidplatform.net/ (không cần mạng).
  * Dùng địa chỉ https (thay vì file://) để chạy được engine Rapfi (WebAssembly) nằm trong assets/rapfi/.
+ * Từ v2: app nối vào game Caro LIVE (http://địa-chỉ:3000) nên cần quyền INTERNET + cho phép http/ws.
  */
 public class MainActivity extends Activity {
     private static final String HOST = "appassets.androidplatform.net";
@@ -45,6 +46,8 @@ public class MainActivity extends Activity {
         s.setJavaScriptEnabled(true);
         s.setDomStorageEnabled(true);
         s.setAllowFileAccess(false);
+        // Trang app chạy ở địa chỉ https ảo nhưng nối tới game bằng http/ws trong mạng nhà -> cho phép nội dung hỗn hợp
+        s.setMixedContentMode(WebSettings.MIXED_CONTENT_ALWAYS_ALLOW);
         web.setWebViewClient(new WebViewClient() {
             @Override
             public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {

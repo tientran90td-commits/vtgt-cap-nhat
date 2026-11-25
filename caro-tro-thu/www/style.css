@@ -22,7 +22,7 @@ canvas { display:block; }
 #actions { display:flex; gap:6px; flex-wrap:wrap; }
 #actions button { flex:1; min-width:0; }
 #legend { font-size:12px; color:var(--mut); text-align:center; }
-#setup { position:fixed; inset:0; background:rgba(5,8,18,.92); display:flex; align-items:center; justify-content:center; padding:14px; z-index:10; overflow:auto; }
+#setup { position:absolute; inset:0; background:rgba(5,8,18,.92); display:flex; align-items:center; justify-content:center; padding:14px; z-index:10; overflow:auto; }
 #setup.hidden { display:none; }
 .card { background:var(--panel); border-radius:16px; padding:16px; width:100%; max-width:420px; display:flex; flex-direction:column; gap:12px; }
 .card h2 { margin:0; font-size:20px; }
@@ -31,3 +31,41 @@ select { font:inherit; padding:10px; border-radius:10px; border:0; background:#2
 .row2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
 .row2 button { padding:16px 8px; font-size:16px; }
 .note { font-size:12px; color:var(--mut); line-height:1.4; }
+
+/* ---- khung tab + các màn hình ---- */
+#views { position:fixed; inset:0 0 calc(54px + env(safe-area-inset-bottom)) 0; }
+.view { position:absolute; inset:0; display:none; overflow:hidden; }
+.view.on { display:block; }
+#tabs { position:fixed; left:0; right:0; bottom:0; display:flex; gap:6px; padding:6px 8px calc(6px + env(safe-area-inset-bottom)); background:#0b1020; border-top:1px solid #243058; z-index:20; }
+#tabs button { flex:1; padding:11px 4px; background:#1a2340; font-size:14px; }
+#tabs button.on { background:#2f6fe0; }
+.hidden { display:none !important; }
+.pad { padding:16px; }
+.mut { color:var(--mut); font-size:12px; }
+button.small { padding:6px 10px; font-size:13px; }
+input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a3558; color:var(--txt); width:100%; }
+/* ---- tab Nối game ---- */
+#lk { display:flex; flex-direction:column; height:100%; max-width:680px; margin:0 auto; padding:8px; gap:8px; }
+.lk-top { display:flex; align-items:center; justify-content:space-between; gap:8px; }
+.chip { font-size:12px; font-weight:800; padding:4px 10px; border-radius:99px; }
+.chip.on { background:#1f8f4e; } .chip.off { background:#7a3a3a; }
+.lk-players { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.pl { display:flex; align-items:center; gap:8px; background:var(--panel); border-radius:12px; padding:8px; border:2px solid transparent; min-width:0; }
+.pl img { width:42px; height:42px; border-radius:50%; object-fit:cover; background:#2a3558; flex:none; }
+.pl .nm { font-weight:800; font-size:14px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.pl .rk { font-size:11px; color:var(--mut); }
+.pl > div { min-width:0; }
+#lkPX { border-left:5px solid var(--red); } #lkPO { border-left:5px solid var(--blue); }
+.pl.turn { border-color:var(--gold); box-shadow:0 0 10px rgba(255,213,74,.5); }
+.pl.me .nm { color:var(--green); }
+.lk-me { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+.lk-me label { display:flex; align-items:center; gap:8px; font-weight:700; flex:1; min-width:200px; }
+.lk-me select { flex:1; min-width:0; }
+#lkStatus { background:var(--panel); border-radius:12px; padding:10px 12px; min-height:62px; display:flex; flex-direction:column; justify-content:center; gap:2px; }
+#lkStatus .big { font-size:22px; font-weight:900; } #lkStatus .big.me { color:var(--green); } #lkStatus .big.opp { color:var(--mut); } #lkStatus .big.nhay { color:#c58bff; }
+#lkStatus .sub { font-size:13px; color:var(--mut); }
+#lkWrap { flex:1; min-height:0; overflow:auto; border-radius:10px; background:#0b1020; touch-action:pan-x pan-y; }
+#lkActions { display:flex; gap:6px; } #lkActions button { flex:1; min-width:0; }
+.overlay { position:absolute; inset:0; background:rgba(5,8,18,.94); display:flex; align-items:center; justify-content:center; padding:14px; z-index:5; overflow:auto; }
+#pnFrame { width:100%; height:100%; border:0; background:#10162a; display:none; }
+#viewPanel.has #pnFrame { display:block; } #viewPanel.has #pnNone { display:none; }

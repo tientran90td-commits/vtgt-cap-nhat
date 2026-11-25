@@ -8,6 +8,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { WebSocketServer } = require('ws');
+const applink = require('./applink');
 const config = require('../config');
 const { Hub } = require('./hub');
 const { startDemo } = require('./demo');
@@ -86,6 +87,25 @@ function serveMusicList(res) {
   res.end(JSON.stringify(files));
 }
 
+// ---------- thẻ "Kết nối app Caro Trợ Thủ" (chỉ cho trang trên chính máy này) ----------
+function serveAppLink(req, res, url) {
+  const send = (code, obj) => {
+    res.writeHead(code, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
+    res.end(JSON.stringify(obj));
+  };
+  if (!applink.isLoopback(req.socket.remoteAddress)) return send(403, { ok: false });
+  if (url.pathname === '/app-link' && req.method === 'GET') return send(200, { ok: true, ...applink.info(config.port), listening: config.host });
+  if (url.pathname === '/app-link/wifi' && req.method === 'POST') {
+    applink.setWifi(url.searchParams.get('on') === '1');
+    return send(200, { ok: true, ...applink.info(config.port), listening: config.host, restart: true });
+  }
+  if (url.pathname === '/app-link/newcode' && req.method === 'POST') {
+    applink.newCode();
+    return send(200, { ok: true, ...applink.info(config.port), listening: config.host });
+  }
+  return send(404, { ok: false });
+}
+
 // ---------- HTTP ----------
 const server = http.createServer((req, res) => {
   const url = new URL(req.url, 'http://localhost');
@@ -93,6 +113,7 @@ const server = http.createServer((req, res) => {
   // --- ảnh đại diện TikTok (đi qua máy chủ để trình duyệt vẽ được lên hình 3D) ---
   if (url.pathname === '/avatar') return serveAvatar(url.searchParams.get('u'), res);
   if (url.pathname === '/demo-avatar') return serveDemoAvatar(url.searchParams.get('n'), res);
+  if (url.pathname.startsWith('/app-link')) return serveAppLink(req, res, url);
   if (url.pathname === '/music-list') return serveMusicList(res);
   if (url.pathname.startsWith('/update/') && updater.handle(req, res, url, { log })) return;
   if (url.pathname === '/viewers') {
@@ -163,17 +184,8 @@ const server = http.createServer((req, res) => {
 });
 
 // ---------- WebSocket: đẩy trạng thái cho trang web ----------
-// Chỉ nhận kết nối từ trang chạy trên chính máy này (chặn trang web lạ gọi lệnh vào game)
-function originOk(origin) {
-  if (!origin) return true;
-  try {
-    const h = new URL(origin).hostname;
-    return h === 'localhost' || h === '127.0.0.1' || h === '[::1]';
-  } catch (e) {
-    return false;
-  }
-}
-const wss = new WebSocketServer({ server, verifyClient: (info) => originOk(info.origin) });
+// Chỉ nhận kết nối từ trang trên chính máy này, hoặc app Caro Trợ Thủ (máy khác phải có mã kết nối - xem src/applink.js)
+const wss = new WebSocketServer({ server, verifyClient: (info) => applink.allowWs(info) });
 let lastJson = '';
 let lastSent = 0;
 

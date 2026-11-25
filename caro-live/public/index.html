@@ -122,6 +122,16 @@
 
     <!-- CỘT PHẢI -->
     <section class="col">
+      <div class="card" id="linkCard">
+        <h2>📱 Kết nối app Caro Trợ Thủ</h2>
+        <p class="hint tiny" id="linkMsg">App trên điện thoại nối thẳng vào ván đang chơi để hiện bàn cờ, tên 2 người chơi và gợi ý nước đi cho bạn.</p>
+        <div id="linkInfo" class="hint tiny"></div>
+        <div class="btnrow">
+          <button id="linkWifi">📶 Bật kết nối qua WiFi</button>
+          <button id="linkCode" class="hidden">🔑 Đổi mã</button>
+        </div>
+      </div>
+
       <div class="card" id="updCard">
         <h2>⬆️ Cập nhật phần mềm <small id="updVer" class="ok"></small></h2>
         <p class="hint tiny" id="updMsg">Bấm "Kiểm tra" để xem có bản mới trên GitHub không. Cài đặt, thống kê và ID TikTok của bạn được giữ nguyên.</p>
@@ -254,6 +264,7 @@
   <div id="toast" class="toast hidden"></div>
   <script type="module" src="panel.js"></script>
   <script type="module" src="update-panel.js"></script>
+  <script type="module" src="applink-panel.js"></script>
   <script type="module" src="announce-panel.js"></script>
 </body>
 </html>

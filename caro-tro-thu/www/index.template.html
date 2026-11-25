@@ -8,6 +8,8 @@
 <style>/*CSS*/</style>
 </head>
 <body>
+<div id="views">
+<div id="viewManual" class="view">
 <div id="app">
   <header>
     <h1>♟ Caro Trợ Thủ</h1>
@@ -39,8 +41,53 @@
     <button id="bResume">Quay lại ván đang chơi</button>
   </div>
 </div>
+</div>
+
+<div id="viewLink" class="view on">
+  <div id="lk">
+    <div class="lk-top"><span id="lkChip" class="chip off">Chưa nối</span><span id="lkPhase" class="mut"></span><button id="lkSettings" class="small">⚙ Kết nối</button></div>
+    <div class="lk-players">
+      <div id="lkPX" class="pl"><img alt=""><div><div class="nm">Chưa có người</div><div class="rk">✕ đỏ</div></div></div>
+      <div id="lkPO" class="pl"><img alt=""><div><div class="nm">Chưa có người</div><div class="rk">◯ xanh</div></div></div>
+    </div>
+    <div class="lk-me"><label>Tôi là <select id="lkMe"></select></label><span id="lkMeHint" class="mut"></span></div>
+    <div id="lkStatus"><div id="lkBig" class="big">Chưa nối game</div><div id="lkSub" class="sub"></div></div>
+    <div id="lkWrap"><canvas id="lkBoard"></canvas></div>
+    <div id="lkActions">
+      <button id="lkAlt" disabled>Gợi ý khác</button>
+      <button id="lkNhay" class="nhay" disabled>😜 Nhây</button>
+      <button id="lkZoom">🔍 Phóng to</button>
+    </div>
+  </div>
+  <div id="lkConn" class="overlay hidden">
+    <div class="card">
+      <h2>🔗 Nối vào game</h2>
+      <div class="note">Mở bảng điều khiển game, xem thẻ "Kết nối app Caro Trợ Thủ" để lấy địa chỉ (và mã nếu dùng điện thoại khác).</div>
+      <label>Địa chỉ game<input id="lkAddr" placeholder="192.168.1.5:3000 hoặc 127.0.0.1:3000" autocapitalize="off" autocomplete="off" spellcheck="false"></label>
+      <label>Mã kết nối (6 số, bỏ trống nếu game chạy ngay trên điện thoại này)<input id="lkCode" inputmode="numeric" maxlength="6" placeholder="123456"></label>
+      <label>Mức nghĩ<select id="lkLevel"><option value="fast">Nhanh (0,7 giây)</option><option value="mid" selected>Vừa (2 giây)</option><option value="deep">Sâu (6 giây)</option></select></label>
+      <div id="lkConnMsg" class="note"></div>
+      <button id="lkGo" class="primary">Kết nối</button>
+    </div>
+  </div>
+</div>
+
+<div id="viewPanel" class="view">
+  <div id="pnNone" class="pad note">Chưa có địa chỉ game. Vào tab "Nối game" nhập địa chỉ trước, bảng điều khiển sẽ hiện ở đây.</div>
+  <iframe id="pnFrame" title="Bảng điều khiển game"></iframe>
+</div>
+</div>
+
+<nav id="tabs">
+  <button data-tab="viewLink" class="on">🎮 Nối game</button>
+  <button data-tab="viewPanel">⚙ Điều khiển</button>
+  <button data-tab="viewManual">✍ Tự nhập</button>
+</nav>
+
 <script id="engine">/*ENGINE*/</script>
 <script>/*RAPFI*/</script>
 <script>/*APP*/</script>
+<script>/*LINK*/</script>
+<script>/*TABS*/</script>
 </body>
 </html>

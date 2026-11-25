@@ -15,7 +15,15 @@ export function connect(onState, onStatus) {
 
   function open() {
     const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-    ws = new WebSocket(`${proto}://${location.host}`);
+    // app Caro Trợ Thủ mở bảng điều khiển qua WiFi kèm ?code=... -> nhớ mã để nối WebSocket
+    let code = new URLSearchParams(location.search).get('code') || '';
+    try {
+      if (code) sessionStorage.setItem('caroCode', code);
+      else code = sessionStorage.getItem('caroCode') || '';
+    } catch (e) {
+      /* bỏ qua */
+    }
+    ws = new WebSocket(`${proto}://${location.host}/${code ? '?code=' + encodeURIComponent(code) : ''}`);
     ws.onopen = () => {
       api.connected = true;
       if (onStatus) onStatus(true);

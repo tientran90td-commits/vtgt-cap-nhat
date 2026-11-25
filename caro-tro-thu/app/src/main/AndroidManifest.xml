@@ -1,8 +1,12 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Cần để nối vào game Caro LIVE qua WiFi / cùng điện thoại -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <application
         android:allowBackup="true"
+        android:usesCleartextTraffic="true"
         android:icon="@drawable/ic_launcher"
         android:label="Caro Trợ Thủ"
         android:theme="@android:style/Theme.DeviceDefault.NoActionBar">

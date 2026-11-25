@@ -266,3 +266,15 @@ KHAN GIA TANG QUA (NGOAI TRAN)
 - Nguoi vua tang qua luon co mat trong phong du so khan gia dang bi gioi han. Nguoi dang ngoi o ban thi khong zoom.
 - Tat tinh nang nay: dat "So khan gia dung quanh phong" = 0 trong Cai dat.
 
+APP CARO TRO THU NOI THANG VAO GAME (MOI)
+- Trong app Caro Tro Thu (ban 2.0) co 3 tab: "Noi game" (hien ban co dang danh, ten + anh 2 nguoi choi, tu goi y nuoc di cho ban),
+  "Dieu khien" (chinh la bang dieu khien game ngay trong app) va "Tu nhap" (cach cu, nhap tay nuoc di cua doi thu).
+- Cach noi: bang dieu khien game > the "Ket noi app Caro Tro Thu" co dia chi can nhap vao app.
+  + Game chay ngay tren dien thoai (Termux): nhap 127.0.0.1:3000, khong can ma.
+  + Game chay tren may tinh, cung WiFi: bam "Bat ket noi qua WiFi", DONG game roi mo lai, nhap dia chi + ma 6 so vao app.
+  + Khac WiFi / dung 4G: cai Tailscale (mien phi, tailscale.com) tren may tinh va dien thoai, dang nhap cung 1 tai khoan,
+    roi nhap dia chi 100.x.x.x cua may tinh (cung hien trong the ket noi) + ma 6 so.
+- Trong tab "Noi game": chon "Toi la" = ten TikTok cua ban (chon 1 lan, app nho). Toi luot ban, app tu hien "Ban danh o J9".
+  Nut "Goi y khac" va "Nhay" van dung nhu cu.
+- An toan: mac dinh game chi nhan ket noi tu chinh may do. Bat WiFi thi may khac phai nhap dung ma 6 so; chi bat khi dung WiFi nha minh.
+
