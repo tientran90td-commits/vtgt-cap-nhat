@@ -182,6 +182,7 @@
     const key = want ? st.gameNo + ':' + st.moves.length + ':' + mm : null;
     if (!want) { if (hint) { reqId++; hint = null; } }
     else if (!hint || hint.key !== key) {
+      const t0 = Date.now();
       const mine = { key, x: -1, y: -1, alts: [], nhay: { list: [], idx: -1 }, busy: true };
       hint = mine;
       const p = mm === 'X' ? 1 : 2;
@@ -193,6 +194,7 @@
         mine.busy = false;
         mine.x = r.x; mine.y = r.y; mine.alts = r.alts || [{ x: r.x, y: r.y }]; mine.altIdx = 0;
         mine.shown = { x: r.x, y: r.y };
+        mine.brain = (r.why === 'Rapfi' ? 'Rapfi (mạnh)' : 'bộ não nội bộ' + (window.RapfiBridge ? (RapfiBridge.state === 'ready' ? (strict ? ', luật chặn 2 đầu' : '') : ', Rapfi ' + (RapfiBridge.state === 'loading' ? 'đang tải' : 'không chạy được')) : '')) + ' · ' + Math.round((Date.now() - t0) / 100) / 10 + 's';
         if (navigator.vibrate) { try { navigator.vibrate(80); } catch (e) {} }
         render();
         let lastOpp = -1;
@@ -253,7 +255,7 @@
         const c = nh || hint.shown || hint;
         big.className = 'big ' + (nh ? 'nhay' : 'me');
         big.textContent = (nh ? '😜 Nhây: bạn đánh ô ' : '👉 Bạn đánh ô ') + cellName(c.x, c.y);
-        sub.textContent = nh ? 'Máy đã kiểm tra: dù họ đáp thế nào bạn vẫn thắng.' : 'Gõ ô này vào bình luận để đánh. Còn ' + Math.max(0, Math.ceil((st.turnEndsAt - Date.now()) / 1000)) + ' giây (ước tính).';
+        sub.textContent = (nh ? 'Máy đã kiểm tra: dù họ đáp thế nào bạn vẫn thắng.' : 'Gõ ô này vào bình luận để đánh. Còn ' + Math.max(0, Math.ceil((st.turnEndsAt - Date.now()) / 1000)) + ' giây (ước tính).') + (hint.brain ? ' [🧠 ' + hint.brain + ']' : '');
         return;
       }
       const opp = p[mm === 'X' ? 'O' : 'X'];
