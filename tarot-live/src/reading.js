@@ -127,8 +127,13 @@ function build(drawn, user, opts = {}) {
 // 1) showSteps: xáo bài (MC chào) -> chia bài -> lật cả 5 lá -> đọc tên từng lá. Chạy NGAY, trong lúc AI đang viết.
 // 2) readSteps: đọc từng lá + tổng kết + lời chúc. Được nối vào sau khi AI trả lời (hoặc dùng lời viết sẵn).
 function makeDur(opts) {
-  const mpc = (MS_PER_CHAR[opts.speed] || MS_PER_CHAR.normal) / (Number(opts.rate) > 0 ? Number(opts.rate) : 1); // đọc chậm thì mỗi bước dài ra
-  return (text, min) => (opts.fast ? 1200 : Math.max(min, Math.round(text.length * mpc)));
+  const base = MS_PER_CHAR[opts.speed] || MS_PER_CHAR.normal;
+  // đọc chậm thì mỗi bước dài ra; mỗi vai (điều phối / người đọc Tarot) có tốc độ riêng
+  const rateOf = (role) => {
+    const r = Number(role === 'mc' ? opts.rateMc : opts.rate);
+    return r > 0 ? r : 1;
+  };
+  return (text, min, role = 'reader') => (opts.fast ? 1200 : Math.max(min, Math.round((text.length * base) / rateOf(role))));
 }
 
 function layout(steps, base = 0) {
@@ -165,14 +170,14 @@ function showSteps(cards, user, opts = {}) {
   const n = cards.length;
   const steps = [];
   const intro = introText(user.name, opts.profile, opts.sensitive, rnd);
-  steps.push({ kind: 'shuffle', say: intro, dur: dur(intro, 6000) });
+  steps.push({ kind: 'shuffle', role: 'reader', say: intro, dur: dur(intro, 6000, 'reader') });
   const deal = `Mình chia ${n === 5 ? 'năm' : n} lá bài ra bàn.`;
-  steps.push({ kind: 'deal', say: deal, dur: dur(deal, 3500) });
+  steps.push({ kind: 'deal', role: 'mc', say: deal, dur: dur(deal, 3500, 'mc') });
   const rv = `Giờ mình lật cả ${n === 5 ? 'năm' : n} lá cùng lúc nhé.`;
-  steps.push({ kind: 'reveal', say: rv, dur: dur(rv, 3500) });
+  steps.push({ kind: 'reveal', role: 'mc', say: rv, dur: dur(rv, 3500, 'mc') });
   cards.forEach((c, i) => {
     const say = `${ORD[i]}, ${c.pos}: ${c.vi}${c.rev ? ', lá ngược' : ''}.`;
-    steps.push({ kind: 'name', idx: i, say, dur: dur(say, 3200) });
+    steps.push({ kind: 'name', idx: i, role: 'mc', say, dur: dur(say, 3200, 'mc') });
   });
   return { steps, total: layout(steps, 0) };
 }
@@ -185,7 +190,7 @@ function readSteps(cards, opts = {}) {
   const steps = [];
   cards.forEach((c, i) => {
     const say = `${ORD[i]}, ${c.pos}: ${c.vi}${c.rev ? ', lá ngược' : ''}. Từ khóa: ${c.kw}. ${c.text}`;
-    steps.push({ kind: 'card', idx: i, say, dur: dur(say, 7000) });
+    steps.push({ kind: 'card', idx: i, role: 'reader', say, dur: dur(say, 7000, 'reader') });
   });
   if (n > 1) {
     const w = n === 3 ? 'ba' : 'năm';
@@ -196,11 +201,11 @@ function readSteps(cards, opts = {}) {
       const list = kws.slice(0, -1).join(', ') + ' và ' + kws[kws.length - 1];
       sum = `Tổng kết: ${w} từ khóa dành cho bạn là ${list}. Hãy xem ${w} lá bài như một câu chuyện gợi mở để suy ngẫm, quyết định luôn nằm ở bạn.`;
     }
-    steps.push({ kind: 'sum', say: sum, dur: dur(sum, 4500) });
+    steps.push({ kind: 'sum', role: 'reader', say: sum, dur: dur(sum, 4500, 'reader') });
   }
   let out = pick(OUTRO, rnd);
   if (opts.number == null || opts.number % 4 === 0) out += ' ' + DISCLAIMER;
-  steps.push({ kind: 'outro', say: out, dur: dur(out, 3500) });
+  steps.push({ kind: 'outro', role: 'reader', say: out, dur: dur(out, 3500, 'reader') });
   return { steps, total: layout(steps, 0) };
 }
 

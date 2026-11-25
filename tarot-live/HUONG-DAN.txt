@@ -77,3 +77,9 @@ Chi mang tinh GIAI TRI va goi mo. Game KHONG du doan suc khoe, tien bac, sinh tu
    - Giong do TRINH DUYET MO MAN HINH LIVE quyet dinh (khong phai may chu). Termux: dung Chrome tren dien thoai, giong Google tieng Viet
      (Cai dat Android > Chuyen van ban thanh giong noi > Google > tai goi tieng Viet). Danh sach giong hien trong bang dieu khien la cua trinh duyet dang mo no.
    - Giong cua OBS / TikTok LIVE Studio: neu nguon hinh la trinh duyet tich hop, giong co the khac Edge; hay thu truoc khi LIVE.
+
+10) HAI GIONG: DIEU PHOI + NGUOI DOC TAROT
+   - Dieu phoi (mac dinh giong nu, HoaiMy): moi nguoi duoc chon, nhac ghi thong tin, chia bai, lat bai, doc ten tung la, bao dang cho AI, cam on qua tang.
+   - Nguoi doc Tarot (mac dinh giong nam, NamMinh, cham va tram): chao nguoi xem + cung hoang dao, doc y nghia tung la, tong ket, loi chuc.
+   - Doi giong, toc do, cao do cua tung vai trong Cai dat. Bam "Thu giong dieu phoi" / "Thu giong nguoi doc Tarot" de nghe.
+   - May chi co 1 giong tieng Viet (vi du dien thoai): hai vai van khac nhau nho toc do va cao do (dieu phoi cao hon, nguoi doc Tarot tram hon).

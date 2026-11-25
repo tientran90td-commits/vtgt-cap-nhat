@@ -63,7 +63,7 @@ export class Voice {
     if (!this.viVoices().length) return 'Chưa tìm thấy giọng tiếng Việt. Hãy dùng Microsoft Edge, hoặc cài gói ngôn ngữ tiếng Việt cho Windows.';
     const m = this.pick.mc ? this.pick.mc.name : '?';
     const r = this.pick.ref ? this.pick.ref.name : '?';
-    return this.pick.distinct ? `Điều phối: ${m} • Trọng tài: ${r}` : `Chỉ có 1 giọng (${m}) - đổi cao độ để phân biệt 2 vai`;
+    return this.pick.distinct ? `Điều phối: ${m} • Người đọc Tarot: ${r}` : `Chỉ có 1 giọng (${m}): 2 vai khác nhau nhờ tốc độ và cao độ`;
   }
 
   setSettings(s) {

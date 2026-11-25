@@ -15,6 +15,8 @@ const NUMBERS = {
   voiceVolume: [0, 1],
   voiceRate: [0.6, 1.3],
   voicePitch: [0.6, 1.3],
+  readerRate: [0.6, 1.3],
+  readerPitch: [0.6, 1.3],
   collectSeconds: [15, 180],
   minScore: [1, 100],
   aiTimeout: [3, 25],
@@ -40,13 +42,13 @@ class Settings {
     for (const [k, [lo, hi]] of Object.entries(NUMBERS)) {
       if (patch[k] == null || patch[k] === '') continue;
       const n = Number(patch[k]);
-      if (Number.isFinite(n)) this.v[k] = Math.min(hi, Math.max(lo, ['voiceVolume', 'voiceRate', 'voicePitch'].includes(k) ? n : Math.round(n)));
+      if (Number.isFinite(n)) this.v[k] = Math.min(hi, Math.max(lo, ['voiceVolume', 'voiceRate', 'voicePitch', 'readerRate', 'readerPitch'].includes(k) ? n : Math.round(n)));
     }
     for (const k of BOOLS) if (patch[k] != null) this.v[k] = !!patch[k];
     if (patch.defaultSpread != null) this.v.defaultSpread = [3, 5].includes(Number(patch.defaultSpread)) ? Number(patch.defaultSpread) : 1;
     if (SPEEDS.includes(patch.readSpeed)) this.v.readSpeed = patch.readSpeed;
     if (['off', 'claude', 'gemini'].includes(patch.aiProvider)) this.v.aiProvider = patch.aiProvider;
-    if (typeof patch.voiceName === 'string') this.v.voiceName = patch.voiceName.replace(/[<>{}]/g, '').slice(0, 100);
+    for (const k of ['voiceName', 'readerVoice']) if (typeof patch[k] === 'string') this.v[k] = patch[k].replace(/[<>{}]/g, '').slice(0, 100);
     if (typeof patch.aiModel === 'string') this.v.aiModel = patch.aiModel.replace(/[^\w.\-]/g, '').slice(0, 60);
     for (const k of ['title', 'subtitle']) {
       if (typeof patch[k] === 'string') {
