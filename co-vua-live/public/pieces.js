@@ -77,7 +77,9 @@ export function makeChessPiece(t, color, cell = 0.2) {
       g.add(lathe([...BASE, [0.2, 0.3], [0.14, 0.6], [0.26, 0.68], [0.3, 0.84], [0.2, 0.84], [0.17, 0.78], [0, 0.78]], mat));
       for (let i = 0; i < 7; i++) {
         const a = (i / 7) * Math.PI * 2;
-        g.add(Object.assign(ball(0.045, 0.9, mat), { position: new THREE.Vector3(Math.cos(a) * 0.23, 0.9, Math.sin(a) * 0.23) }));
+        const pearl = ball(0.045, 0.9, mat);
+        pearl.position.set(Math.cos(a) * 0.23, 0.9, Math.sin(a) * 0.23);
+        g.add(pearl);
       }
       g.add(ball(0.07, 0.95, mat));
       break;

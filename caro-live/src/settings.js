@@ -20,6 +20,7 @@ const NUMBERS = {
   reminderSeconds: [0, 1800],
   confirmSeconds: [0, 120],
   idleHintSeconds: [0, 120],
+  crowdMax: [0, 14],
   clockSeconds: [0, 60],
 };
 const BOOLS = ['blockBothEnds', 'winnerStays', 'hostCanPlay', 'autoNextGame', 'showSign', 'themeAuto', 'ledOn', 'showCellLabels', 'celebrateOn'];

@@ -252,3 +252,11 @@ TIEU CHUAN LIVE TIKTOK (MOI)
 BAN CO VU TRU (CO SAO BANG)
 - Bang dieu khien > Kieu ban co > chon "Vu tru (co sao bang)". Cu vai chuc giay lai co mot ngoi sao bang bay ngang ban co.
 
+NHAN VAT NGOI / DUNG DAY VA KHAN GIA QUANH PHONG
+- Khi het van ma chua co nguoi moi duoc chon, 2 nhan vat dung day, keo ghe ra va di ra mep phong; camera lui ra cho thay ca phong.
+  Khi co nguoi duoc chon, ho di vao, quay mat vao ban va ngoi xuong.
+- Nguoi xem dang binh luan / tha tim / tang qua (khong phai nguoi choi) hien thanh nhan vat nho dung xa ban co, co ten va anh dai dien.
+  Nguoi moi di vao, nguoi khong con tuong tac thi di ra; khi co nguoi thang ca phong nhay mung.
+- Chinh so luong: Bang dieu khien > Cai dat > "So khan gia dung quanh phong" (0 = tat, toi da 14).
+- Ten khan gia cung duoc loc tu tho tuc / link giong ten nguoi choi.
+

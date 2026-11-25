@@ -22,6 +22,7 @@ export class Director {
     this.effPhase = 'lobby';
     this.onReset = null;
     this.onPlaced = null; // gọi khi 1 quân vừa chạm bàn (dùng cho âm thanh/hiệu ứng)
+    this.seatInit = false;
     this.lockPose = null; // chỉ dùng khi kiểm tra góc quay
     this.view = { moves: [], last: null, winLine: null, resultReady: false, effPhase: 'lobby', busy: false };
   }
@@ -36,6 +37,19 @@ export class Director {
       this.queued = s.moves.length;
     }
     this.syncNames();
+    this.syncSeats(!this.seatInit);
+    this.seatInit = true;
+  }
+
+  /** Ai đang có mặt ở bàn: đang có ván/xác nhận/xem kết quả thì cả 2 ngồi; ở sảnh chờ thì chỉ ngồi người đã được chọn. */
+  syncSeats(instant) {
+    const s = this.state;
+    const sc = this.scene;
+    if (!sc.seat) return;
+    const lobbyPick = s.phase === 'lobby' && s.lobby && s.lobby.preview ? s.lobby.preview : [];
+    sc.seat('X', s.phase !== 'lobby' || !!lobbyPick[0], instant);
+    sc.seat('O', s.phase !== 'lobby' || !!lobbyPick[1], instant);
+    if (sc.setCrowd) sc.setCrowd(s.crowd || [], instant);
   }
 
   resetBoard(s) {
@@ -120,7 +134,8 @@ export class Director {
     if (eff === 'lobby' || eff === 'confirm') {
       chars.X.setMode('idle');
       chars.O.setMode('idle');
-      sc.setPose('wide');
+      // sảnh chờ: lùi camera cho thấy cả phòng (ghế trống + khán giả); lúc chọn người xác nhận thì quay về bàn
+      sc.setPose(eff === 'lobby' && !(sc.seats && (sc.seats.X.desired || sc.seats.O.desired)) ? 'room' : 'wide');
     } else if (eff === 'coin') {
       chars.X.setMode('cheer');
       chars.O.setMode('cheer');
@@ -156,6 +171,7 @@ export class Director {
       }
     }
 
+    sc.crowdCheer = eff === 'finished' && !!(s.result && s.result.winner);
     if (this.lockPose) sc.setPose(this.lockPose);
     sc.update(dt, time, { urgency });
 

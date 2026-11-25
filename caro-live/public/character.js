@@ -265,6 +265,10 @@ export class Character {
     this.phase = Math.random() * 6;
     this.heldVisible = false;
     this.lookYaw = 0;
+    // do seatmotion.js điều khiển khi nhân vật đứng dậy / đi lại
+    this.walkPhase = 0;
+    this.walkAmp = 0;
+    this.walkLean = 0;
 
     this.rig = null;
     this.build(opt);
@@ -863,6 +867,17 @@ export class Character {
         browRaise = 0.02 + this.urgency * 0.04;
         browTilt = 0.12 + this.urgency * 0.12;
         bubble = true;
+        break;
+      }
+      case 'walk': {
+        // đứng dậy / đi bộ: 2 tay buông, vung nhẹ ngược chân
+        const sw = Math.sin(this.walkPhase) * 0.34 * this.walkAmp;
+        goals[0] = this.rel(0.5, -0.5, 0.05 - sw);
+        goals[1] = this.rel(-0.5, -0.5, 0.05 + sw);
+        speeds = [10, 10];
+        leanGoal = this.walkLean;
+        head.x = 0;
+        mouth = 'smile';
         break;
       }
       case 'win':

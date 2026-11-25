@@ -37,9 +37,11 @@ class Interaction {
         shared: false,
         followed: false,
         order: this.seq++,
+        seenAt: Date.now(),
       };
       this.users.set(u.id, u);
     } else {
+      u.seenAt = Date.now();
       if (user.name) u.name = user.name;
       if (user.avatar) u.avatar = user.avatar;
       if (user.uniqueId) u.uniqueId = user.uniqueId;

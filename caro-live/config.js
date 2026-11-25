@@ -82,6 +82,7 @@ module.exports = {
   showSign: true,
   showCellLabels: true, // ghi tọa độ (A1, H8, O15...) mờ trong từng ô vuông để người xem biết gõ gì
   themeAuto: true, // mỗi ván đổi màu bàn cờ, màu phòng, tóc/áo 2 nhân vật
+  crowdMax: 10, // số khán giả (tên + ảnh đại diện) hiện thành nhân vật đứng quanh phòng, 0 = tắt
   boardSkin: 'auto', // kiểu bàn cờ: 'auto' = mỗi ván 1 kiểu | 'wood' = bàn gỗ | rong-vang, thanh-long, bach-ho, chu-tuoc, huyen-vu, cong-nghe, neon-tim, thien-ha, vu-tru (vũ trụ, có sao băng)
   // CẢNH GIỚI (rank): số ván thắng cần để lên từng bậc: Phàm Nhân->Luyện Khí->Trúc Cơ->Kết Đan->Nguyên Anh->Hóa Thần
   rankWins: [2, 4, 6, 8, 12],

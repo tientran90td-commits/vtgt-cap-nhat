@@ -233,6 +233,18 @@ class Hub {
       }));
   }
 
+  /** Khán giả đang xem (không phải người chơi) để vẽ nhân vật đứng quanh phòng: tên + ảnh đại diện. */
+  crowd(now = Date.now()) {
+    const max = Number.isFinite(this.cfg.crowdMax) ? this.cfg.crowdMax : 10;
+    if (max <= 0) return [];
+    const m = this.match;
+    return [...this.interaction.users.values()]
+      .filter((u) => u.seenAt && now - u.seenAt < 15 * 60000 && !m.markOf(u.id))
+      .sort((a, b) => b.seenAt - a.seenAt)
+      .slice(0, max)
+      .map((u) => ({ id: u.id, name: u.name, avatar: u.avatar || '' }));
+  }
+
   tick(now = Date.now()) {
     this.match.tick(now);
     if (this.likeIgnored && now - (this.likeIgnoredAt || 0) > 60000) {
@@ -252,6 +264,7 @@ class Hub {
     const s = this.match.getState(now);
     s.recent = this.chatLog;
     s.demo = !!this.cfg.demo; // đang chạy chế độ thử (khán giả ảo)
+    s.crowd = this.crowd(now);
     s.notice = this.notice;
     s.announce = this.announcement && now < this.announcement.until ? { id: this.announcement.id, text: this.announcement.text, until: this.announcement.until } : null;
     s.promo = this.promo && now < this.promo.until ? this.promo : null;

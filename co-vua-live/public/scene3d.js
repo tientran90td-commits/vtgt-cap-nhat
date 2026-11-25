@@ -4,6 +4,8 @@
  */
 import * as THREE from './vendor/three.module.js';
 import { Character } from './character.js';
+import { SeatMotion } from './seatmotion.js';
+import { Crowd } from './crowd.js';
 import { makeChessPiece } from './pieces.js';
 import { layout, paintBoardBase, paintWood } from './board.js';
 import { sqXY, colorOf } from './chessmodel.js';
@@ -16,6 +18,7 @@ const SEAT_Z = 1.75;
 // Các góc quay. p = vị trí camera, l = điểm nhìn.
 const POSES = {
   wide: { p: [5.2, 3.4, 2.4], l: [0, 0.8, 0] },
+  room: { p: [8.4, 2.1, 5.2], l: [-0.5, -0.5, -1.2] }, // lùi xa: thấy cả phòng, ghế trống và khán giả
   table: { p: [3.6, 3.3, 2.1], l: [0, 0.55, 0] },
   focusX: { p: [4.4, 3.5, -1.2], l: [0, 1.15, 1.2] }, // sau lưng O, nhìn mặt X
   focusO: { p: [-4.4, 3.5, 1.2], l: [0, 1.15, -1.2] }, // sau lưng X, nhìn mặt O
@@ -78,8 +81,24 @@ export class Scene3D {
     this.chars.X.attachTo(this.scene);
     this.chars.O.attachTo(this.scene);
     this.boardCenter = V(0, BOARD_Y, 0);
+    // động tác ngồi vào bàn / đứng dậy đi ra (seatmotion.js) và khán giả đứng quanh phòng (crowd.js)
+    this.seats = {
+      X: new SeatMotion(this.chars.X, this.chairParts.X, 1, -4.7),
+      O: new SeatMotion(this.chars.O, this.chairParts.O, -1, 4.7),
+    };
+    this.crowd = new Crowd(this.scene);
     this.time = 0;
     this.loadModels();
+  }
+
+  /** Báo nhân vật `mark` nên ngồi ở bàn (present) hay đứng dậy đi ra. instant: đặt luôn, không diễn. */
+  seat(mark, present, instant = false) {
+    this.seats[mark].want(present, instant);
+  }
+
+  /** Danh sách khán giả (tên + ảnh đại diện) để vẽ nhân vật đứng quanh phòng. */
+  setCrowd(list, instant = false) {
+    this.crowd.setViewers(list, instant);
   }
 
   /** Nếu có file models/nam.glb, models/nu.glb thì thay nhân vật dựng sẵn bằng model 3D thật. */
@@ -198,6 +217,7 @@ export class Scene3D {
     }
     // ghế (đệm + lưng ghế)
     const seatMat = (this.seatMat = new THREE.MeshStandardMaterial({ color: 0x7a1f2e, roughness: 0.8 }));
+    this.chairParts = { X: [], O: [] };
     for (const sign of [1, -1]) {
       const seat = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.62, 0.14, 28), seatMat);
       seat.position.set(0, -0.85, sign * (SEAT_Z + 0.05));
@@ -206,10 +226,12 @@ export class Scene3D {
       const stool = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.16, 0.9, 14), legMat);
       stool.position.set(0, -1.4, sign * (SEAT_Z + 0.05));
       s.add(stool);
+      this.chairParts[sign > 0 ? 'X' : 'O'].push(seat, stool);
       const back = new THREE.Mesh(new THREE.BoxGeometry(1.5, 1.5, 0.12), seatMat);
       back.position.set(0, 0.1, sign * (SEAT_Z + 0.78));
       back.castShadow = true;
       s.add(back);
+      this.chairParts[sign > 0 ? 'X' : 'O'].push(back);
     }
   }
 
@@ -462,6 +484,9 @@ export class Scene3D {
     for (const k of ['X', 'O']) this.chars[k].tag.sprite.visible = !m || m[2] === k;
 
     // nhân vật
+    this.seats.X.update(dt, time);
+    this.seats.O.update(dt, time);
+    this.crowd.update(dt, time, this.crowdCheer);
     const c = { boardCenter: this.boardCenter, urgency: 0 };
     this.chars.X.update(dt, time, { ...c, urgency: ctx.urgency.X || 0 });
     this.chars.O.update(dt, time, { ...c, urgency: ctx.urgency.O || 0 });
@@ -574,6 +599,8 @@ export class NullScene {
     this.chars = { X: mk(), O: mk() };
   }
   setTheme() {}
+  seat() {}
+  setCrowd() {}
   cellToWorld() {
     return {};
   }
