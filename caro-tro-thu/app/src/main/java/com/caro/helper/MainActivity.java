@@ -182,11 +182,27 @@ public class MainActivity extends Activity {
 
     private void moveBack() {
         if (!inOverlay || web == null) return;
-        try { appWm().removeView(web); } catch (Exception e) { /* bỏ qua */ }
+        // removeViewImmediate: gỡ ngay (removeView thường gỡ chậm -> WebView còn "cha" cũ nên không gắn lại được => màn hình trống)
+        try { appWm().removeViewImmediate(web); } catch (Exception e) { /* bỏ qua */ }
         inOverlay = false;
-        try {
-            if (web.getParent() == null) container.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
-        } catch (Exception e) { /* bỏ qua */ }
+        attachBack(0);
+    }
+
+    private void attachBack(final int tries) {
+        if (web == null || container == null) return;
+        if (web.getParent() == container) return;
+        if (web.getParent() == null) {
+            try {
+                container.addView(web, new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+                return;
+            } catch (Exception e) { /* thử lại bên dưới */ }
+        }
+        if (tries < 20) container.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                attachBack(tries + 1);
+            }
+        }, 50);
     }
 
     @Override
