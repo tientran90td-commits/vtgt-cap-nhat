@@ -14,6 +14,10 @@ Tai file CaroLIVE-Windows.zip, giai nen ra o dia (vi du D:\CaroLIVE), bam dup "C
      (ban co, luot di, nguoi choi, diem tuong tac; dong ho khong bi mat gio luc game tat). Game tu luu van vao data\dang-choi.json.
      Luu y: LAN CAP NHAT DAU TIEN len ban co tinh nang nay van mat van (ban cu chua biet luu); tu lan sau tro di thi giu duoc.
      Bam "Dung" roi "Bat dau" lai chu dong thi bat dau moi, khong khoi phuc van cu.
+  6) GHEP TAY / HEN TRUOC + CHUOI THANG: o muc "Tat ca nguoi xem", chon 2 nguoi roi nhap o "da thang lien tiep" (vd 3, 4) cho tung nguoi.
+     De trong = GIU NGUYEN chuoi hien co (nguoi dang giu ban), nguoi chua co thi tinh 0. Game giu so van nay: thang them 1 van thi chuoi +1,
+     toi so van toi da (Cai dat -> "So van thang lien tiep toi da") thi nguoi do phai xuong, nhuong cho nguoi khac.
+     Dong xu chon ben di truoc luon ngau nhien 50/50 (khong thien vi nguoi nao, ke ca nguoi giu ban).
   Neu app bao khong ket noi duoc dien thoai: kiem tra may tinh co Internet, game dang chay, the 3 hien "da co the noi vao".
   Luu y: duong truyen Internet dung dich vu mien phi cua Cloudflare/ntfy, khong cam ket luc nao cung chay; khi rot app tu noi lai.
 

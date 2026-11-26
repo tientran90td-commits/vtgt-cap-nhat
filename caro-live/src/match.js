@@ -35,6 +35,7 @@ class Match {
 
     this.gameNo = 0;
     this.champion = null; // { ...player, streak }
+    this.entering = {}; // chuỗi thắng của từng người LÚC VÀO ván hiện tại: { id: số ván } (ghép tay có thể tự đặt)
     this.excludeNext = new Set();
     this.booked = null; // cặp đã HẸN TRƯỚC cho ván kế tiếp: { ids:[a,b], confirmLike }
     this.firstLobby = true;
@@ -100,9 +101,39 @@ class Match {
     const uniq = [...new Set(Array.isArray(ids) ? ids.map(String) : [])];
     const list = uniq.map((id) => this.interaction.users.get(id)).filter(Boolean);
     if (uniq.length !== 2 || list.length !== 2) return { ok: false, msg: 'Cần chọn đúng 2 người (người này phải đã tương tác trong live).' };
-    this.booked = { ids: uniq, confirmLike: !!opt.confirmLike };
-    this.feed(`📌 Đã hẹn trước: đạo hữu ${list[0].name} và ${list[1].name} sẽ đấu ván kế tiếp`, 'info');
+    const streaks = this.cleanStreaks(uniq, opt.streaks);
+    this.booked = { ids: uniq, confirmLike: !!opt.confirmLike, streaks };
+    this.feed(`📌 Đã hẹn trước: đạo hữu ${list[0].name} và ${list[1].name} sẽ đấu ván kế tiếp${this.streakNote(list, streaks)}`, 'info');
     return { ok: true };
+  }
+
+  /** Làm sạch số ván thắng liên tiếp do chủ phòng nhập: chỉ giữ người trong cặp, số nguyên 0-50. Bỏ trống = tự động. */
+  cleanStreaks(ids, raw) {
+    const out = {};
+    if (!raw || typeof raw !== 'object') return out;
+    for (const id of ids) {
+      const v = raw[id];
+      if (v === undefined || v === null || v === '') continue;
+      const n = Math.floor(Number(v));
+      if (Number.isFinite(n)) out[id] = Math.max(0, Math.min(50, n));
+    }
+    return out;
+  }
+
+  /** Chuỗi thắng lúc vào ván: số chủ phòng đặt; không đặt thì GIỮ NGUYÊN chuỗi hiện có (người đang giữ bàn). */
+  makeEntering(list, preset) {
+    const out = {};
+    for (const u of list) {
+      const n = preset && preset[u.id] !== undefined ? preset[u.id] : this.champion && this.champion.id === u.id ? this.champion.streak : 0;
+      if (n > 0) out[u.id] = n;
+    }
+    return out;
+  }
+
+  streakNote(list, preset) {
+    const ent = this.makeEntering(list, preset);
+    const parts = list.filter((u) => ent[u.id] > 0).map((u) => `${u.name} đang thắng ${ent[u.id]} ván liên tiếp`);
+    return parts.length ? ` (${parts.join('; ')})` : '';
   }
 
   cancelBooked() {
@@ -161,6 +192,7 @@ class Match {
     if (c.booked) {
       // tới lượt cặp đã hẹn: bỏ chuỗi thắng cũ, dùng lịch hẹn một lần
       confirmLike = !!(this.booked && this.booked.confirmLike) && this.cfg.confirmSeconds > 0;
+      c.entering = this.makeEntering(c.list, this.booked && this.booked.streaks); // tính TRƯỚC khi bỏ người giữ bàn cũ
       this.champion = null;
       this.excludeNext.clear();
       this.booked = null;
@@ -180,6 +212,7 @@ class Match {
       slots: c.list.map((u) => ({ user: u, done: this.isHost(u) })), // chủ phòng không cần thả tim
       round: 1,
       warned: false,
+      entering: c.entering || null,
     };
     const pending = this.confirm.slots.filter((x) => !x.done).map((x) => x.user);
     const names = c.list.map((u) => u.name).join(' và ');
@@ -203,8 +236,9 @@ class Match {
     if (this.phase !== 'confirm' || !this.confirm) return;
     if (!this.confirm.slots.every((x) => x.done)) return;
     const list = this.confirm.slots.map((x) => x.user);
+    const entering = this.confirm.entering || undefined;
     this.confirm = null;
-    this.startCoin({ list }, now);
+    this.startCoin({ list, entering }, now);
   }
 
   /** Hết giờ xác nhận: người chưa thả tim mất suất, mời người kế tiếp thay. */
@@ -255,12 +289,19 @@ class Match {
     const chosen = c.list;
     let p1;
     let p2;
-    if (this.champion) {
+    if (c.entering) {
+      // ghép tay / hẹn trước: đủ 2 người, chuỗi thắng do chủ phòng đặt (hoặc giữ nguyên của người đang giữ bàn)
+      p1 = chosen[0];
+      p2 = chosen[1];
+      this.entering = { ...c.entering };
+    } else if (this.champion) {
       p1 = this.champion;
       p2 = chosen[0];
+      this.entering = { [this.champion.id]: this.champion.streak };
     } else {
       p1 = chosen[0];
       p2 = chosen[1];
+      this.entering = {};
     }
     const heads = crypto.randomInt(2) === 0;
     const xp = heads ? p1 : p2;
@@ -278,6 +319,14 @@ class Match {
       tails: { name: brief(p2).name },
       first: { mark: 'X', name: brief(xp).name },
     };
+    if (c.entering) {
+      // hiện "chuỗi thắng" trên màn hình cho người đang có chuỗi cao nhất
+      const best = [p1, p2].sort((a, b) => (this.entering[b.id] || 0) - (this.entering[a.id] || 0))[0];
+      const n = this.entering[best.id] || 0;
+      this.champion = n > 0 ? { ...brief(best), streak: n } : null;
+      const note = this.streakNote([p1, p2], this.entering);
+      if (note && this.cfg.winnerStays) this.feed(`🔥 Chuỗi thắng giữ nguyên${note}`, 'info');
+    }
     this.interaction.resetPoints();
     this.excludeNext.clear();
     this.stats.recordGame(p1);
@@ -492,12 +541,13 @@ class Match {
     const list = uniq.map((id) => this.interaction.users.get(id)).filter(Boolean);
     if (uniq.length !== 2 || list.length !== 2) return { ok: false, msg: 'Cần chọn đúng 2 người (người này phải đã tương tác trong live).' };
     if ((this.phase === 'playing' || this.phase === 'coin') && !opt.force) return { ok: false, msg: 'Đang có ván. Hãy xác nhận dừng ván trước khi chọn người mới.' };
+    const entering = this.makeEntering(list, this.cleanStreaks(uniq, opt.streaks)); // tính trước khi bỏ người giữ bàn cũ
     this.champion = null;
     this.excludeNext.clear();
     this.enterLobby(now);
-    this.feed(`🎯 Chủ phòng chỉ định đạo hữu ${list[0].name} và ${list[1].name} tỷ thí`, 'info');
-    if (opt.confirmLike && this.cfg.confirmSeconds > 0) this.startConfirm({ list }, now);
-    else this.startCoin({ list }, now);
+    this.feed(`🎯 Chủ phòng chỉ định đạo hữu ${list[0].name} và ${list[1].name} tỷ thí${this.streakNote(list, entering)}`, 'info');
+    if (opt.confirmLike && this.cfg.confirmSeconds > 0) this.startConfirm({ list, entering }, now);
+    else this.startCoin({ list, entering }, now);
     return { ok: true };
   }
 
@@ -579,7 +629,7 @@ class Match {
     let streak = 1;
     let steppedDown = false;
     if (this.cfg.winnerStays) {
-      streak = (this.champion && this.champion.id === winner.id ? this.champion.streak : 0) + 1;
+      streak = (this.entering[winner.id] || 0) + 1; // chuỗi lúc vào ván (kể cả do chủ phòng đặt) + ván vừa thắng
       if (this.cfg.maxWinStreak > 0 && streak >= this.cfg.maxWinStreak) {
         steppedDown = true;
         this.champion = null;
@@ -668,6 +718,7 @@ class Match {
 
   hardReset(now) {
     this.champion = null;
+    this.entering = {};
     this.excludeNext.clear();
     this.gameNo += 1;
     this.feed('♻ Chủ phòng đã khai mở lại trận pháp', 'info');

@@ -17,7 +17,7 @@ const MAX_AGE_AUTO_MS = 2 * 60 * 1000; // lưu định kỳ (chỉ dùng khi b�
 const MAX_USERS = 3000;
 const AUTOSAVE_MS = 3000;
 
-const MATCH_PLAIN = ['gameNo', 'champion', 'booked', 'firstLobby', 'confirm', 'lastCommentAt', 'extraUsed', 'partial', 'hinted', 'phase', 'players', 'result', 'coin', 'waiting', 'lobbySecs', 'lobbyWarned', 'turn', 'timeouts', 'warned', 'rankUpInfo', 'rankDownInfo', 'signPulseUntil', 'feedList', 'feedSeq'];
+const MATCH_PLAIN = ['entering', 'gameNo', 'champion', 'booked', 'firstLobby', 'confirm', 'lastCommentAt', 'extraUsed', 'partial', 'hinted', 'phase', 'players', 'result', 'coin', 'waiting', 'lobbySecs', 'lobbyWarned', 'turn', 'timeouts', 'warned', 'rankUpInfo', 'rankDownInfo', 'signPulseUntil', 'feedList', 'feedSeq'];
 const MATCH_TIMES = ['phaseStartedAt', 'phaseEndsAt', 'turnStartedAt', 'turnEndsAt', 'signPulseUntil'];
 const MATCH_SETS = ['excludeNext', 'confirmFailed'];
 
@@ -71,6 +71,7 @@ function restore(hub, snap, now = Date.now()) {
   if (m.lastCommentAt) for (const k of Object.keys(m.lastCommentAt)) if (m.lastCommentAt[k]) m.lastCommentAt[k] += d;
   for (const k of MATCH_SETS) m[k] = new Set(s[k] || []);
   if (m.confirm && m.confirm.slots) m.confirm.slots = m.confirm.slots.map((x) => ({ user: inter.users.get(x.id) || x.user, done: !!x.done }));
+  if (!s.entering && m.champion) m.entering = { [m.champion.id]: m.champion.streak }; // ảnh chụp từ bản cũ chưa có chuỗi thắng lúc vào ván
   m.game.cells = snap.game.cells;
   m.game.moves = snap.game.moves;
   hub.chatLog = snap.chatLog || [];

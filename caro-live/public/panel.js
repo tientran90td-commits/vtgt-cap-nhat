@@ -421,7 +421,30 @@ function renderViewers() {
     const u = viewers.find((v) => v.id === id);
     return u ? esc(u.name) : '(đã rời)';
   };
+  renderStreakRow(nameOf);
   $('vwPick').innerHTML = picked.length ? 'Đã chọn: ' + picked.map(nameOf).join('  vs  ') + (picked.length < 2 ? '  vs  …' : '') : 'Chưa chọn ai.';
+}
+// Số ván đã thắng liên tiếp của từng người được chọn (bỏ trống = giữ nguyên chuỗi hiện có của người giữ bàn)
+const streakVals = {};
+let streakSig = '';
+function renderStreakRow(nameOf) {
+  const box = $('vwStreaks');
+  const sig = picked.join('|');
+  box.classList.toggle('hidden', picked.length === 0);
+  if (sig === streakSig) return;
+  streakSig = sig;
+  box.innerHTML = picked
+    .map((id) => `<label>${nameOf(id)} đã thắng liên tiếp <input type="number" min="0" max="50" data-id="${esc(id)}" placeholder="tự động" value="${esc(streakVals[id] == null ? '' : streakVals[id])}"> ván</label>`)
+    .join('');
+}
+$('vwStreaks').oninput = (e) => {
+  const el = e.target.closest('input[data-id]');
+  if (el) streakVals[el.dataset.id] = el.value;
+};
+function streaksOut() {
+  const out = {};
+  for (const id of picked) if (streakVals[id] !== undefined && streakVals[id] !== '') out[id] = Number(streakVals[id]);
+  return out;
 }
 $('vwList').onclick = (e) => {
   const li = e.target.closest('li[data-id]');
@@ -437,7 +460,7 @@ $('vwList').onclick = (e) => {
 };
 $('vwBook').onclick = () => {
   if (picked.length !== 2) return toast('Hãy chọn đủ 2 người trước.', 'warn');
-  cmd('book', { ids: picked.slice(), confirmLike: $('vwLike').checked });
+  cmd('book', { ids: picked.slice(), confirmLike: $('vwLike').checked, streaks: streaksOut() });
   picked.length = 0;
   renderViewers();
 };
@@ -450,7 +473,7 @@ $('vwGo').onclick = () => {
   if (picked.length !== 2) return toast('Hãy chọn đủ 2 người trước.', 'warn');
   const busy = !!S && (S.phase === 'playing' || S.phase === 'coin');
   if (busy && !confirm('Đang có ván. Dừng ván này và cho 2 người đã chọn đấu?')) return;
-  cmd('pick', { ids: picked.slice(), force: true, confirmLike: $('vwLike').checked });
+  cmd('pick', { ids: picked.slice(), force: true, confirmLike: $('vwLike').checked, streaks: streaksOut() });
   picked.length = 0;
   renderViewers();
 };

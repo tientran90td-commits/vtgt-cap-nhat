@@ -173,7 +173,7 @@ class Hub {
       case 'skipConfirm':
         return done(m.skipConfirm(now));
       case 'pick':
-        return done(m.pickPlayers(msg.ids, { force: !!msg.force, confirmLike: !!msg.confirmLike }, now));
+        return done(m.pickPlayers(msg.ids, { force: !!msg.force, confirmLike: !!msg.confirmLike, streaks: msg.streaks }, now));
       case 'forfeit':
         return done(m.forfeitPlayer(msg.mark === 'O' ? 'O' : 'X', now));
       case 'settings': {
@@ -188,7 +188,7 @@ class Hub {
       case 'announce':
         return done(this.announce(msg.text, msg.seconds, now, { every: msg.every, speakRepeat: !!msg.speakRepeat }));
       case 'book':
-        return done(m.bookNext(msg.ids, { confirmLike: !!msg.confirmLike }, now));
+        return done(m.bookNext(msg.ids, { confirmLike: !!msg.confirmLike, streaks: msg.streaks }, now));
       case 'bookClear':
         return done(m.cancelBooked());
       case 'announceClear':
