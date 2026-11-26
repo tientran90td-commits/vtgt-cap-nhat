@@ -18,14 +18,8 @@ const { Tunnel } = require('./tunnel');
 const REPUBLISH_MS = 5 * 60 * 1000; // gửi lại địa chỉ định kỳ (ntfy giữ tin ~12 giờ) để điện thoại luôn tìm được bản mới
 const HEALTH_EVERY_MS = 20 * 1000; // cứ 20 giây tự gọi thử chính đường hầm từ bên ngoài
 const HEALTH_GRACE_MS = 40 * 1000; // vừa mở xong cần vài chục giây để mạng Cloudflare nhận địa chỉ mới
-const HEALTH_FAILS = 2; // thử hỏng liên tiếp bấy nhiêu lần thì dựng lại đường hầm
+const HEALTH_FAILS = 3; // cloudflared báo MẤT kết nối liên tiếp bấy nhiêu lần (~1 phút) thì dựng lại đường hầm
 const DELAY_AFTER_URL_MS = 4000; // địa chỉ mới cần vài giây để mạng Cloudflare nhận
-
-/** Gọi 1 trang tĩnh (không cần mã) qua địa chỉ đường hầm; trả true nếu game trả lời. */
-async function defaultProbe(url) {
-  const r = await fetch(url + '/version.json', { cache: 'no-store', signal: AbortSignal.timeout(8000), headers: { 'User-Agent': 'caro-health' } });
-  return r.ok;
-}
 
 class Remote extends EventEmitter {
   constructor({ dataDir, port, log }) {
@@ -44,7 +38,8 @@ class Remote extends EventEmitter {
     this.lastUrl = '';
     this.tunnel.on('status', (s) => this.onTunnel(s));
     this.tunnel.on('log', (m) => this.log(m));
-    this.probe = defaultProbe; // (url) => Promise<boolean>; có thể thay khi kiểm tra tự động
+    // true = còn kết nối, false = cloudflared báo mất hết kết nối, null = không biết (không làm gì). Có thể thay khi kiểm tra tự động.
+    this.probe = () => this.tunnel.ready();
     this.healthFails = 0;
     this.onlineAt = 0;
     this.load();
@@ -121,13 +116,14 @@ class Remote extends EventEmitter {
   async health(now = Date.now()) {
     const t = this.tunnel;
     if (!this.cfg.enabled || t.state !== 'online' || !t.url || now - this.onlineAt < HEALTH_GRACE_MS) return;
-    let ok = false;
+    let ok = null;
     try {
       ok = await this.probe(t.url);
     } catch (e) {
-      ok = false;
+      ok = null;
     }
     if (t.url === '' || t.state !== 'online') return; // trong lúc chờ đã đổi trạng thái
+    if (ok === null) return; // không hỏi được thì không kết luận (tránh dựng lại oan một đường truyền đang tốt)
     if (ok) {
       this.healthFails = 0;
       return;
@@ -135,7 +131,7 @@ class Remote extends EventEmitter {
     this.healthFails++;
     if (this.healthFails >= HEALTH_FAILS) {
       this.healthFails = 0;
-      t.restart('không ai gọi vào được');
+      t.restart('cloudflared báo mất kết nối tới Cloudflare');
     }
   }
 
