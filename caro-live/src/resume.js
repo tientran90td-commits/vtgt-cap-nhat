@@ -17,7 +17,7 @@ const MAX_AGE_AUTO_MS = 2 * 60 * 1000; // lưu định kỳ (chỉ dùng khi b�
 const MAX_USERS = 3000;
 const AUTOSAVE_MS = 3000;
 
-const MATCH_PLAIN = ['entering', 'gameNo', 'champion', 'booked', 'firstLobby', 'confirm', 'lastCommentAt', 'extraUsed', 'partial', 'hinted', 'phase', 'players', 'result', 'coin', 'waiting', 'lobbySecs', 'lobbyWarned', 'turn', 'timeouts', 'warned', 'rankUpInfo', 'rankDownInfo', 'signPulseUntil', 'feedList', 'feedSeq'];
+const MATCH_PLAIN = ['entering', 'gameNo', 'champion', 'booked', 'firstLobby', 'confirm', 'lastCommentAt', 'extraUsed', 'partial', 'hinted', 'phase', 'players', 'result', 'coin', 'coinPlayers', 'coinSeats', 'waiting', 'lobbySecs', 'lobbyWarned', 'turn', 'timeouts', 'warned', 'rankUpInfo', 'rankDownInfo', 'signPulseUntil', 'feedList', 'feedSeq'];
 const MATCH_TIMES = ['phaseStartedAt', 'phaseEndsAt', 'turnStartedAt', 'turnEndsAt', 'signPulseUntil'];
 const MATCH_SETS = ['excludeNext', 'confirmFailed'];
 

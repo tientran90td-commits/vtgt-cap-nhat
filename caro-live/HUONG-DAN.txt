@@ -329,3 +329,10 @@ LOGO TEN KENH (MOI)
   3) Trong app PC, mục 3, mở "Đường dự phòng zrok", dán mã, bấm "Lưu mã". Chỉ cần làm một lần.
   4) Từ đó, nếu Cloudflare không lên sau khoảng 1 phút, app tự chuyển sang zrok và báo địa chỉ mới cho điện thoại.
      Cloudflare lên lại thì app tự quay về Cloudflare. Mã zrok lưu ở data/zrok.json (đừng gửi file này cho ai).
+
+TUNG ĐỒNG XU (bản 38)
+  Đồng xu bay lên và lộn vòng trước, chưa ai biết kết quả. Khi đồng xu rơi, hệ thống mới bốc ngẫu nhiên mặt ngửa/sấp,
+  đồng xu giảm tốc rồi dừng đúng mặt đó, lúc ấy mới công bố ai cầm quân X (đi trước), ai cầm quân O.
+  Trước khi đồng xu dừng, 2 thẻ người chơi chỉ hiện "?" và nhãn NGỬA/SẤP; lời đọc kết quả cũng chờ đến lúc đồng xu dừng.
+  Ô "Giây tung đồng xu" trong bảng điều khiển nên để từ 6 giây trở lên cho hiệu ứng đủ chậm rãi (mặc định 7 giây).
+

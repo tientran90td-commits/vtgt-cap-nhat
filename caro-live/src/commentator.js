@@ -124,13 +124,13 @@ class Commentator {
   }
 
   // ----- trọng tài -----
-  coin(xUser, oUser, now, flipMs) {
+  coinToss(now) {
     this.say('coinToss', {}, { at: now + 1200 });
-    this.say(
-      'coinResult',
-      { ten1: this.nm(xUser, 'quân X'), ten2: this.nm(oUser, 'quân O') },
-      { at: now + flipMs, prio: 3 }
-    );
+  }
+
+  /** Đọc kết quả đúng lúc đồng xu đã dừng và đã chia X/O (match.revealCoin). */
+  coinResult(xUser, oUser, now) {
+    this.say('coinResult', { ten1: this.nm(xUser, 'quân X'), ten2: this.nm(oUser, 'quân O') }, { at: now, prio: 3 });
   }
 
   start(xUser, now) {

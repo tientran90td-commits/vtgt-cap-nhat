@@ -92,6 +92,10 @@ export class Director {
       const pv = s.phase === 'lobby' ? s.lobby.preview : s.confirm.slots;
       X.setTag(pv[0] ? pv[0].name : 'Chờ đạo hữu…', true, pv[0] ? pv[0].avatar : '');
       O.setTag(pv[1] ? pv[1].name : 'Chờ đạo hữu…', true, pv[1] ? pv[1].avatar : '');
+    } else if (s.phase === 'coin' && s.coin && !s.players.X) {
+      // đang tung đồng xu, chưa chia X/O: chỉ hiện tên 2 người (trung tính), chưa nói ai cầm quân nào
+      X.setTag(s.coin.heads.name, true, s.coin.heads.avatar || '');
+      O.setTag(s.coin.tails.name, true, s.coin.tails.avatar || '');
     } else {
       X.setTag(s.players.X ? s.players.X.name : '…', false, s.players.X ? s.players.X.avatar : '');
       O.setTag(s.players.O ? s.players.O.name : '…', false, s.players.O ? s.players.O.avatar : '');

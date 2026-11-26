@@ -18,7 +18,10 @@ const brief = (u) => ({
   avatar: u.avatar || '',
 });
 
-const COIN_FLIP_MS = 3400; // khớp với hiệu ứng đồng xu ở giao diện
+// Tung đồng xu: đồng xu bay/quay (chưa ai biết kết quả) -> hết COIN_DRAW_MS mới BỐC NGẪU NHIÊN mặt ngửa/sấp
+// -> đồng xu rơi và dừng trong COIN_LAND_MS -> lúc đó mới công bố ai X (đi trước), ai O. Khớp với public/coin.js.
+const COIN_DRAW_MS = 2600;
+const COIN_LAND_MS = 1500;
 
 class Match {
   constructor(cfg, interaction, stats, commentator) {
@@ -172,6 +175,8 @@ class Match {
     this.game.reset();
     this.result = null;
     this.coin = null;
+    this.coinPlayers = null;
+    this.coinSeats = null;
     this.waiting = false;
     this.confirm = null;
     this.confirmFailed = new Set();
@@ -303,21 +308,24 @@ class Match {
       p2 = chosen[1];
       this.entering = {};
     }
-    const heads = crypto.randomInt(2) === 0;
-    const xp = heads ? p1 : p2;
-    const op = heads ? p2 : p1;
-
     this.voice.picked(this.champion, chosen, now);
 
     this.gameNo += 1;
     this.game.reset();
     this.result = null;
-    this.players = { X: brief(xp), O: brief(op) };
+    // CHƯA chia X/O: kết quả đồng xu được bốc ngẫu nhiên ở drawCoin() sau khi đồng xu đã bay một lúc
+    this.players = { X: null, O: null };
+    this.coinPlayers = [p1, p2];
+    this.coinSeats = null;
+    const drawMs = Math.max(1200, Math.min(COIN_DRAW_MS, this.cfg.coinSeconds * 1000 - COIN_LAND_MS - 700));
     this.coin = {
-      face: heads ? 'heads' : 'tails',
-      heads: { name: brief(p1).name },
-      tails: { name: brief(p2).name },
-      first: { mark: 'X', name: brief(xp).name },
+      face: null, // 'heads' | 'tails' - có sau drawMs
+      first: null, // { mark: 'X', name } - có sau revealMs
+      revealed: false,
+      heads: brief(p1),
+      tails: brief(p2),
+      drawMs,
+      revealMs: drawMs + COIN_LAND_MS,
     };
     if (c.entering) {
       // hiện "chuỗi thắng" trên màn hình cho người đang có chuỗi cao nhất
@@ -335,8 +343,40 @@ class Match {
     this.phase = 'coin';
     this.phaseStartedAt = now;
     this.phaseEndsAt = now + this.cfg.coinSeconds * 1000;
+    this.voice.coinToss(now);
+  }
+
+  /** Bốc ngẫu nhiên mặt đồng xu (ngửa = người thứ nhất đi trước, sấp = người thứ hai). Chỉ gọi khi đồng xu đã bay xong phần quay. */
+  drawCoin() {
+    const c = this.coin;
+    if (!c || c.face !== null || !this.coinPlayers) return;
+    const [p1, p2] = this.coinPlayers;
+    const heads = crypto.randomInt(2) === 0;
+    c.face = heads ? 'heads' : 'tails';
+    this.coinSeats = heads ? [p1, p2] : [p2, p1];
+  }
+
+  /** Đồng xu đã dừng hẳn: bây giờ mới chia X/O và công bố. */
+  revealCoin(now) {
+    const c = this.coin;
+    if (!c || c.revealed || c.face === null || !this.coinSeats) return;
+    const [xp, op] = this.coinSeats;
+    this.players = { X: brief(xp), O: brief(op) };
+    c.first = { mark: 'X', name: this.players.X.name };
+    c.revealed = true;
     this.feed(`🪙 Tung đồng xu: đạo hữu ${this.players.X.name} đi trước (X đỏ)`, 'info');
-    this.voice.coin(this.players.X, this.players.O, now, COIN_FLIP_MS);
+    this.voice.coinResult(this.players.X, this.players.O, now);
+  }
+
+  /** Bốc + công bố ngay (hết giờ pha tung xu, hoặc kiểm thử). */
+  settleCoin(now = Date.now()) {
+    this.drawCoin();
+    this.revealCoin(now);
+  }
+
+  /** Đã ngồi vào bàn (hoặc đang tung đồng xu giành quyền đi trước) - dùng để không vẽ họ lẫn vào khán giả. */
+  seated(userId) {
+    return this.markOf(userId) || (this.coinPlayers && this.coinPlayers.some((u) => u.id === userId) && this.phase === 'coin' ? 'X' : null);
   }
 
   startPlaying(now) {
@@ -753,9 +793,19 @@ class Match {
         if (left <= 0) this.confirmTimeout(now);
         break;
       }
-      case 'coin':
-        if (now >= this.phaseEndsAt) this.startPlaying(now);
+      case 'coin': {
+        const c = this.coin;
+        if (c && c.revealed === false) {
+          // (revealed === undefined là ván cũ lưu từ bản trước: đã chia X/O sẵn, không cần làm gì)
+          if (c.face === null && now >= this.phaseStartedAt + c.drawMs) this.drawCoin();
+          if (c.face !== null && now >= this.phaseStartedAt + c.revealMs) this.revealCoin(now);
+        }
+        if (now >= this.phaseEndsAt) {
+          if (c && c.revealed === false) this.settleCoin(now);
+          this.startPlaying(now);
+        }
         break;
+      }
       case 'playing':
         if (!this.warned && this.cfg.turnSeconds >= 15 && this.turnEndsAt - now <= 10000) {
           this.warned = true;

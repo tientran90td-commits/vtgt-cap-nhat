@@ -10,6 +10,7 @@ import { themeForGame, classicTheme, applyTheme } from './theme.js';
 import { pickSkin } from './board-skins.js';
 import { Voice } from './voice.js';
 import { Sfx } from './sfx.js';
+import { CoinFx } from './coin.js';
 import { Music } from './music.js';
 import { Fx } from './fx.js';
 import { Celebrate } from './celebrate.js';
@@ -57,6 +58,7 @@ const voice = new Voice({
 });
 voice.forceMute = forceMuted;
 const sfx = new Sfx();
+const coinFx = new CoinFx(document.getElementById('coinScene'), sfx);
 sfx.forceMute = forceMuted;
 const music = new Music();
 music.forceMute = forceMuted;
@@ -295,19 +297,22 @@ function renderPlayers(s, eff, now) {
   const lobby = eff === 'lobby' || confirming;
   const pv = confirming ? s.confirm.slots : s.lobby.preview;
   const cards = { X: $('pX'), O: $('pO') };
+  // đang tung đồng xu mà CHƯA có kết quả: chưa ai là X hay O -> hiện 2 người (ngửa | sấp) với dấu "?"
+  const tossing = eff === 'coin' && !!s.coin && !s.players.X;
   for (const mark of ['X', 'O']) {
     const card = cards[mark];
-    const person = lobby ? (mark === 'X' ? pv[0] : pv[1]) : s.players[mark];
+    const person = tossing ? (mark === 'X' ? s.coin.heads : s.coin.tails) : lobby ? (mark === 'X' ? pv[0] : pv[1]) : s.players[mark];
     setAvatar(card, person);
     setFrame(card.querySelector('.fr'), person && person.rank ? person.rank.tier : 0); // khung avatar theo cảnh giới
     setText(card.querySelector('.nm'), person ? person.name : 'Chờ đạo hữu…');
     let sub = '';
     if (confirming) sub = person ? (person.champion ? 'Nhà vô địch • giữ bàn' : person.done ? '❤ Đã thả tim • sẵn sàng!' : 'Hãy THẢ TIM để xác nhận') : '';
     else if (lobby) sub = person ? (person.champion ? `Nhà vô địch • thắng ${s.champion ? s.champion.streak : 1} ván` : 'Đang dẫn đầu tương tác') : 'Hãy tương tác để lên bàn';
+    else if (tossing) sub = mark === 'X' ? 'Mặt NGỬA' : 'Mặt SẤP';
     else sub = `Cầm quân ${mark === 'X' ? 'X đỏ' : 'O xanh'}`;
-    if (!lobby && s.champion && s.players[mark] && s.champion.name === s.players[mark].name && s.champion.streak >= 1 && eff !== 'finished') sub += ` • chuỗi thắng ${s.champion.streak}`;
+    if (!lobby && !tossing && s.champion && s.players[mark] && s.champion.name === s.players[mark].name && s.champion.streak >= 1 && eff !== 'finished') sub += ` • chuỗi thắng ${s.champion.streak}`;
     setText(card.querySelector('.sub'), sub);
-    setText(card.querySelector('.mk'), lobby ? '?' : mark === 'X' ? '✕' : '○');
+    setText(card.querySelector('.mk'), lobby || tossing ? '?' : mark === 'X' ? '✕' : '○');
 
     const playing = eff === 'playing' && s.turn === mark;
     card.classList.toggle('active', playing);
@@ -423,7 +428,7 @@ function clockTick(s, eff, now) {
   }
 }
 
-let coinKey = null;
+let coinDoneKey = null;
 let lastTick = -1;
 function renderOverlay(s, eff, now) {
   const ov = $('overlay');
@@ -436,6 +441,7 @@ function renderOverlay(s, eff, now) {
   else if (eff === 'confirm') which = 'confirm';
   else if (eff === 'coin') which = 'coin';
   else if (eff === 'finished' && director.resultReady) which = 'result';
+  if (which !== 'coin') coinFx.stop();
   ov.classList.toggle('hidden', !which);
   lobbyEl.classList.toggle('hidden', which !== 'lobby');
   cfEl.classList.toggle('hidden', which !== 'confirm');
@@ -459,25 +465,13 @@ function renderOverlay(s, eff, now) {
   } else if (which === 'confirm' && s.confirm) {
     renderConfirm(s, now);
   } else if (which === 'coin' && s.coin) {
-    const elapsed = now - s.phaseStartedAt;
-    const coin = $('coin');
-    if (coinKey !== s.gameNo) {
-      coinKey = s.gameNo;
-      if (elapsed < 1500) sfx.coin();
-      setText($('coinHead'), s.coin.heads.name);
-      setText($('coinTail'), s.coin.tails.name);
-      const final = 360 * 5 + (s.coin.face === 'tails' ? 180 : 0);
-      coin.style.transition = 'none';
-      coin.style.transform = 'rotateY(0deg)';
-      void coin.offsetWidth;
-      if (elapsed > 3300) {
-        coin.style.transform = `rotateY(${final}deg)`;
-      } else {
-        coin.style.transition = 'transform 3s cubic-bezier(0.15, 0.7, 0.2, 1)';
-        coin.style.transform = `rotateY(${final}deg)`;
-      }
+    coinFx.set(s, () => director.nowServer());
+    const done = s.coin.revealed && s.coin.first;
+    if (done && coinDoneKey !== s.gameNo) {
+      coinDoneKey = s.gameNo;
+      if (now - s.phaseStartedAt < (s.coin.revealMs || 0) + 1500) sfx.coinDone();
     }
-    setText($('coinResult'), elapsed > 3300 ? `${s.coin.first.name} đi trước • quân X đỏ` : '');
+    setText($('coinResult'), done ? `${s.coin.first.name} đi trước • quân X đỏ` : s.coin.face ? 'Đồng xu đang dừng…' : '');
   } else if (which === 'result' && s.result) {
     resultEffects(s);
     setText($('resText'), s.result.text);

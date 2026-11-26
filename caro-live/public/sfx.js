@@ -128,11 +128,30 @@ export class Sfx {
     this.tone(f * 0.5, t, 0.07, { type: 'triangle', gain: urgent ? 0.14 : 0.08 });
   }
 
-  coin() {
+  /** Đồng xu bay lên: tiếng "vù/ting ting" nối nhau suốt lúc quay (~2.4 giây). */
+  coinToss() {
     if (!this.ready()) return;
     const t = this.ctx.currentTime;
-    for (let i = 0; i < 9; i++) this.tone(2400 + (i % 3) * 300, t + i * 0.28, 0.12, { type: 'sine', gain: 0.1, slide: 600 });
-    this.tone(1760, t + 2.9, 0.5, { type: 'triangle', gain: 0.2 });
+    this.tone(500, t, 0.5, { type: 'sine', gain: 0.07, slide: 1400 });
+    for (let i = 0; i < 8; i++) this.tone(2600 + (i % 3) * 260, t + 0.15 + i * 0.28, 0.1, { type: 'sine', gain: 0.07 - i * 0.004, slide: 500 });
+  }
+
+  /** Đồng xu chạm sàn và nảy: hai tiếng "keng" kim loại. */
+  coinLand() {
+    if (!this.ready()) return;
+    const t = this.ctx.currentTime;
+    this.tone(3100, t, 0.18, { type: 'triangle', gain: 0.16, slide: -400 });
+    this.tone(2100, t, 0.22, { type: 'sine', gain: 0.1 });
+    this.tone(3300, t + 0.34, 0.12, { type: 'triangle', gain: 0.1, slide: -300 });
+    this.tone(3500, t + 0.55, 0.08, { type: 'triangle', gain: 0.06 });
+  }
+
+  /** Đồng xu dừng hẳn, công bố người đi trước. */
+  coinDone() {
+    if (!this.ready()) return;
+    const t = this.ctx.currentTime;
+    this.tone(1760, t, 0.5, { type: 'triangle', gain: 0.2 });
+    this.tone(2349, t + 0.12, 0.5, { type: 'sine', gain: 0.12 });
   }
 
   chime() {
