@@ -15,6 +15,7 @@ const { startDemo } = require('./demo');
 const updater = require('./updater');
 const remoteHttp = require('./remote-http');
 const { Remote } = require('./remote');
+const resume = require('./resume');
 
 const PUBLIC = path.join(__dirname, '..', 'public');
 const MIME = {
@@ -39,6 +40,7 @@ const demo = wantDemo || (!useTikFinity && !config.tiktokUsername);
 config.demo = demo;
 
 const hub = new Hub(config);
+resume.start(hub, path.join(__dirname, '..', 'data', 'dang-choi.json'), log); // giữ ván đang chơi khi cập nhật / khởi động lại
 
 
 // ---------- ảnh đại diện + nhạc nền ----------

@@ -100,17 +100,31 @@ class Engine extends EventEmitter {
     });
   }
 
+  /** Người dùng chủ động tắt: xóa dữ liệu "ván đang dở" để lần mở sau bắt đầu mới (khác với cập nhật / game tự mở lại). */
+  clearResume() {
+    try {
+      fs.unlinkSync(path.join(this.root, 'data', 'dang-choi.json'));
+    } catch (err) {
+      /* không có thì thôi */
+    }
+  }
+
   stop() {
     this.want = false;
     clearTimeout(this.timer);
     this.crashes = 0;
     if (this.proc) {
+      const p = this.proc;
+      p.once('exit', () => this.clearResume()); // đợi game tắt hẳn rồi mới xóa (tránh bị ghi lại)
       try {
-        this.proc.kill();
+        p.kill();
       } catch (e) {
         /* đã tắt */
       }
-    } else this.setState('off');
+    } else {
+      this.clearResume();
+      this.setState('off');
+    }
   }
 
   restart(mode) {

@@ -10,6 +10,10 @@ Tai file CaroLIVE-Windows.zip, giai nen ra o dia (vi du D:\CaroLIVE), bam dup "C
   4) Muon giu BANG XEP HANG cu: bam "Lay bang xep hang tu game cu" (luc game dang DUNG), chon thu muc game cu.
      Thu cong: chep file data\thanh-tich.json (bang xep hang) va data\cai-dat.json (cai dat) tu game cu sang thu muc data cua app moi.
      Cac lan cap nhat sau, thu muc data luon duoc giu nguyen.
+  5) CAP NHAT KHI DANG CHOI: bam "Cap nhat" luc dang co van -> game tu mo lai va VAN DANG DANH VAN TIEP TUC dung cho cu
+     (ban co, luot di, nguoi choi, diem tuong tac; dong ho khong bi mat gio luc game tat). Game tu luu van vao data\dang-choi.json.
+     Luu y: LAN CAP NHAT DAU TIEN len ban co tinh nang nay van mat van (ban cu chua biet luu); tu lan sau tro di thi giu duoc.
+     Bam "Dung" roi "Bat dau" lai chu dong thi bat dau moi, khong khoi phuc van cu.
   Neu app bao khong ket noi duoc dien thoai: kiem tra may tinh co Internet, game dang chay, the 3 hien "da co the noi vao".
   Luu y: duong truyen Internet dung dich vu mien phi cua Cloudflare/ntfy, khong cam ket luc nao cung chay; khi rot app tu noi lai.
 
