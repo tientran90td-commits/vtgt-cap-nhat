@@ -99,8 +99,8 @@ module.exports = {
   rankLossPenalty: 'tier', // thua = ĐỘ KIẾP THẤT BẠI: 'tier' = mất hết điểm của cảnh giới đang đứng (Kết Đan 4 điểm -> Kết Đan 0 điểm, giữ cảnh giới) | 'all' = mất sạch về Phàm Nhân | số (vd 1 = trừ 1 điểm) | 0 = thua không mất điểm
   rankPromoBonus: 0, // (tùy chọn) vừa lên cảnh giới mới được tặng sẵn bấy nhiêu điểm để thua ngay 1 ván không bị tụt liền. Mặc định 0: thắng +1, thua -1 đúng như nhau
   rankBoardRows: 4, // số người hiện trên bảng rank
-  celebrateOn: true, // có người thắng -> phát video ăn mừng (public/media/celebrate.mp4): có tiếng ngay, 4 giây sau mới hiện hình thế chỗ 2 nhân vật
-  celebrateMinSeconds: Number(process.env.CARO_CELEB_MIN) || (fast ? 0 : 28), // màn hình kết quả giữ ít nhất bấy nhiêu giây để video chạy hết (video ~10,4 giây + vài giây quân cuối còn đang đặt xuống + thời gian MC đọc lời chúc mừng SAU video)
+  celebrateOn: true, // có người thắng -> phát video ăn mừng (mỗi trận bốc ngẫu nhiên 1 trong các video ở public/media, xem public/celebrate.js): có tiếng ngay, vài giây sau mới hiện hình thế chỗ 2 nhân vật
+  celebrateMinSeconds: Number(process.env.CARO_CELEB_MIN) || (fast ? 0 : 33), // màn hình kết quả giữ ít nhất bấy nhiêu giây để video chạy hết (video dài nhất 15 giây + vài giây quân cuối còn đang đặt xuống + thời gian MC đọc lời chúc mừng SAU video)
   ledOn: true, // đèn LED chạy ở đường kẻ bàn cờ
   // Đến lượt mà người chơi chưa bình luận gì sau bấy nhiêu giây -> biển báo nhấp nháy để gây chú ý (0 = tắt).
   idleHintSeconds: fast ? 0 : 12,

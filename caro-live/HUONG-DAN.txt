@@ -200,11 +200,13 @@ LOI THOAI + NHAN VAT TIEN HIEP
 - Hai nhan vat mac dao bao / tien phuc (kim quan, tram ngoc, tay ao rong, lua phi doi).
 
 VIDEO AN MUNG KHI CO NGUOI THANG
-- Co nguoi thang van -> nhac cua video phat ngay, 4 giay sau hinh moi hien len thay cho 2 nhan vat o duoi. Neu trinh duyet khong phat duoc mp4 thi tu dung ban webm (celebrate.webm). Het video thi tro ve nhu cu
-  (2 nhan vat quay lai) va game chay cac buoc tiep theo binh thuong. Man hinh ket qua duoc giu it nhat 28 giay de video chay het.
+- Co nguoi thang van -> nhac cua video phat ngay, vai giay sau hinh moi hien len thay cho 2 nhan vat o duoi. Neu trinh duyet khong phat duoc mp4 thi tu dung ban webm. Het video thi tro ve nhu cu
+  (2 nhan vat quay lai) va game chay cac buoc tiep theo binh thuong. Man hinh ket qua duoc giu it nhat 33 giay de video chay het.
+- (Ban 39) Co 3 video, MOI TRAN BOC NGAU NHIEN 1 VIDEO: video cu (hien hinh luc giay 4), video 1 moi (celebrate2, hien hinh luc giay 3),
+  video 2 moi (celebrate3, dai 15 giay, hien hinh luc giay 6). Tat ca nam trong public\media.
 - Bat/tat: Bang dieu khien > cai dat van > "Video an mung khi co nguoi thang".
-- Doi video khac: thay file public\media\celebrate.mp4 (nen dung mp4 ma H.264 + AAC, hinh vuong cho dep). Neu video dai hon, tang
-  celebrateMinSeconds trong config.js.
+- Them/doi video: bo 2 file <ten>.mp4 (H.264 + AAC) va <ten>.webm vao public\media, roi them 1 dong vao danh sach VIDEOS dau file public\celebrate.js
+  (ghi ten file va giay hien hinh showAt). Hinh vuong cho dep (hinh chu nhat se bi cat 2 ben). Neu video dai hon 15 giay, tang celebrateMinSeconds trong config.js.
 - Trinh duyet co the tat tieng video cho den khi bam vao trang 1 lan. Trong OBS / TikFinity thuong van co tieng.
 - MC khen nguoi thang "ba dao, ba khi...": sua o muc Loi thoai (winGame, congrats, winForfeit, streak). Neu ban da tung sua loi thoai
   (data\thoai.json), bam "Khoi phuc tat ca thoai goc" de nhan cau khen moi.
