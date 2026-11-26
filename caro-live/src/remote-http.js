@@ -3,6 +3,7 @@
  * Cổng điều khiển "xem từ xa" cho bảng điều khiển / app PC (CHỈ nhận từ chính máy này, không nhận qua đường hầm).
  *   GET  /remote           trạng thái
  *   POST /remote/config    { account, password, enabled }
+ *   POST /remote/zrok      { token }  (mã zrok cho đường dự phòng; rỗng = xóa)
  */
 const applink = require('./applink');
 
@@ -41,8 +42,19 @@ function handle(req, res, url) {
   if (url.pathname === '/remote/config' && req.method === 'POST') {
     body(req).then(async (b) => {
       try {
+        if (b.zrokToken !== undefined && !b.account && b.enabled === undefined) return send(200, { ok: true, ...remote.setZrokToken(String(b.zrokToken || '')) }); // chỉ lưu/xóa mã zrok
         const st = await remote.configure(String(b.account || ''), String(b.password || ''), b.enabled !== false);
         send(200, { ok: true, ...st });
+      } catch (e) {
+        send(200, { ok: false, error: e.message });
+      }
+    });
+    return true;
+  }
+  if (url.pathname === '/remote/zrok' && req.method === 'POST') {
+    body(req).then((b) => {
+      try {
+        send(200, { ok: true, ...remote.setZrokToken(String(b.token || '')) });
       } catch (e) {
         send(200, { ok: false, error: e.message });
       }

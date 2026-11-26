@@ -14,11 +14,13 @@ const A = require('./account-core');
 const applink = require('./applink');
 const rendezvous = require('./rendezvous');
 const { Tunnel } = require('./tunnel');
+const { Zrok } = require('./zrok');
 
 const REPUBLISH_MS = 5 * 60 * 1000; // gửi lại địa chỉ định kỳ (ntfy giữ tin ~12 giờ) để điện thoại luôn tìm được bản mới
 const HEALTH_EVERY_MS = 20 * 1000; // cứ 20 giây tự gọi thử chính đường hầm từ bên ngoài
 const HEALTH_GRACE_MS = 40 * 1000; // vừa mở xong cần vài chục giây để mạng Cloudflare nhận địa chỉ mới
 const HEALTH_FAILS = 3; // cloudflared báo MẤT kết nối liên tiếp bấy nhiêu lần (~1 phút) thì dựng lại đường hầm
+const FALLBACK_AFTER_MS = 60 * 1000; // Cloudflare chưa lên được sau bấy lâu mà đã có mã zrok -> bật đường dự phòng zrok
 const DELAY_AFTER_URL_MS = 4000; // địa chỉ mới cần vài giây để mạng Cloudflare nhận
 
 class Remote extends EventEmitter {
@@ -28,6 +30,8 @@ class Remote extends EventEmitter {
     this.port = port;
     this.log = log || (() => {});
     this.tunnel = new Tunnel(dataDir);
+    this.zrok = new Zrok(dataDir);
+    this.cfBadSince = 0;
     this.cfg = { enabled: false, account: '', server: rendezvous.DEFAULT_SERVER };
     this.keys = null; // { token, topic, keyB64 }
     this.key = null;
@@ -38,6 +42,8 @@ class Remote extends EventEmitter {
     this.lastUrl = '';
     this.tunnel.on('status', (s) => this.onTunnel(s));
     this.tunnel.on('log', (m) => this.log(m));
+    this.zrok.on('status', (s) => this.onTunnel(s));
+    this.zrok.on('log', (m) => this.log(m));
     // true = còn kết nối, false = cloudflared báo mất hết kết nối, null = không biết (không làm gì). Có thể thay khi kiểm tra tự động.
     this.probe = () => this.tunnel.ready();
     this.healthFails = 0;
@@ -81,6 +87,7 @@ class Remote extends EventEmitter {
     this.cfg.enabled = true;
     this.save();
     this.tunnel.stop();
+    this.zrok.stop();
     this.lastUrl = '';
     return this.enable();
   }
@@ -93,6 +100,8 @@ class Remote extends EventEmitter {
     this.tunnel.start(this.port);
     this.timers.push(setInterval(() => this.publish().catch(() => {}), REPUBLISH_MS));
     this.timers.push(setInterval(() => this.health().catch(() => {}), HEALTH_EVERY_MS));
+    this.cfBadSince = Date.now();
+    this.timers.push(setInterval(() => this.fallback(), HEALTH_EVERY_MS));
     this.emit('status', this.status());
     return this.status();
   }
@@ -108,6 +117,7 @@ class Remote extends EventEmitter {
     for (const t of this.timers) clearInterval(t);
     this.timers = [];
     this.tunnel.stop();
+    this.zrok.stop();
     this.published = 0;
     return this.status();
   }
@@ -135,9 +145,45 @@ class Remote extends EventEmitter {
     }
   }
 
-  onTunnel(s) {
-    if (s.state === 'online' && s.url && s.url !== this.lastUrl) {
-      this.lastUrl = s.url;
+  /** Địa chỉ đang dùng được: ưu tiên Cloudflare, nếu không có thì zrok (dự phòng). */
+  cur() {
+    const t = this.tunnel;
+    if (t.state === 'online' && t.url) return { src: 'cloudflare', url: t.url };
+    const z = this.zrok;
+    if (z.state === 'online' && z.url) return { src: 'zrok', url: z.url };
+    return null;
+  }
+
+  /** Cloudflare mãi không lên mà đã có mã zrok -> bật zrok; Cloudflare lên rồi -> tắt zrok cho đỡ tốn. */
+  fallback(now = Date.now()) {
+    if (!this.cfg.enabled) return;
+    if (this.tunnel.state === 'online') {
+      this.cfBadSince = 0;
+      if (this.zrok.want) {
+        setTimeout(() => {
+          if (this.tunnel.state === 'online') this.zrok.stop();
+        }, 15000);
+      }
+      return;
+    }
+    if (!this.cfBadSince) this.cfBadSince = now;
+    if (now - this.cfBadSince >= FALLBACK_AFTER_MS && this.zrok.hasToken() && !this.zrok.want) {
+      this.log('Cloudflare chưa lên được, chuyển sang đường dự phòng zrok…');
+      this.zrok.start(this.port);
+    }
+  }
+
+  setZrokToken(token) {
+    const has = this.zrok.setToken(token);
+    if (!has) this.zrok.stop();
+    this.emit('status', this.status());
+    return this.status();
+  }
+
+  onTunnel() {
+    const c = this.cur();
+    if (c && c.url !== this.lastUrl) {
+      this.lastUrl = c.url;
       this.onlineAt = Date.now();
       this.healthFails = 0;
       setTimeout(() => this.publish().catch(() => {}), DELAY_AFTER_URL_MS);
@@ -146,9 +192,10 @@ class Remote extends EventEmitter {
   }
 
   async publish() {
-    if (!this.cfg.enabled || !this.key || !this.tunnel.url) return;
+    const c = this.cur();
+    if (!this.cfg.enabled || !this.key || !c) return;
     try {
-      const text = await A.seal(this.key, { v: 1, t: Date.now(), url: this.tunnel.url });
+      const text = await A.seal(this.key, { v: 1, t: Date.now(), url: c.url });
       await rendezvous.publish(this.cfg.server, this.keys.topic, text);
       this.published = Date.now();
       this.pubError = '';
@@ -163,14 +210,34 @@ class Remote extends EventEmitter {
 
   status() {
     const t = this.tunnel.info();
+    const z = this.zrok.info();
+    const c = this.cur();
+    let tunnel = t.state;
+    let url = t.url;
+    let error = t.error;
+    let progress = t.progress;
+    let via = 'cloudflare';
+    if (c && c.src === 'zrok') {
+      tunnel = 'online';
+      url = c.url;
+      error = '';
+      via = 'zrok';
+    } else if (this.zrok.want && t.state !== 'online') {
+      // đang chạy đường dự phòng: nói rõ cả hai bên
+      if (z.state !== 'off') tunnel = z.state;
+      progress = z.state === 'downloading' ? z.progress : progress;
+      error = [t.error && 'Cloudflare: ' + t.error, z.error && 'zrok: ' + z.error].filter(Boolean).join(' | ');
+    }
     return {
       enabled: !!this.cfg.enabled,
       account: this.cfg.account,
       hasKeys: !!this.keys,
-      tunnel: t.state,
-      url: t.url,
-      progress: t.progress,
-      error: t.error || this.pubError,
+      tunnel,
+      via,
+      zrokSet: this.zrok.hasToken(),
+      url,
+      progress,
+      error: error || this.pubError,
       published: this.published,
       phones: this.phones(),
       server: this.cfg.server,

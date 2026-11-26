@@ -27,25 +27,36 @@ function setRemote() {
   const el = $('rStat');
   if (lastErr) {
     el.innerHTML = `<span style="color:#ff9a9a">${esc(lastErr)}</span>`;
+    setZrok();
     return setPill();
   }
   if (!rem) {
     el.innerHTML = '<span class="muted">Chạy game xong mới bật kết nối được.</span>';
+    setZrok();
     return setPill();
   }
   if (!rem.enabled) {
     el.innerHTML = '<span class="muted">Chưa bật. Nhập tài khoản + mật khẩu rồi bấm "Bật kết nối".</span>';
+    setZrok();
     return setPill();
   }
   const T = { downloading: `Đang tải thành phần kết nối lần đầu (${rem.progress || 0}%)…`, starting: 'Đang mở đường truyền Internet…', online: 'Đường truyền đã mở', error: 'Đường truyền lỗi, đang thử lại…', off: 'Đã tắt' };
-  let h = `Tài khoản: <b>${esc(rem.account)}</b><br>${T[rem.tunnel] || rem.tunnel}`;
+  let h = `Tài khoản: <b>${esc(rem.account)}</b><br>${T[rem.tunnel] || rem.tunnel}${rem.via === 'zrok' && rem.tunnel === 'online' ? ' (đang dùng đường dự phòng zrok)' : ''}`;
   if (rem.tunnel === 'online') h += rem.published ? '<br>✅ Điện thoại đã có thể nối vào (nhập đúng tài khoản + mật khẩu).' : '<br>Đang báo địa chỉ cho điện thoại…';
   if (rem.phones) h += `<br>📱 Đang có <b>${rem.phones}</b> điện thoại kết nối`;
   if (rem.error) h += `<br><span style="color:#ff9a9a">${esc(rem.error)}</span>`;
   el.innerHTML = h;
   setPill();
+  setZrok();
 }
 
+function setZrok() {
+  const z = $('zStat');
+  if (zMsg) z.innerHTML = zMsg;
+  else z.textContent = rem && rem.zrokSet ? 'Đã có mã zrok. Dự phòng sẽ tự bật khi cần.' : 'Chưa có mã zrok.';
+}
+
+let zMsg = '';
 function esc(s) {
   return String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]);
 }
@@ -92,6 +103,23 @@ $('rOn').addEventListener('click', async () => {
     rem = r;
   }
   setRemote();
+});
+$('zSave').addEventListener('click', async () => {
+  const r = await caro.remoteConfig({ zrokToken: $('zt').value });
+  if (r && r.ok) {
+    $('zt').value = '';
+    rem = r;
+    zMsg = '';
+  } else zMsg = `<span style="color:#ff9a9a">${esc((r && r.error) || 'Không lưu được mã')}</span>`;
+  setRemote();
+  setZrok();
+});
+$('zDel').addEventListener('click', async () => {
+  const r = await caro.remoteConfig({ zrokToken: '' });
+  zMsg = '';
+  if (r && r.ok) rem = r;
+  setRemote();
+  setZrok();
 });
 $('rOff').addEventListener('click', async () => {
   lastErr = '';

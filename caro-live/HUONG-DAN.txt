@@ -322,3 +322,10 @@ LOGO TEN KENH (MOI)
   Luu y: kieu chu phai co san tren may tinh dang chay LIVE (cac kieu tren deu co san tren Windows). Chu co dau tieng Viet hien tot nhat voi Arial, Segoe UI, Tahoma, Georgia, Times.
 
 - (Cap nhat) Cac muc Logo nam trong THE RIENG "Logo ten kenh", ngay duoi the "Thong bao cho nguoi xem" o dau trang bang dieu khien (khong phai tim trong Cai dat van dau nua).
+
+ĐƯỜNG DỰ PHÒNG ZROK (khi Cloudflare báo lỗi 429 hoặc không lên được)
+  1) Đăng ký miễn phí ở myzrok.io, tạo tài khoản zrok, rồi đăng nhập api-v2.zrok.io.
+  2) Bấm "Getting Started Wizard", chép mã ở bước 2 (dòng "zrok2 enable ...", chỉ chép đoạn chữ + số sau chữ enable).
+  3) Trong app PC, mục 3, mở "Đường dự phòng zrok", dán mã, bấm "Lưu mã". Chỉ cần làm một lần.
+  4) Từ đó, nếu Cloudflare không lên sau khoảng 1 phút, app tự chuyển sang zrok và báo địa chỉ mới cho điện thoại.
+     Cloudflare lên lại thì app tự quay về Cloudflare. Mã zrok lưu ở data/zrok.json (đừng gửi file này cho ai).

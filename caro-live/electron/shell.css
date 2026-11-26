@@ -22,3 +22,7 @@ button.link{background:none;border:0;color:#7fa4ff;padding:0;font-size:12px;font
 .stat b{color:#fff}
 #log{margin:0;height:170px;overflow:auto;background:#0c0e14;border-radius:8px;padding:8px 10px;font:12px/1.5 Consolas,monospace;color:#aeb6cf;white-space:pre-wrap}
 @media (max-width:820px){main{grid-template-columns:1fr}.card.grow{grid-column:auto}}
+
+details.zrok { margin-top: 10px; }
+details.zrok summary { cursor: pointer; color: #9fb4d8; font-size: 13px; }
+details.zrok .row input { flex: 1; min-width: 0; }

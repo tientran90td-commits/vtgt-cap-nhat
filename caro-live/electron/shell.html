@@ -56,6 +56,16 @@
       <button id="rOff" disabled>Tắt kết nối</button>
     </div>
     <div id="rStat" class="stat"></div>
+    <details class="zrok">
+      <summary>Đường dự phòng zrok (tùy chọn, dùng khi Cloudflare bị chặn/lỗi)</summary>
+      <p class="muted small">Đăng ký miễn phí tại <b>myzrok.io</b>, đăng nhập vào <b>api-v2.zrok.io</b>, bấm "Getting Started Wizard" và chép mã ở bước "zrok2 enable ..." (đoạn chữ + số sau chữ enable). Dán vào đây. Khi Cloudflare không lên được sau khoảng 1 phút, app tự chuyển sang zrok.</p>
+      <div class="row">
+        <input id="zt" placeholder="Mã zrok (khoảng 12 ký tự)" autocomplete="off" spellcheck="false">
+        <button id="zSave">Lưu mã</button>
+        <button id="zDel">Xóa mã</button>
+      </div>
+      <div id="zStat" class="muted small"></div>
+    </details>
   </section>
 
   <section class="card grow">
