@@ -84,7 +84,7 @@
   async function target() {
     if (cfg.mode === 'acct') {
       if (!cfg.acct) return null;
-      if (!tunnelUrl || (failCount >= 2 && Date.now() - resolvedAt > 15000)) {
+      if (!tunnelUrl || (failCount >= 2 && Date.now() - resolvedAt > 8000)) { // rớt 2 lần liền: hỏi lại hòm thư xem máy tính đã có địa chỉ mới chưa
         if (resolving) return null;
         resolving = true;
         try { tunnelUrl = await resolveTunnel(); resolvedAt = Date.now(); failCount = 0; }

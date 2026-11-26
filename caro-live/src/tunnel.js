@@ -100,7 +100,7 @@ class Tunnel extends EventEmitter {
       if (!this.want) return;
       this.url = '';
       this.set('starting');
-      const p = cp.spawn(bin, ['tunnel', '--no-autoupdate', '--url', `http://127.0.0.1:${this.port}`], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
+      const p = cp.spawn(bin, ['tunnel', '--no-autoupdate', '--protocol', 'http2', '--url', `http://127.0.0.1:${this.port}`], { windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] });
       this.proc = p;
       let ready = false;
       const onData = (buf) => {
@@ -136,6 +136,18 @@ class Tunnel extends EventEmitter {
     clearTimeout(this.timer);
     this.timer = setTimeout(() => this.launch(), this.backoff);
     this.backoff = Math.min(this.backoff * 2, 60000);
+  }
+
+  /** Ép dựng lại đường hầm (khi phát hiện nó đã "chết" dù tiến trình cloudflared còn chạy). Địa chỉ mới sẽ được báo lại cho điện thoại. */
+  restart(why) {
+    if (!this.want || !this.proc) return;
+    this.emit('log', 'Đường truyền Internet bị đứng' + (why ? ' (' + why + ')' : '') + ', đang dựng lại…');
+    this.backoff = 3000;
+    try {
+      this.proc.kill();
+    } catch (e) {
+      /* đã tắt */
+    }
   }
 
   stop() {

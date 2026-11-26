@@ -19,6 +19,8 @@ Tai file CaroLIVE-Windows.zip, giai nen ra o dia (vi du D:\CaroLIVE), bam dup "C
      toi so van toi da (Cai dat -> "So van thang lien tiep toi da") thi nguoi do phai xuong, nhuong cho nguoi khac.
      Dong xu chon ben di truoc luon ngau nhien 50/50 (khong thien vi nguoi nao, ke ca nguoi giu ban).
   Neu app bao khong ket noi duoc dien thoai: kiem tra may tinh co Internet, game dang chay, the 3 hien "da co the noi vao".
+  Do on dinh duong truyen: app tu kiem tra duong truyen moi 20 giay; neu "dung" (khong ai goi vao duoc) se tu dung lai va bao dia chi moi cho dien thoai
+     (dien thoai tu hoi lai sau vai giay, thuong tu noi lai trong khoang nua phut). Dung giao thuc TCP (http2) on dinh hon tren nhieu mang nha.
   Luu y: duong truyen Internet dung dich vu mien phi cua Cloudflare/ntfy, khong cam ket luc nao cung chay; khi rot app tu noi lai.
 
 CARO LIVE v1.0 (BAN CHINH THUC) - HUONG DAN NHANH (Vietnamese, khong dau de tranh loi font)
