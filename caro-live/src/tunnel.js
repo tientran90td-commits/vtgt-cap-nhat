@@ -53,6 +53,8 @@ class Tunnel extends EventEmitter {
     this.attempt = 0; // số lần khởi động liên tiếp chưa thành công: mỗi lần đổi giao thức kết nối (http2 -> tự động -> quic)
     this.metricsPort = 0;
     this.tail = [];
+    this.limited = 0; // số lần liên tiếp bị Cloudflare từ chối vì tạo quá nhiều đường truyền (lỗi 429)
+    this.coolUntil = 0;
   }
 
   set(state, extra = {}) {
@@ -107,6 +109,7 @@ class Tunnel extends EventEmitter {
   start(port) {
     this.want = true;
     this.port = port;
+    if (Date.now() < this.coolUntil) return; // đang chờ Cloudflare mở lại: bấm thêm chỉ làm bị chặn lâu hơn
     this.launch();
   }
 
@@ -144,6 +147,8 @@ class Tunnel extends EventEmitter {
           ready = true;
           this.attempt = 0;
           this.backoff = 3000;
+          this.limited = 0;
+          this.coolUntil = 0;
           this.url = m[0];
           this.set('online', { url: m[0] });
         }
@@ -171,8 +176,19 @@ class Tunnel extends EventEmitter {
 
   fail(msg) {
     if (!this.want) return;
-    this.set('error', { error: String(msg).slice(0, 160), url: '' });
     clearTimeout(this.timer);
+    if (/\b429\b|too many requests|rate.?limit/i.test(String(msg))) {
+      // Cloudflare giới hạn số lần tạo đường truyền miễn phí theo mạng nhà bạn. Thử dồn dập chỉ bị chặn lâu hơn -> chờ hẳn vài phút.
+      const mins = [3, 6, 10, 15][Math.min(this.limited, 3)];
+      this.limited++;
+      this.coolUntil = Date.now() + mins * 60000;
+      this.set('error', { error: `Cloudflare đang tạm giới hạn việc tạo đường truyền (lỗi 429: thử quá nhiều lần). Tự thử lại sau ${mins} phút, bạn cứ để yên, đừng bấm lại.`, url: '' });
+      this.emit('log', `Cloudflare báo 429 (giới hạn tạo đường truyền). Chờ ${mins} phút rồi tự thử lại.`);
+      this.timer = setTimeout(() => this.launch(), mins * 60000);
+      return;
+    }
+    this.limited = 0;
+    this.set('error', { error: String(msg).slice(0, 160), url: '' });
     this.timer = setTimeout(() => this.launch(), this.backoff);
     this.backoff = Math.min(this.backoff * 2, 60000);
   }
