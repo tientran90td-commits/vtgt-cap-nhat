@@ -103,6 +103,10 @@ class Remote extends EventEmitter {
   }
 
   disable() {
+    // báo cho điện thoại biết là đã TẮT (để khỏi cố nối vào địa chỉ cũ đã chết)
+    if (this.key && this.keys && this.cfg.enabled) {
+      A.seal(this.key, { v: 1, t: Date.now(), off: true }).then((text) => rendezvous.publish(this.cfg.server, this.keys.topic, text)).catch(() => {});
+    }
     this.cfg.enabled = false;
     this.save();
     applink.setRemoteToken('');

@@ -57,6 +57,7 @@
     });
   }
   let tunnelUrl = '';
+  let lastPostAt = 0; // lúc máy tính báo địa chỉ lần cuối (để báo người dùng nếu có vẻ máy tính đã tắt)
   let resolvedAt = 0;
   let resolving = false;
   let failCount = 0;
@@ -76,9 +77,17 @@
     const key = await CaroAccount.keyFrom(a.keyB64);
     for (let i = msgs.length - 1; i >= 0; i--) {
       const o = await CaroAccount.open(key, msgs[i].message);
-      if (o && URL_OK.test(String(o.url || ''))) return o.url;
+      if (!o) continue;
+      if (o.off) throw new Error('Máy tính đã TẮT kết nối. Mở app Caro LIVE trên máy tính và bấm "Bật kết nối" lại.');
+      if (URL_OK.test(String(o.url || ''))) { lastPostAt = Number(o.t) || (msgs[i].time || 0) * 1000; return o.url; }
     }
     throw new Error('Chưa thấy máy tính nào đang bật kết nối cho tài khoản này. Kiểm tra: app trên máy tính đang chạy, đã bấm "Bật kết nối", đúng tài khoản + mật khẩu.');
+  }
+  function ageText() {
+    if (!lastPostAt) return '';
+    const min = Math.round((Date.now() - lastPostAt) / 60000);
+    if (min < 0) return '';
+    return min > 12 ? ` (máy tính báo lần cuối cách ${min} phút trước, có thể app trên máy tính đã tắt)` : '';
   }
   /** Xác định địa chỉ đích { base, wsUrl } theo chế độ đang dùng. */
   async function target() {
@@ -99,6 +108,8 @@
   }
   const hasTarget = () => (cfg.mode === 'acct' ? !!cfg.acct : !!cfg.addr);
   let curTarget = null;
+  let openUrl = ''; // địa chỉ bảng điều khiển CHỈ khi đang nối được (tránh mở địa chỉ đã chết)
+  const fire = () => { try { window.dispatchEvent(new Event('caro-link-state')); } catch (e) {} };
   let connSeq = 0;
 
   function connect() {
@@ -127,7 +138,7 @@
     try { ws = new WebSocket(t.wsUrl); } catch (e) { setChip('off', 'Địa chỉ không đúng'); return; }
     const mine = ws;
     lastMsg = Date.now();
-    ws.onopen = () => { everOpen = true; failCount = 0; lastMsg = Date.now(); setChip('on', cfg.mode === 'acct' ? 'Đã nối máy tính' : 'Đã nối game'); showConnect(false); };
+    ws.onopen = () => { everOpen = true; failCount = 0; lastMsg = Date.now(); openUrl = t.panel; fire(); setChip('on', cfg.mode === 'acct' ? 'Đã nối máy tính' : 'Đã nối game'); showConnect(false); };
     ws.onmessage = (e) => {
       if (mine !== ws) return;
       lastMsg = Date.now();
@@ -136,10 +147,11 @@
     };
     ws.onclose = () => {
       if (mine !== ws) return;
+      openUrl = ''; fire();
       failCount++;
       setChip('off', 'Mất kết nối, đang thử lại…');
       if (!everOpen) showConnect(true, cfg.mode === 'acct'
-        ? 'Tìm thấy máy tính nhưng chưa nối được. Kiểm tra game trên máy tính đang chạy và kết nối vẫn "đã mở". Nếu máy tính vừa khởi động lại, đợi vài chục giây rồi thử lại.'
+        ? 'Tìm thấy địa chỉ nhưng chưa nối được' + ageText() + '. Hãy kiểm tra app Caro LIVE trên máy tính đang chạy và thẻ 3 báo "đã có thể nối vào". Điện thoại sẽ tự thử lại.'
         : 'Chưa nối được. Kiểm tra: game đang chạy? điện thoại cùng WiFi (hoặc cùng Tailscale)? đã bấm "Bật kết nối qua WiFi" trong bảng điều khiển và mở lại game? đúng mã 6 số?');
       retry = setTimeout(connect, 2500);
     };
@@ -577,10 +589,10 @@
     // bảng điều khiển trong app
     window.LinkApp = {
       panelUrl() {
-        if (cfg.mode === 'acct') return cfg.acct && tunnelUrl ? tunnelUrl + '/?code=' + cfg.acct.token : '';
-        const a = normAddr(cfg.addr);
-        return a ? 'http://' + a + '/' + (cfg.code ? '?code=' + encodeURIComponent(cfg.code) : '') : '';
+        return openUrl; // rỗng nếu chưa nối được game
       },
+      hasTarget() { return hasTarget(); },
+      status() { return { open: !!openUrl, hasTarget: hasTarget() }; },
       relayout() { L = null; if (st) render(); },
     };
     if (hasTarget()) { showConnect(false); connect(); } else showConnect(true, 'Nhập tài khoản + mật khẩu giống bên app Caro LIVE trên máy tính để xem và điều khiển game.');
