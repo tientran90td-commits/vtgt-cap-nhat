@@ -558,17 +558,26 @@ class Match {
     } else if (r.draw) {
       this.voice.move(this.players[mark], mark, x, y, null, n, now);
       this.finishDraw(now);
-    } else if (this.cfg.oBan && mark === 'X' && this.game.moves.filter((m) => m.mark === 'X').length === (Number(this.cfg.oBanAfter) || 2)) {
+    } else if (this.banDue(mark)) {
       // luật "O cấm 1 ô": sau nước thứ oBanAfter của X (mặc định 2), O phải chọn 1 ô cấm (gõ tọa độ) rồi mới được đi quân
       this.voice.move(this.players[mark], mark, x, y, null, n, now);
-      this.ban.picking = true;
-      this.beginTurn('O', now);
-      this.feed(`🚫 ${this.players.O.name} hãy CẤM 1 ô: gõ tọa độ ô muốn cấm (cả hai bên không được đi vào ô đó đến hết ván)`, 'warn', 'O');
-      this.voice.banAsk(this.players.O, now);
+      this.startBan(now);
     } else {
       this.voice.move(this.players[mark], mark, x, y, this.players[next], n, now);
       this.beginTurn(next, now);
     }
+  }
+
+  /** Vừa xong nước của `mark`: có tới lúc O cấm ô chưa? (dùng cho cả nước thường lẫn nước thiên đạo đánh thay khi hết giờ) */
+  banDue(mark) {
+    return !!(this.cfg.oBan && mark === 'X' && !this.ban.cell && !this.ban.picking && this.game.moves.filter((m) => m.mark === 'X').length >= (Number(this.cfg.oBanAfter) || 2));
+  }
+
+  startBan(now) {
+    this.ban.picking = true;
+    this.beginTurn('O', now);
+    this.feed(`🚫 ${this.players.O.name} hãy CẤM 1 ô: gõ tọa độ ô muốn cấm (cả hai bên không được đi vào ô đó đến hết ván)`, 'warn', 'O');
+    this.voice.banAsk(this.players.O, now);
   }
 
   /** O chọn ô cấm (bước 1). Xong thì O gõ tọa độ lần nữa để đi quân (bước 2). */
@@ -627,6 +636,7 @@ class Match {
     this.voice.timeoutAuto(player, cell.x, cell.y, this.game.moves.length, now);
     if (r.win) this.finishWin(mark, r.line, now);
     else if (r.draw) this.finishDraw(now);
+    else if (this.banDue(mark)) this.startBan(now); // X bị đánh thay đúng nước thứ 2: vẫn tới lượt O cấm ô
     else this.beginTurn(other(mark), now);
   }
 
