@@ -85,7 +85,7 @@ class Match {
 
   rulesText() {
     const c = this.cfg;
-    return `${c.winLength} quân liên tiếp${c.blockBothEnds ? ', không bị chặn 2 đầu' : ''}${c.forbidX && c.winLength === 5 ? ', X bị cấm 3-3 / 4-4 / hàng dài' : ''}${c.oBan ? ', sau nước đầu O được cấm 1 ô' : ''}`;
+    return `${c.winLength} quân liên tiếp${c.blockBothEnds ? ', không bị chặn 2 đầu' : ''}${c.forbidX && c.winLength === 5 ? ', X bị cấm 3-3 / 4-4 / hàng dài' : ''}${c.oBan ? ', sau nước đầu O cấm 1 ô (cả hai bên không được đi)' : ''}`;
   }
 
   // ---------- chọn người chơi ----------
@@ -527,8 +527,8 @@ class Match {
       }
       return;
     }
-    if (mark === 'X' && this.ban.cell && this.ban.cell.x === x && this.ban.cell.y === y) {
-      if (this.softNote(`ban:${player.id}`, `🚫 ${labelOf(x, y)} đã bị ${this.players.O.name} CẤM, ${player.name} chọn ô khác`, 6000, 'warn')) {
+    if (this.ban.cell && this.ban.cell.x === x && this.ban.cell.y === y) {
+      if (this.softNote(`ban:${player.id}`, `🚫 ${labelOf(x, y)} là ô bị CẤM (cả hai bên không được đi), ${player.name} chọn ô khác`, 6000, 'warn')) {
         this.voice.banHit(player, x, y, now);
       }
       return;
@@ -563,7 +563,7 @@ class Match {
       this.voice.move(this.players[mark], mark, x, y, null, n, now);
       this.ban.picking = true;
       this.beginTurn('O', now);
-      this.feed(`🚫 ${this.players.O.name} hãy CẤM 1 ô: gõ tọa độ ô muốn cấm (quân X không được đi vào ô đó đến hết ván)`, 'warn', 'O');
+      this.feed(`🚫 ${this.players.O.name} hãy CẤM 1 ô: gõ tọa độ ô muốn cấm (cả hai bên không được đi vào ô đó đến hết ván)`, 'warn', 'O');
       this.voice.banAsk(this.players.O, now);
     } else {
       this.voice.move(this.players[mark], mark, x, y, this.players[next], n, now);
@@ -587,7 +587,7 @@ class Match {
     this.ban = { cell: { x, y }, picking: false };
     const o = this.players.O;
     const xp = this.players.X;
-    this.feed(`🚫 ${o.name} đã CẤM ô ${labelOf(x, y)}: ${xp.name} (X) không được đi vào đó đến hết ván. Mời ${o.name} đi quân!`, 'warn', 'O');
+    this.feed(`🚫 ${o.name} đã CẤM ô ${labelOf(x, y)}: cả hai bên không được đi vào đó đến hết ván. Mời ${o.name} đi quân!`, 'warn', 'O');
     this.voice.banSet(o, xp, x, y, now);
     this.beginTurn('O', now);
   }
@@ -611,7 +611,7 @@ class Match {
       this.setBan(bc.x, bc.y, now);
       return;
     }
-    const isBanned = (c) => mark === 'X' && this.ban.cell && this.ban.cell.x === c.x && this.ban.cell.y === c.y;
+    const isBanned = (c) => this.ban.cell && this.ban.cell.x === c.x && this.ban.cell.y === c.y;
     let cell = this.game.nearbyEmptyCell();
     for (let i = 0; i < 80 && cell && (isBanned(cell) || (this.cfg.forbidX && forbiddenReason(this.game, cell.x, cell.y, mark))); i++) cell = this.game.nearbyEmptyCell();
     if (!cell) {
