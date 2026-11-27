@@ -11,6 +11,7 @@ const NUMBERS = {
   nextLobbySeconds: [3, 300],
   coinSeconds: [4, 20],
   turnSeconds: [8, 180],
+  oBanAfter: [1, 3], // luật "O cấm 1 ô": cấm sau nước thứ mấy của X
   extraTimeSeconds: [5, 120],
   extraTimesPerGame: [0, 5],
   resultSeconds: [5, 60],

@@ -85,7 +85,7 @@ class Match {
 
   rulesText() {
     const c = this.cfg;
-    return `${c.winLength} quân liên tiếp${c.blockBothEnds ? ', không bị chặn 2 đầu' : ''}${c.forbidX && c.winLength === 5 ? ', X bị cấm 3-3 / 4-4 / hàng dài' : ''}${c.oBan ? ', sau nước đầu O cấm 1 ô (cả hai bên không được đi)' : ''}`;
+    return `${c.winLength} quân liên tiếp${c.blockBothEnds ? ', không bị chặn 2 đầu' : ''}${c.forbidX && c.winLength === 5 ? ', X bị cấm 3-3 / 4-4 / hàng dài' : ''}${c.oBan ? ', O cấm 1 ô sau nước thứ ' + (Number(c.oBanAfter) || 2) + ' của X (cả hai bên không được đi)' : ''}`;
   }
 
   // ---------- chọn người chơi ----------
@@ -558,8 +558,8 @@ class Match {
     } else if (r.draw) {
       this.voice.move(this.players[mark], mark, x, y, null, n, now);
       this.finishDraw(now);
-    } else if (this.cfg.oBan && n === 1 && mark === 'X') {
-      // luật "O cấm 1 ô": sau nước đầu của X, O phải chọn 1 ô cấm (gõ tọa độ) rồi mới được đi quân
+    } else if (this.cfg.oBan && mark === 'X' && this.game.moves.filter((m) => m.mark === 'X').length === (Number(this.cfg.oBanAfter) || 2)) {
+      // luật "O cấm 1 ô": sau nước thứ oBanAfter của X (mặc định 2), O phải chọn 1 ô cấm (gõ tọa độ) rồi mới được đi quân
       this.voice.move(this.players[mark], mark, x, y, null, n, now);
       this.ban.picking = true;
       this.beginTurn('O', now);

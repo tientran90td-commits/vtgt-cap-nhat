@@ -71,7 +71,7 @@ const DEFAULTS = [
   { key: 'forbidden', group: 'Trong ván', role: 'ref', label: 'Đánh vào ô cấm (luật cấm)', vars: ['ten', 'oco', 'lydo'],
     text: 'Ô {oco} là ô cấm! Đạo hữu {ten} đi trước nên không được {lydo}. Mời chọn ô khác.\nKhoan đã đạo hữu {ten}, ô {oco} bị cấm vì {lydo}! Đi trước thì phải chịu luật cấm, chọn ô khác nhé!\nÔ {oco} không được đâu đạo hữu {ten}, {lydo} là phạm luật cấm đó!' },
   { key: 'banAsk', group: 'Trong ván', role: 'ref', label: 'Luật O cấm ô: mời O chọn ô cấm', vars: ['ten'],
-    text: 'Quân X đã đi xong nước đầu. Mời đạo hữu {ten} chọn một ô để cấm, gõ tọa độ ô đó.\nĐạo hữu {ten} có quyền cấm một ô! Gõ tọa độ ô muốn cấm, cả hai bên sẽ không được đặt quân vào đó đến hết ván.\nĐến lượt đạo hữu {ten} ra lệnh cấm một ô. Chọn khéo nhé, cấm là cấm đến hết ván đó!' },
+    text: 'Quân X đã đi xong. Mời đạo hữu {ten} chọn một ô để cấm, gõ tọa độ ô đó.\nĐạo hữu {ten} có quyền cấm một ô! Gõ tọa độ ô muốn cấm, cả hai bên sẽ không được đặt quân vào đó đến hết ván.\nĐến lượt đạo hữu {ten} ra lệnh cấm một ô. Chọn khéo nhé, cấm là cấm đến hết ván đó!' },
   { key: 'banSet', group: 'Trong ván', role: 'ref', label: 'Luật O cấm ô: đã cấm xong', vars: ['ten', 'ten2', 'oco'],
     text: 'Ô {oco} đã bị cấm! Cả hai bên đều không được đánh vào đó nữa. Mời đạo hữu {ten} đi quân.\nĐạo hữu {ten} cấm ô {oco}! Cả hai bên nhớ tránh ô đó nhé. Mời đạo hữu {ten} xuất chiêu.\nÔ {oco} thành cấm địa rồi! Ai bước vào cũng phạm luật. Đạo hữu {ten}, mời đi quân!' },
   { key: 'banHit', group: 'Trong ván', role: 'ref', label: 'Luật O cấm ô: đánh vào ô bị cấm', vars: ['ten', 'oco'],

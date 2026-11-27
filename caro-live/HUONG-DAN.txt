@@ -353,7 +353,7 @@ LUẬT CẤM CHO QUÂN ĐI TRƯỚC (bản 40)
 
 LUẬT "O CẤM 1 Ô" (bản 41)
 - Bảng điều khiển: tick "Luật cân bằng: sau nước đầu của X, O được CẤM 1 ô". Mặc định tắt.
-- Cách chạy: X đi nước đầu -> màn hình hiện thông báo + MC đọc mời O cấm ô -> O gõ tọa độ ô muốn cấm (bước 1)
+- Cách chạy (mặc định cấm SAU 2 NƯỚC của X: X đi, O đi, X đi nước 2; đổi ở ô "cấm sau nước thứ mấy của X", 1-3): X đi xong nước đó -> màn hình hiện thông báo + MC đọc mời O cấm ô -> O gõ tọa độ ô muốn cấm (bước 1)
   -> game báo ô đã cấm -> O gõ tọa độ lần nữa để đi quân (bước 2).
 - Ô bị cấm tối hẳn đi như biến mất khỏi bàn cờ. CẢ HAI BÊN (X và O) đều không được đi vào ô đó, cấm đến hết ván.
 - Chỉ cấm 1 lần mỗi ván. Hết giờ lúc đang chọn ô cấm: thiên đạo cấm thay 1 ô gần quân (tính 1 lần hết giờ).
