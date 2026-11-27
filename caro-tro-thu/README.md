@@ -38,3 +38,7 @@ Kéo nút để đổi chỗ, chạm để mở lại app. Mã: BubbleService.ja
 ## Gợi ý không bị dừng khi sang TikTok (bản 2.4)
 Khi bong bóng đang bật và app ra nền, WebView được chuyển sang một cửa sổ nổi 1x1 điểm ảnh (vô hình) để Android không làm chậm/đóng băng trang
 (trước đây gợi ý chỉ chạy được 2-3 lần rồi dừng). Mở lại app thì WebView về chỗ cũ. Xem MainActivity.moveToOverlay / moveBack.
+
+## Luật "O cấm 1 ô" và luật cấm 3-3 / 4-4 (bản 3.1)
+- Khi game bật luật **O cấm 1 ô**, tới lượt bạn (bên O) chọn ô cấm, app hiện **🚫 Bạn CẤM ô …** = ô quân X muốn đi nhất; gõ ô đó vào bình luận, rồi gõ tiếp nước đi của bạn.
+- Ô bị cấm vẽ tối trên bàn cờ; app không bao giờ gợi ý đi vào ô cấm (cả 2 bên). Khi game bật luật cấm 3-3/4-4 cho X, app cũng né các ô đó khi gợi ý cho X (ô hiện vòng cấm đỏ).

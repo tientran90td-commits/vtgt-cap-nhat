@@ -1642,6 +1642,33 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
       return new Worker(URL.createObjectURL(new Blob([eng + tail], { type: 'text/javascript' })));
     } catch (e) { return null; }
   }
+  // ---------- ô bị cấm: luật "O cấm 1 ô" (st.banned, cả 2 bên) + luật cấm 3-3/4-4 (st.forbidden, chỉ X) ----------
+  function blockedSet(mm) {
+    const n = (st && st.size) || 15;
+    const set = new Set();
+    for (const c of (st && st.banned) || []) set.add(c.y * n + c.x);
+    if (mm === 'X') for (const c of (st && st.forbidden) || []) set.add(c.y * n + c.x);
+    return set;
+  }
+  // Máy tính xong mà gợi ý rơi vào ô cấm -> đổi sang nước tốt nhất kế tiếp không bị cấm
+  function avoidBlocked(size, strict, moves, p, r, blocked) {
+    if (!r || !blocked || !blocked.size) return r;
+    const ok = (c) => !blocked.has(c.y * size + c.x);
+    const alts = (r.alts && r.alts.length ? r.alts : [{ x: r.x, y: r.y }]).filter(ok);
+    if (!ok(r) || !alts.length) {
+      try {
+        const g = CaroEngine.fromMoves(size, strict, moves);
+        for (const [c] of g.candidates(p, 30)) {
+          const a = { x: c % size, y: (c / size) | 0 };
+          if (ok(a) && !alts.some((q) => q.x === a.x && q.y === a.y) && alts.length < 4) alts.push(a);
+        }
+      } catch (e) {}
+    }
+    const out = Object.assign({}, r);
+    if (!ok(r) && alts.length) { out.x = alts[0].x; out.y = alts[0].y; }
+    out.alts = alts.length ? alts : [{ x: out.x, y: out.y }];
+    return out;
+  }
   function think(size, strict, moves, p, cb) {
     const lv = LEVELS[cfg.level] || LEVELS.mid;
     const id = ++reqId;
@@ -1694,17 +1721,22 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
     const mm = myMark();
     if (mm) { const pl = players()[mm]; if (pl && cfg.me.name !== pl.name) { cfg.me.name = pl.name; save(); } }
     const want = mm && st.phase === 'playing' && !st.result && st.turn === mm;
-    const key = want ? st.gameNo + ':' + st.moves.length + ':' + mm : null;
+    const banMode = !!(want && mm === 'O' && st.banPicking); // luật "O cấm 1 ô": tới lượt O chọn ô cấm
+    const key = want ? st.gameNo + ':' + st.moves.length + ':' + mm + ':' + (banMode ? 'ban' : 'go') + ':' + (st.banned && st.banned[0] ? st.banned[0].x + '_' + st.banned[0].y : '') : null;
     if (!want) { if (hint) { reqId++; hint = null; } }
     else if (!hint || hint.key !== key) {
       const t0 = Date.now();
-      const mine = { key, x: -1, y: -1, alts: [], nhay: { list: [], idx: -1 }, busy: true };
+      const mine = { key, x: -1, y: -1, alts: [], nhay: { list: [], idx: -1 }, busy: true, ban: banMode };
       hint = mine;
       const p = mm === 'X' ? 1 : 2;
       const size = st.size;
       const strict = strictRule();
       const moves = movesOf();
-      think(size, strict, moves, p, (r) => {
+      // chế độ cấm ô: tính nước đi hay nhất của ĐỐI THỦ (X) rồi cấm đúng ô đó
+      const thinkP = banMode ? 1 : p;
+      const blocked = banMode ? new Set() : blockedSet(mm);
+      think(size, strict, moves, thinkP, (r0) => {
+        const r = avoidBlocked(size, strict, moves, thinkP, r0, blocked);
         if (hint !== mine || !r) return;
         mine.busy = false;
         mine.x = r.x; mine.y = r.y; mine.alts = r.alts || [{ x: r.x, y: r.y }]; mine.altIdx = 0;
@@ -1714,9 +1746,10 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
         render();
         let lastOpp = -1;
         for (let i = moves.length - 1; i >= 0; i--) if (moves[i][2] !== p) { lastOpp = moves[i][1] * size + moves[i][0]; break; }
+        if (banMode) { render(); return; } // đang cấm ô thì không có nước nhây
         runNhay({ id: reqId, size, strict, moves, p, ms: 1400, lastOpp }, (list) => {
           if (hint !== mine) return;
-          mine.nhay.list = list.filter((k) => !(k.x === mine.x && k.y === mine.y));
+          mine.nhay.list = list.filter((k) => !(k.x === mine.x && k.y === mine.y) && !blocked.has(k.y * size + k.x));
           render();
         });
       });
@@ -1768,6 +1801,12 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
         if (!hint || hint.busy) { big.textContent = '⏳ Đang tính nước đi…'; sub.textContent = 'Chờ một chút.'; return; }
         const nh = hint.nhay.idx >= 0 ? hint.nhay.list[hint.nhay.idx] : null;
         const c = nh || hint.shown || hint;
+        if (hint.ban) {
+          big.className = 'big me';
+          big.textContent = '🚫 Bạn CẤM ô ' + cellName(c.x, c.y);
+          sub.textContent = 'Đây là ô quân X muốn đi nhất. Gõ ô này vào bình luận để cấm, rồi gõ tiếp nước đi của bạn (cả hai bên đều không được đi vào ô cấm). Còn ' + Math.max(0, Math.ceil((st.turnEndsAt - Date.now()) / 1000)) + ' giây (ước tính).' + (hint.brain ? ' [🧠 ' + hint.brain + ']' : '');
+          return;
+        }
         big.className = 'big ' + (nh ? 'nhay' : 'me');
         big.textContent = (nh ? '😜 Nhây: bạn đánh ô ' : '👉 Bạn đánh ô ') + cellName(c.x, c.y);
         sub.textContent = (nh ? 'Máy đã kiểm tra: dù họ đáp thế nào bạn vẫn thắng.' : 'Gõ ô này vào bình luận để đánh. Còn ' + Math.max(0, Math.ceil((st.turnEndsAt - Date.now()) / 1000)) + ' giây (ước tính).') + (hint.brain ? ' [🧠 ' + hint.brain + ']' : '');
@@ -1837,6 +1876,18 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
     }
     const P = (x, y) => [C(x), C(n - 1 - y)];
     const r = cell * 0.36;
+    // ô bị cấm: tối hẳn (O cấm, cả 2 bên) / biểu tượng cấm đỏ (luật 3-3, 4-4 của X, chỉ hiện khi tới lượt X)
+    for (const b of st.banned || []) {
+      const [bx, by] = P(b.x, b.y);
+      ctx.fillStyle = 'rgb(6,5,10)';
+      ctx.fillRect(bx - cell / 2, by - cell / 2, cell, cell);
+    }
+    for (const f of st.forbidden || []) {
+      const [fx, fy] = P(f.x, f.y);
+      ctx.strokeStyle = 'rgba(200,30,30,.9)'; ctx.fillStyle = 'rgba(90,0,0,.35)'; ctx.lineWidth = Math.max(1.5, cell * 0.07);
+      ctx.beginPath(); ctx.arc(fx, fy, cell * 0.27, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(fx - cell * 0.19, fy + cell * 0.19); ctx.lineTo(fx + cell * 0.19, fy - cell * 0.19); ctx.stroke();
+    }
     const list = st.moves || [];
     for (const mv of list) {
       const [cx, cy] = P(mv.x, mv.y);
@@ -1860,11 +1911,12 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
       if (c2) {
         const [cx, cy] = P(c2.x, c2.y);
         const a = 0.55 + 0.45 * Math.sin(pulse * 5);
-        ctx.strokeStyle = nh ? 'rgba(197,139,255,' + a + ')' : 'rgba(61,220,132,' + a + ')';
-        ctx.fillStyle = nh ? 'rgba(197,139,255,.25)' : 'rgba(61,220,132,.28)';
+        const bn = hint.ban && !nh;
+        ctx.strokeStyle = nh ? 'rgba(197,139,255,' + a + ')' : bn ? 'rgba(255,150,40,' + a + ')' : 'rgba(61,220,132,' + a + ')';
+        ctx.fillStyle = nh ? 'rgba(197,139,255,.25)' : bn ? 'rgba(255,150,40,.3)' : 'rgba(61,220,132,.28)';
         ctx.lineWidth = Math.max(3, cell * 0.14);
         ctx.beginPath(); ctx.arc(cx, cy, cell * 0.46, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
-        ctx.fillStyle = nh ? '#7b3fc4' : '#0f7a3f';
+        ctx.fillStyle = nh ? '#7b3fc4' : bn ? '#a84b00' : '#0f7a3f';
         ctx.font = '900 ' + Math.max(10, cell * 0.5) + 'px system-ui, sans-serif';
         ctx.fillText('★', cx, cy + 1);
       }
@@ -1914,7 +1966,7 @@ input { font:inherit; padding:10px; border-radius:10px; border:0; background:#2a
       if (!hint || hint.busy) { bubbleSend('info', 'Đang tính nước đi…', '⏳'); return; }
       const nh = hint.nhay.idx >= 0 ? hint.nhay.list[hint.nhay.idx] : null;
       const c = nh || hint.shown || hint;
-      bubbleSend(nh ? 'nhay' : 'me', nh ? '😜 Nhây: bạn đánh ô' : '👉 Bạn đánh ô', cellName(c.x, c.y));
+      bubbleSend(nh ? 'nhay' : 'me', hint.ban ? '🚫 Bạn CẤM ô' : nh ? '😜 Nhây: bạn đánh ô' : '👉 Bạn đánh ô', cellName(c.x, c.y));
       return;
     }
     bubbleSend('idle', '', '');
