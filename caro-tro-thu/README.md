@@ -42,3 +42,6 @@ Khi bong bóng đang bật và app ra nền, WebView được chuyển sang mộ
 ## Luật "O cấm 1 ô" và luật cấm 3-3 / 4-4 (bản 3.1)
 - Khi game bật luật **O cấm 1 ô**, tới lượt bạn (bên O) chọn ô cấm, app hiện **🚫 Bạn CẤM ô …** = ô quân X muốn đi nhất; gõ ô đó vào bình luận, rồi gõ tiếp nước đi của bạn.
 - Ô bị cấm vẽ tối trên bàn cờ; app không bao giờ gợi ý đi vào ô cấm (cả 2 bên). Khi game bật luật cấm 3-3/4-4 cho X, app cũng né các ô đó khi gợi ý cho X (ô hiện vòng cấm đỏ).
+
+## Ô cấm là "tường" (bản 3.2)
+Bộ não coi ô bị O cấm như một bức tường chặn cả hai bên: dây quân nào đi qua ô cấm là dây chết, app không còn gợi ý chặn 2 đầu một dây đã hết đường 5. Rapfi không biết ô cấm, nên khi bàn có ô cấm app vẫn dùng Rapfi nhưng kiểm tra lại từng gợi ý bằng bộ não nội bộ (hiểu ô cấm): loại gợi ý bỏ lỡ nước thắng/chặn thắng, dựa vào dây đã chết, hoặc để đối thủ ép thắng; khi đó dùng nước của bộ não nội bộ.

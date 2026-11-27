@@ -142,5 +142,18 @@ ok(results.random.every((r) => r === 'win'), 'thắng bot ngẫu nhiên');
   const e5 = fromMoves(15, false, [[7,7,1],[8,8,2],[6,6,1],[9,9,2],[7,8,1],[8,7,2]]);
   ok(e5.nhay(1, { ms: 300 }).length === 0, 'chưa có đường thắng chắc: không nhây');
 }
+{
+  // ô cấm (tường): X F8 G8 _ I8 với H8 bị cấm -> dây chết, máy không được thấy "H8 thắng" hay cần chặn 2 đầu
+  const C = (x, y) => y * 15 + x;
+  const mv = [[5, 7, 1], [6, 7, 1], [8, 7, 1], [2, 2, 2], [12, 12, 2]];
+  const open_ = fromMoves(15, false, mv);
+  const dead = fromMoves(15, false, mv, [C(7, 7)]);
+  ok(open_.bestMove(2, { ms: 500, maxDepth: 6 }).x === 7, 'không cấm: máy bắt buộc chặn H8');
+  ok(dead.bestMove(2, { ms: 500, maxDepth: 6 }).x !== 7 || dead.bestMove(2, { ms: 500, maxDepth: 6 }).y !== 7, 'H8 bị cấm: không bao giờ chọn H8');
+  ok(!dead.candidates(1, 0).some(([c]) => c === C(7, 7)) && !dead.candidates(2, 0).some(([c]) => c === C(7, 7)), 'ô cấm không nằm trong ứng viên');
+  ok(dead.cellScore(C(4, 7), 2) < open_.cellScore(C(4, 7), 2) * 0.5, 'dây đã chết: chặn đầu E8 không còn đáng giá')
+  const e = fromMoves(15, false, [[5, 7, 1], [6, 7, 1], [7, 7, 1], [8, 7, 1]], [C(9, 7)]);
+  ok(e.winningCells(1).some((c) => c === C(4, 7)) && !e.winningCells(1).some((c) => c === C(9, 7)), 'X 4 quân, đầu phải bị cấm: chỉ còn thắng ở đầu trái');
+}
 console.log(`engine tests: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

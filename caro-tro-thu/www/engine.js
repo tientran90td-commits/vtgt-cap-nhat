@@ -19,11 +19,13 @@
 
   class Engine {
     /** size: cạnh bàn cờ; strict: true = 5 quân bị chặn cả 2 đầu thì không thắng. */
-    constructor(size = 15, strict = false) {
+    constructor(size = 15, strict = false, walls = []) {
       this.n = size;
       this.strict = !!strict;
       const n = size;
-      this.b = new Int8Array(n * n); // 0 trống, 1, 2
+      this.b = new Int8Array(n * n); // 0 trống, 1, 2, 3 = ô CẤM (không ai đi được)
+      const wallSet = new Set(walls || []);
+      for (const c of wallSet) if (c >= 0 && c < n * n) this.b[c] = 3;
       this.nb = new Int16Array(n * n); // số quân nằm trong vòng 2 ô quanh mỗi ô
       this.win = []; // các cửa sổ: mảng 5 chỉ số ô
       this.cellWins = Array.from({ length: n * n }, () => []);
@@ -35,11 +37,14 @@
             if (ex < 0 || ex >= n || ey < 0 || ey >= n) continue;
             const id = this.win.length;
             const cells = [];
+            let dead = false; // cửa sổ chứa ô cấm: không ai làm được 5 quân ở đây -> bỏ hẳn
             for (let k = 0; k < 5; k++) {
               const c = (y + k * dy) * n + (x + k * dx);
+              if (wallSet.has(c)) dead = true;
               cells.push(c);
-              this.cellWins[c].push(id);
             }
+            if (dead) continue;
+            for (const c of cells) this.cellWins[c].push(id);
             this.win.push(cells);
           }
         }
@@ -485,6 +490,27 @@
       return out;
     }
 
+    /**
+     * Phe p đi ô c rồi, đối thủ có thắng ngay / ép thắng được không? (dùng kiểm tra gợi ý của Rapfi khi bàn có ô cấm)
+     * Trả true = nước này nguy hiểm.
+     */
+    unsafeAfter(p, c, ms) {
+      const n = this.n;
+      const o = 3 - p;
+      const x = c % n;
+      const y = (c / n) | 0;
+      this.place(x, y, p);
+      let bad = false;
+      if (!this.isWinAt(x, y, p)) {
+        this.deadline = Date.now() + (ms || 250);
+        this.aborted = false;
+        bad = this.winningCells(o).length > 0 || this.vcf(o, 14) !== -1;
+        this.aborted = false;
+      }
+      this.undo();
+      return bad;
+    }
+
     // ---------- alpha-beta ----------
     evalFor(p) {
       return this.score[p] - this.score[3 - p] * 1.05;
@@ -611,8 +637,8 @@
   }
 
   /** dựng engine từ danh sách nước đã đi [[x,y,p],...] */
-  function fromMoves(size, strict, moves) {
-    const e = new Engine(size, strict);
+  function fromMoves(size, strict, moves, walls) {
+    const e = new Engine(size, strict, walls);
     for (const [x, y, p] of moves) e.place(x, y, p);
     return e;
   }

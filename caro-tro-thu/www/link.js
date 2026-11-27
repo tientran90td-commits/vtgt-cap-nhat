@@ -212,8 +212,8 @@
     try {
       const eng = document.getElementById('engine').textContent;
       const tail = kind === 'nhay'
-        ? '\nself.onmessage=function(e){var d=e.data;var g=CaroEngine.fromMoves(d.size,d.strict,d.moves);var l=g.nhay(d.p,{ms:d.ms,lastOpp:d.lastOpp,max:4});self.postMessage({id:d.id,list:l});};'
-        : '\nself.onmessage=function(e){var d=e.data;var g=CaroEngine.fromMoves(d.size,d.strict,d.moves);var m=g.bestMove(d.p,{ms:d.ms,maxDepth:d.depth});m.id=d.id;self.postMessage(m);};';
+        ? '\nself.onmessage=function(e){var d=e.data;var g=CaroEngine.fromMoves(d.size,d.strict,d.moves,d.walls);var l=g.nhay(d.p,{ms:d.ms,lastOpp:d.lastOpp,max:4});self.postMessage({id:d.id,list:l});};'
+        : '\nself.onmessage=function(e){var d=e.data;var g=CaroEngine.fromMoves(d.size,d.strict,d.moves,d.walls);var m=g.bestMove(d.p,{ms:d.ms,maxDepth:d.depth});m.id=d.id;self.postMessage(m);};';
       return new Worker(URL.createObjectURL(new Blob([eng + tail], { type: 'text/javascript' })));
     } catch (e) { return null; }
   }
@@ -226,13 +226,13 @@
     return set;
   }
   // Máy tính xong mà gợi ý rơi vào ô cấm -> đổi sang nước tốt nhất kế tiếp không bị cấm
-  function avoidBlocked(size, strict, moves, p, r, blocked) {
+  function avoidBlocked(size, strict, moves, p, r, blocked, walls) {
     if (!r || !blocked || !blocked.size) return r;
     const ok = (c) => !blocked.has(c.y * size + c.x);
     const alts = (r.alts && r.alts.length ? r.alts : [{ x: r.x, y: r.y }]).filter(ok);
     if (!ok(r) || !alts.length) {
       try {
-        const g = CaroEngine.fromMoves(size, strict, moves);
+        const g = CaroEngine.fromMoves(size, strict, moves, walls);
         for (const [c] of g.candidates(p, 30)) {
           const a = { x: c % size, y: (c / size) | 0 };
           if (ok(a) && !alts.some((q) => q.x === a.x && q.y === a.y) && alts.length < 4) alts.push(a);
@@ -244,17 +244,36 @@
     out.alts = alts.length ? alts : [{ x: out.x, y: out.y }];
     return out;
   }
-  function think(size, strict, moves, p, cb) {
+  function rapfiRejected(size, strict, moves, p, r, walls) {
+    try {
+      const cell = r.y * size + r.x;
+      const g = CaroEngine.fromMoves(size, strict, moves, walls);
+      if (g.b[cell] !== 0) return true;
+      const mine = g.winningCells(p);
+      if (mine.length) return !mine.includes(cell); // đang có nước thắng ngay: phải đi nước đó
+      const theirs = g.winningCells(3 - p);
+      if (theirs.length) return !theirs.includes(cell); // phải chặn
+      const open = CaroEngine.fromMoves(size, strict, moves); // cùng thế nhưng KHÔNG có ô cấm
+      const a = open.cellScore(cell, p);
+      if (a > 0 && g.cellScore(cell, p) < a * 0.4) return true; // giá trị nước đi này chủ yếu nhờ dây đã chết
+      return g.unsafeAfter(p, cell, 250);
+    } catch (e) { return false; }
+  }
+  function think(size, strict, moves, p, cb, walls) {
     const lv = LEVELS[cfg.level] || LEVELS.mid;
     const id = ++reqId;
     const done = (r) => { if (id === reqId) cb(r); };
     if (window.RapfiBridge && RapfiBridge.usable(strict)) {
       RapfiBridge.think({ size, moves: moves.map((m) => ({ x: m[0], y: m[1], p: m[2] })), me: p, ms: lv.ms }, (err, r) => {
         if (id !== reqId) return;
-        if (err || !r) { thinkJs(id, size, strict, moves, p, lv, done); return; }
+        if (err || !r) { thinkJs(id, size, strict, moves, p, lv, done, walls); return; }
+        // Bàn có ô cấm: Rapfi không biết ô cấm chặn cả hai bên -> kiểm tra gợi ý bằng bộ não nội bộ (hiểu ô cấm).
+        // Gợi ý bị loại nếu: bỏ lỡ nước thắng/chặn thắng, dựa vào dây đã chết vì ô cấm, hoặc để đối thủ ép thắng.
+        if (walls && walls.length && rapfiRejected(size, strict, moves, p, r, walls)) { thinkJs(id, size, strict, moves, p, lv, done, walls); return; }
+        if (walls && walls.length) r.checked = true;
         const alts = [{ x: r.x, y: r.y }];
         try {
-          const g = CaroEngine.fromMoves(size, strict, moves);
+          const g = CaroEngine.fromMoves(size, strict, moves, walls);
           for (const [c] of g.candidates(p, 6)) { const ax = c % size, ay = (c / size) | 0; if (!(ax === r.x && ay === r.y) && alts.length < 4) alts.push({ x: ax, y: ay }); }
         } catch (e) {}
         r.alts = alts;
@@ -262,17 +281,17 @@
       });
       return;
     }
-    thinkJs(id, size, strict, moves, p, lv, done);
+    thinkJs(id, size, strict, moves, p, lv, done, walls);
   }
-  function thinkJs(id, size, strict, moves, p, lv, done) {
-    const payload = { id, size, strict, moves, p, ms: lv.ms, depth: lv.depth };
+  function thinkJs(id, size, strict, moves, p, lv, done, walls) {
+    const payload = { id, size, strict, moves, p, ms: lv.ms, depth: lv.depth, walls: walls || [] };
     if (worker === null) worker = makeWorker('best') || false;
     if (worker) {
       worker.onmessage = (e) => { if (e.data.id === id) done(e.data); };
-      worker.onerror = () => { worker = false; setTimeout(() => thinkJs(id, size, strict, moves, p, lv, done), 0); };
+      worker.onerror = () => { worker = false; setTimeout(() => thinkJs(id, size, strict, moves, p, lv, done, walls), 0); };
       worker.postMessage(payload);
     } else {
-      setTimeout(() => done(CaroEngine.fromMoves(size, strict, moves).bestMove(p, { ms: lv.ms, maxDepth: lv.depth })), 30);
+      setTimeout(() => done(CaroEngine.fromMoves(size, strict, moves, walls).bestMove(p, { ms: lv.ms, maxDepth: lv.depth })), 30);
     }
   }
   function runNhay(payload, cb) {
@@ -282,7 +301,7 @@
       nhayWorker.onerror = () => { nhayWorker = false; cb([]); };
       nhayWorker.postMessage(payload);
     } else {
-      try { cb(CaroEngine.fromMoves(payload.size, payload.strict, payload.moves).nhay(payload.p, { ms: payload.ms, lastOpp: payload.lastOpp, max: 4 })); } catch (e) { cb([]); }
+      try { cb(CaroEngine.fromMoves(payload.size, payload.strict, payload.moves, payload.walls).nhay(payload.p, { ms: payload.ms, lastOpp: payload.lastOpp, max: 4 })); } catch (e) { cb([]); }
     }
   }
 
@@ -310,24 +329,25 @@
       // chế độ cấm ô: tính nước đi hay nhất của ĐỐI THỦ (X) rồi cấm đúng ô đó
       const thinkP = banMode ? 1 : p;
       const blocked = banMode ? new Set() : blockedSet(mm);
+      const walls = ((st && st.banned) || []).map((c) => c.y * size + c.x); // ô O đã cấm: chặn cả hai bên
       think(size, strict, moves, thinkP, (r0) => {
-        const r = avoidBlocked(size, strict, moves, thinkP, r0, blocked);
+        const r = avoidBlocked(size, strict, moves, thinkP, r0, blocked, walls);
         if (hint !== mine || !r) return;
         mine.busy = false;
         mine.x = r.x; mine.y = r.y; mine.alts = r.alts || [{ x: r.x, y: r.y }]; mine.altIdx = 0;
         mine.shown = { x: r.x, y: r.y };
-        mine.brain = (r.why === 'Rapfi' ? 'Rapfi (mạnh)' : 'bộ não nội bộ' + (window.RapfiBridge ? (RapfiBridge.state === 'ready' ? (strict ? ', luật chặn 2 đầu' : '') : ', Rapfi ' + (RapfiBridge.state === 'loading' ? 'đang tải' : 'không chạy được')) : '')) + ' · ' + Math.round((Date.now() - t0) / 100) / 10 + 's · tính trên ' + moves.length + ' quân';
+        mine.brain = (r.why === 'Rapfi' ? (r.checked ? 'Rapfi + kiểm tra ô cấm' : 'Rapfi (mạnh)') : 'bộ não nội bộ' + (window.RapfiBridge ? (RapfiBridge.state === 'ready' ? (strict ? ', luật chặn 2 đầu' : walls.length ? ', có ô cấm' : '') : ', Rapfi ' + (RapfiBridge.state === 'loading' ? 'đang tải' : 'không chạy được')) : '')) + ' · ' + Math.round((Date.now() - t0) / 100) / 10 + 's · tính trên ' + moves.length + ' quân';
         if (navigator.vibrate) { try { navigator.vibrate(80); } catch (e) {} }
         render();
         let lastOpp = -1;
         for (let i = moves.length - 1; i >= 0; i--) if (moves[i][2] !== p) { lastOpp = moves[i][1] * size + moves[i][0]; break; }
         if (banMode) { render(); return; } // đang cấm ô thì không có nước nhây
-        runNhay({ id: reqId, size, strict, moves, p, ms: 1400, lastOpp }, (list) => {
+        runNhay({ id: reqId, size, strict, moves, p, ms: 1400, lastOpp, walls }, (list) => {
           if (hint !== mine) return;
           mine.nhay.list = list.filter((k) => !(k.x === mine.x && k.y === mine.y) && !blocked.has(k.y * size + k.x));
           render();
         });
-      });
+      }, walls);
     }
     render();
   }
