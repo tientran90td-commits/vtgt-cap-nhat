@@ -349,3 +349,12 @@ LUẬT CẤM CHO QUÂN ĐI TRƯỚC (bản 40)
   X gõ vào ô cấm: nước không được tính, vẫn tới lượt X, MC báo "ô cấm" và lý do. Hết giờ thì thiên đạo cũng không đánh thay vào ô cấm.
   Chỉ áp dụng khi thắng 5 quân (winLength = 5). Luật nằm riêng trong src\forbidden.js.
   Lưu ý: app Trợ Thủ chưa biết luật cấm nên có thể gợi ý nước bị cấm cho X.
+
+
+LUẬT "O CẤM 1 Ô" (bản 41)
+- Bảng điều khiển: tick "Luật cân bằng: sau nước đầu của X, O được CẤM 1 ô". Mặc định tắt.
+- Cách chạy: X đi nước đầu -> màn hình hiện thông báo + MC đọc mời O cấm ô -> O gõ tọa độ ô muốn cấm (bước 1)
+  -> game báo ô đã cấm -> O gõ tọa độ lần nữa để đi quân (bước 2).
+- Ô bị cấm tối hẳn đi như biến mất khỏi bàn cờ. Chỉ X bị cấm đi vào ô đó (O vẫn đi được), cấm đến hết ván.
+- Chỉ cấm 1 lần mỗi ván. Hết giờ lúc đang chọn ô cấm: thiên đạo cấm thay 1 ô gần quân (tính 1 lần hết giờ).
+- Dùng chung được với luật cấm 3-3/4-4 của bản 40.

@@ -32,8 +32,8 @@ function spellCell(x, y) {
 //   lively (2) = thêm đọc từng nước đi, cảnh báo giờ trong trận
 // Các câu không được đọc vẫn hiện chữ trên màn hình (khung thông báo / biển báo).
 const LEVEL = { quiet: 0, normal: 1, lively: 2 };
-const QUIET_KEYS = new Set(['coinResult', 'winGame', 'winForfeit', 'draw', 'giftBig']);
-const MATCH_ONLY_KEYS = new Set(['move', 'moveEnd', 'occupied', 'forbidden', 'warn10', 'timeoutAuto', 'extraTime']);
+const QUIET_KEYS = new Set(['coinResult', 'winGame', 'winForfeit', 'draw', 'giftBig', 'banAsk', 'banSet']); // banAsk/banSet: luật "O cấm ô" chỉ nói 1 lần mỗi ván, luôn đọc
+const MATCH_ONLY_KEYS = new Set(['move', 'moveEnd', 'occupied', 'forbidden', 'banHit', 'warn10', 'timeoutAuto', 'extraTime']);
 const minLevel = (key, inMatch) => (QUIET_KEYS.has(key) ? 0 : inMatch || MATCH_ONLY_KEYS.has(key) ? 2 : 1);
 
 class Commentator {
@@ -154,6 +154,18 @@ class Commentator {
 
   forbidden(user, x, y, lydo, now) {
     this.say('forbidden', { ten: this.nm(user, 'vô danh'), oco: spellCell(x, y), lydo }, { at: now, prio: 1 });
+  }
+
+  banAsk(user, now) {
+    this.say('banAsk', { ten: this.nm(user, 'quân O') }, { at: now + 400, prio: 2 });
+  }
+
+  banSet(oUser, xUser, x, y, now) {
+    this.say('banSet', { ten: this.nm(oUser, 'quân O'), ten2: this.nm(xUser, 'quân X'), oco: spellCell(x, y) }, { at: now, prio: 2 });
+  }
+
+  banHit(user, x, y, now) {
+    this.say('banHit', { ten: this.nm(user, 'vô danh'), oco: spellCell(x, y) }, { at: now, prio: 1 });
   }
 
   timeoutAuto(user, x, y, n, now) {

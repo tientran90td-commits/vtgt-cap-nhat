@@ -85,7 +85,7 @@ class Match {
 
   rulesText() {
     const c = this.cfg;
-    return `${c.winLength} quân liên tiếp${c.blockBothEnds ? ', không bị chặn 2 đầu' : ''}${c.forbidX && c.winLength === 5 ? ', X bị cấm 3-3 / 4-4 / hàng dài' : ''}`;
+    return `${c.winLength} quân liên tiếp${c.blockBothEnds ? ', không bị chặn 2 đầu' : ''}${c.forbidX && c.winLength === 5 ? ', X bị cấm 3-3 / 4-4 / hàng dài' : ''}${c.oBan ? ', sau nước đầu O được cấm 1 ô' : ''}`;
   }
 
   // ---------- chọn người chơi ----------
@@ -174,6 +174,7 @@ class Match {
     this.phase = 'lobby';
     this.players = { X: null, O: null };
     this.game.reset();
+    this.ban = { cell: null, picking: false }; // luật "O cấm 1 ô" (src: tryBan)
     this.result = null;
     this.coin = null;
     this.coinPlayers = null;
@@ -385,6 +386,7 @@ class Match {
     this.phaseStartedAt = now;
     this.timeouts = { X: 0, O: 0 };
     this.extraUsed = { X: 0, O: 0 };
+    this.ban = { cell: null, picking: false };
     this.beginTurn('X', now);
     this.feed(`▶ Khai cục! Gõ tọa độ như j9, k6 để xuất chiêu`, 'info');
     this.voice.start(this.players.X, now);
@@ -514,10 +516,20 @@ class Match {
 
   tryMove(mark, x, y, now) {
     const player = this.players[mark];
+    if (this.ban.picking) {
+      this.tryBan(mark, x, y, now);
+      return;
+    }
     if (!this.game.isEmpty(x, y)) {
       const label = labelOf(x, y);
       if (this.softNote(`occ:${player.id}`, `${label} đã có quân, ${player.name} chọn ô khác`, 4000)) {
         this.voice.occupied(player, x, y, now);
+      }
+      return;
+    }
+    if (mark === 'X' && this.ban.cell && this.ban.cell.x === x && this.ban.cell.y === y) {
+      if (this.softNote(`ban:${player.id}`, `🚫 ${labelOf(x, y)} đã bị ${this.players.O.name} CẤM, ${player.name} chọn ô khác`, 6000, 'warn')) {
+        this.voice.banHit(player, x, y, now);
       }
       return;
     }
@@ -546,10 +558,38 @@ class Match {
     } else if (r.draw) {
       this.voice.move(this.players[mark], mark, x, y, null, n, now);
       this.finishDraw(now);
+    } else if (this.cfg.oBan && n === 1 && mark === 'X') {
+      // luật "O cấm 1 ô": sau nước đầu của X, O phải chọn 1 ô cấm (gõ tọa độ) rồi mới được đi quân
+      this.voice.move(this.players[mark], mark, x, y, null, n, now);
+      this.ban.picking = true;
+      this.beginTurn('O', now);
+      this.feed(`🚫 ${this.players.O.name} hãy CẤM 1 ô: gõ tọa độ ô muốn cấm (quân X không được đi vào ô đó đến hết ván)`, 'warn', 'O');
+      this.voice.banAsk(this.players.O, now);
     } else {
       this.voice.move(this.players[mark], mark, x, y, this.players[next], n, now);
       this.beginTurn(next, now);
     }
+  }
+
+  /** O chọn ô cấm (bước 1). Xong thì O gõ tọa độ lần nữa để đi quân (bước 2). */
+  tryBan(mark, x, y, now) {
+    const player = this.players[mark];
+    if (!this.game.isEmpty(x, y)) {
+      if (this.softNote(`occ:${player.id}`, `${labelOf(x, y)} đã có quân, ${player.name} chọn ô trống để cấm`, 4000)) {
+        this.voice.occupied(player, x, y, now);
+      }
+      return;
+    }
+    this.setBan(x, y, now);
+  }
+
+  setBan(x, y, now) {
+    this.ban = { cell: { x, y }, picking: false };
+    const o = this.players.O;
+    const xp = this.players.X;
+    this.feed(`🚫 ${o.name} đã CẤM ô ${labelOf(x, y)}: ${xp.name} (X) không được đi vào đó đến hết ván. Mời ${o.name} đi quân!`, 'warn', 'O');
+    this.voice.banSet(o, xp, x, y, now);
+    this.beginTurn('O', now);
   }
 
   onTurnTimeout(now) {
@@ -560,10 +600,20 @@ class Match {
       this.finishForfeit(mark, 'hết thời gian quá nhiều lần nên bị xử thua', now);
       return;
     }
-    let cell = this.game.nearbyEmptyCell();
-    if (cell && this.cfg.forbidX) {
-      for (let i = 0; i < 80 && cell && forbiddenReason(this.game, cell.x, cell.y, mark); i++) cell = this.game.nearbyEmptyCell();
+    if (this.ban.picking) {
+      // O hết giờ mà chưa chọn ô cấm: thiên đạo chọn thay 1 ô gần quân
+      const bc = this.game.nearbyEmptyCell();
+      if (!bc) {
+        this.finishDraw(now);
+        return;
+      }
+      this.feed(`⏰ ${player.name} hết giờ! Thiên đạo cấm thay ô ${labelOf(bc.x, bc.y)} (${this.timeouts[mark]}/${this.cfg.maxTimeouts})`, 'warn', mark);
+      this.setBan(bc.x, bc.y, now);
+      return;
     }
+    const isBanned = (c) => mark === 'X' && this.ban.cell && this.ban.cell.x === c.x && this.ban.cell.y === c.y;
+    let cell = this.game.nearbyEmptyCell();
+    for (let i = 0; i < 80 && cell && (isBanned(cell) || (this.cfg.forbidX && forbiddenReason(this.game, cell.x, cell.y, mark))); i++) cell = this.game.nearbyEmptyCell();
     if (!cell) {
       this.finishDraw(now);
       return;
@@ -900,6 +950,8 @@ class Match {
       coin: this.coin,
       moves: this.game.moves.map((m) => ({ x: m.x, y: m.y, m: m.mark })),
       forbidden: this.cfg.forbidX && this.phase === 'playing' && this.turn === 'X' ? forbiddenCells(this.game, 'X') : [],
+      banned: this.ban.cell ? [this.ban.cell] : [],
+      banPicking: !!this.ban.picking,
       result: this.result,
       champion: this.champion ? { name: this.champion.name, streak: this.champion.streak } : null,
       booked: this.bookedList() ? this.bookedList().map((u) => u.name) : null,

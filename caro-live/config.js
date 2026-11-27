@@ -32,6 +32,7 @@ module.exports = {
   boardSize: 15, // bàn 15 x 15 (cột A-O, hàng 1-15)
   winLength: 5, // 5 quân liên tiếp là thắng
   blockBothEnds: false, // false = đủ 5 quân liên tiếp là thắng, kể cả bị chặn 2 đầu | true = bị chặn cả 2 đầu thì KHÔNG tính thắng
+  oBan: false, // true = LUẬT "O CẤM 1 Ô": sau nước đầu của X, O gõ 1 ô để cấm (X không được đi vào đó đến hết ván), rồi O mới đi quân
   forbidX: false, // true = LUẬT CẤM cho quân đi trước (X): không được đánh vào ô tạo 3-3, 4-4 hoặc hàng dài hơn 5 (xem src/forbidden.js)
 
   // ===== CHỌN NGƯỜI CHƠI =====

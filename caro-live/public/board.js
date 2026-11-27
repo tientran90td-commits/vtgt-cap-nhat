@@ -274,6 +274,17 @@ export class BoardView {
       }
       ctx.restore();
     }
+    // ô O đã CẤM (luật "O cấm 1 ô"): tối hẳn đi như biến mất khỏi bàn cờ (che luôn đường kẻ)
+    if (view.banned && view.banned.length) {
+      ctx.save();
+      for (const f of view.banned) {
+        const p = cellCenter(L, f.x, f.y);
+        const h = L.cell / 2;
+        ctx.fillStyle = 'rgb(6,5,10)';
+        ctx.fillRect(p.cx - h - 1, p.cy - h - 1, L.cell + 2, L.cell + 2);
+      }
+      ctx.restore();
+    }
     for (const m of view.moves) {
       const p = cellCenter(L, m.x, m.y);
       drawMark(ctx, m.m, p.cx, p.cy, L.cell * 0.4);

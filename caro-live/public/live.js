@@ -342,6 +342,7 @@ function renderHint(s, eff, now) {
     const p = s.players[s.turn];
     const name = p ? p.name : '';
     if (director.busy || !p) html = `<b>${escapeHtml(name || '…')}</b> đang bố trận…`;
+    else if (s.banPicking) html = `🚫 Đạo hữu <b>${escapeHtml(name)}</b> hãy <b>CẤM 1 Ô</b> • còn <b>${Math.max(0, Math.ceil((s.turnEndsAt - now) / 1000))}s</b> • gõ tọa độ ô muốn cấm, ví dụ <b>j9</b>`;
     else {
       const left = Math.max(0, Math.ceil((s.turnEndsAt - now) / 1000));
       html = `Lượt của đạo hữu <b>${escapeHtml(name)}</b> • còn <b>${left}s</b> • gõ tọa độ như <b>j9</b>, <b>k6</b>`;
