@@ -6,6 +6,7 @@
  * Người chơi đánh cờ bằng cách bình luận tọa độ, ví dụ: j9, k6.
  */
 const crypto = require('crypto');
+const { forbiddenReason, forbiddenCells } = require('./forbidden');
 const { Game, labelOf } = require('./game');
 const { parseMove, parsePartial, parseCommand } = require('./commands');
 const { rankInfo } = require('./rank');
@@ -84,7 +85,7 @@ class Match {
 
   rulesText() {
     const c = this.cfg;
-    return `${c.winLength} quân liên tiếp${c.blockBothEnds ? ', không bị chặn 2 đầu' : ''}`;
+    return `${c.winLength} quân liên tiếp${c.blockBothEnds ? ', không bị chặn 2 đầu' : ''}${c.forbidX && c.winLength === 5 ? ', X bị cấm 3-3 / 4-4 / hàng dài' : ''}`;
   }
 
   // ---------- chọn người chơi ----------
@@ -520,6 +521,16 @@ class Match {
       }
       return;
     }
+    if (this.cfg.forbidX) {
+      const why = forbiddenReason(this.game, x, y, mark);
+      if (why) {
+        const label = labelOf(x, y);
+        if (this.softNote(`forbid:${player.id}`, `⛔ ${label} là ô CẤM với quân đi trước (${why}), ${player.name} chọn ô khác`, 6000, 'warn')) {
+          this.voice.forbidden(player, x, y, why, now);
+        }
+        return;
+      }
+    }
     const r = this.game.place(x, y, mark);
     this.timeouts[mark] = 0;
     this.feed(`${player.name} xuất chiêu ${labelOf(x, y)}`, 'move', mark);
@@ -549,7 +560,10 @@ class Match {
       this.finishForfeit(mark, 'hết thời gian quá nhiều lần nên bị xử thua', now);
       return;
     }
-    const cell = this.game.nearbyEmptyCell();
+    let cell = this.game.nearbyEmptyCell();
+    if (cell && this.cfg.forbidX) {
+      for (let i = 0; i < 80 && cell && forbiddenReason(this.game, cell.x, cell.y, mark); i++) cell = this.game.nearbyEmptyCell();
+    }
     if (!cell) {
       this.finishDraw(now);
       return;
@@ -885,6 +899,7 @@ class Match {
       rankBoard: this.rankBoard(),
       coin: this.coin,
       moves: this.game.moves.map((m) => ({ x: m.x, y: m.y, m: m.mark })),
+      forbidden: this.cfg.forbidX && this.phase === 'playing' && this.turn === 'X' ? forbiddenCells(this.game, 'X') : [],
       result: this.result,
       champion: this.champion ? { name: this.champion.name, streak: this.champion.streak } : null,
       booked: this.bookedList() ? this.bookedList().map((u) => u.name) : null,

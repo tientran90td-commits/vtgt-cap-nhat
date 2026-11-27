@@ -338,3 +338,14 @@ TUNG ĐỒNG XU (bản 38)
   Trước khi đồng xu dừng, 2 thẻ người chơi chỉ hiện "?" và nhãn NGỬA/SẤP; lời đọc kết quả cũng chờ đến lúc đồng xu dừng.
   Ô "Giây tung đồng xu" trong bảng điều khiển nên để từ 6 giây trở lên cho hiệu ứng đủ chậm rãi (mặc định 7 giây).
 
+
+LUẬT CẤM CHO QUÂN ĐI TRƯỚC (bản 40)
+  Bảng điều khiển, mục luật/cài đặt: tick "Luật cấm cho quân đi trước (X)". Mặc định TẮT. Đổi được ngay khi đang chạy.
+  Quân X (đi trước, đỏ) KHÔNG được đánh vào ô tạo ra:
+    - 3-3: hai hàng 3 mở cùng lúc;   - 4-4: hai hàng 4 cùng lúc;   - hàng dài: 6 quân liền trở lên.
+  Ngoại lệ: nước làm đủ ĐÚNG 5 quân (thắng) thì luôn được đánh, dù có tạo 3-3 hay 4-4. Hàng 4-3 (một 4 và một 3) vẫn được.
+  Quân O (đi sau) không bị cấm gì cả.
+  Khi tới lượt X, các ô cấm hiện trên bàn bằng biểu tượng "cấm vào" (vòng tròn có gạch chéo) để người xem biết.
+  X gõ vào ô cấm: nước không được tính, vẫn tới lượt X, MC báo "ô cấm" và lý do. Hết giờ thì thiên đạo cũng không đánh thay vào ô cấm.
+  Chỉ áp dụng khi thắng 5 quân (winLength = 5). Luật nằm riêng trong src\forbidden.js.
+  Lưu ý: app Trợ Thủ chưa biết luật cấm nên có thể gợi ý nước bị cấm cho X.

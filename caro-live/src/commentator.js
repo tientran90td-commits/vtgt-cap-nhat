@@ -33,7 +33,7 @@ function spellCell(x, y) {
 // Các câu không được đọc vẫn hiện chữ trên màn hình (khung thông báo / biển báo).
 const LEVEL = { quiet: 0, normal: 1, lively: 2 };
 const QUIET_KEYS = new Set(['coinResult', 'winGame', 'winForfeit', 'draw', 'giftBig']);
-const MATCH_ONLY_KEYS = new Set(['move', 'moveEnd', 'occupied', 'warn10', 'timeoutAuto', 'extraTime']);
+const MATCH_ONLY_KEYS = new Set(['move', 'moveEnd', 'occupied', 'forbidden', 'warn10', 'timeoutAuto', 'extraTime']);
 const minLevel = (key, inMatch) => (QUIET_KEYS.has(key) ? 0 : inMatch || MATCH_ONLY_KEYS.has(key) ? 2 : 1);
 
 class Commentator {
@@ -150,6 +150,10 @@ class Commentator {
 
   occupied(user, x, y, now) {
     this.say('occupied', { ten: this.nm(user, 'vô danh'), oco: spellCell(x, y) }, { at: now, prio: 1 });
+  }
+
+  forbidden(user, x, y, lydo, now) {
+    this.say('forbidden', { ten: this.nm(user, 'vô danh'), oco: spellCell(x, y), lydo }, { at: now, prio: 1 });
   }
 
   timeoutAuto(user, x, y, n, now) {

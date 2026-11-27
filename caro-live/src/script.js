@@ -68,6 +68,8 @@ const DEFAULTS = [
     text: 'Đạo hữu {ten} xuất chiêu tại {oco}.\nĐạo hữu {ten} đánh {oco}, chiêu cuối cùng rồi đó!\n{oco}! Một nước cờ mà thiên địa đổi màu, đạo hữu {ten} đã ra chiêu quyết định!' },
   { key: 'occupied', group: 'Trong ván', role: 'ref', label: 'Ô đã có quân', vars: ['ten', 'oco'],
     text: 'Ô {oco} đã có quân rồi. Mời đạo hữu {ten} chọn ô khác.\nÔ {oco} có quân rồi, đạo hữu {ten} ơi! Đặt chồng lên là phạm luật đó, mắt nhìn kỹ lại chút!\nƠ kìa đạo hữu {ten}, ô {oco} có người ngồi rồi! Chọn ô khác đi, đừng chen chúc!' },
+  { key: 'forbidden', group: 'Trong ván', role: 'ref', label: 'Đánh vào ô cấm (luật cấm)', vars: ['ten', 'oco', 'lydo'],
+    text: 'Ô {oco} là ô cấm! Đạo hữu {ten} đi trước nên không được {lydo}. Mời chọn ô khác.\nKhoan đã đạo hữu {ten}, ô {oco} bị cấm vì {lydo}! Đi trước thì phải chịu luật cấm, chọn ô khác nhé!\nÔ {oco} không được đâu đạo hữu {ten}, {lydo} là phạm luật cấm đó!' },
   { key: 'warn10', group: 'Trong ván', role: 'ref', label: 'Cảnh báo còn 10 giây', vars: ['ten'],
     text: 'Đạo hữu {ten}, chỉ còn mười giây, mau suy diễn!\nĐạo hữu {ten} ơi, mười giây thôi đó! Nghĩ nhanh lên, kẻo đồng hồ làm thịt bây giờ!\nCòn mười giây! Đạo hữu {ten} nghĩ kỹ chưa, hay đang ngủ gật?\nMười giây nữa là hết giờ rồi đạo hữu {ten}! Tim tại hạ còn đập nhanh hơn đạo hữu nghĩ đó!' },
   { key: 'timeoutAuto', group: 'Trong ván', role: 'ref', label: 'Hết giờ, đánh thay', vars: ['ten', 'oco'],

@@ -27,7 +27,7 @@ export class Director {
     this.pendingSpot = null;
     this.spotUntil = 0;
     this.lockPose = null; // chỉ dùng khi kiểm tra góc quay
-    this.view = { moves: [], last: null, winLine: null, resultReady: false, effPhase: 'lobby', busy: false };
+    this.view = { moves: [], forbidden: [], last: null, winLine: null, resultReady: false, effPhase: 'lobby', busy: false };
   }
 
   onState(s, offset) {
@@ -200,6 +200,7 @@ export class Director {
     v.last = this.shown.length ? this.shown[this.shown.length - 1] : null;
     v.winLine = this.resultReady && s.result && s.result.line ? s.result.line : null;
     v.resultReady = this.resultReady;
+    v.forbidden = eff === 'playing' && !busy && s.forbidden ? s.forbidden : [];
     v.effPhase = eff;
     v.busy = busy;
   }

@@ -249,6 +249,31 @@ export class BoardView {
         ctx.fillRect(p.cx - L.cell / 2, p.cy - L.cell / 2, L.cell, L.cell);
       }
     }
+    // ô CẤM với quân đi trước (luật cấm): biểu tượng "cấm vào" (vòng tròn có gạch chéo), khác hẳn quân X và quân O
+    if (view.forbidden && view.forbidden.length) {
+      ctx.save();
+      ctx.lineCap = 'round';
+      const r = L.cell * 0.27;
+      const pulse = 0.78 + 0.18 * Math.sin(t * 4);
+      for (const f of view.forbidden) {
+        const p = cellCenter(L, f.x, f.y);
+        ctx.fillStyle = `rgba(70,0,0,${0.55 * pulse})`;
+        ctx.beginPath();
+        ctx.arc(p.cx, p.cy, r, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.lineWidth = Math.max(2, L.cell * 0.07);
+        ctx.strokeStyle = `rgba(255,255,255,${pulse})`;
+        ctx.beginPath();
+        ctx.arc(p.cx, p.cy, r, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.beginPath();
+        const d = r * 0.72;
+        ctx.moveTo(p.cx - d, p.cy + d);
+        ctx.lineTo(p.cx + d, p.cy - d);
+        ctx.stroke();
+      }
+      ctx.restore();
+    }
     for (const m of view.moves) {
       const p = cellCenter(L, m.x, m.y);
       drawMark(ctx, m.m, p.cx, p.cy, L.cell * 0.4);

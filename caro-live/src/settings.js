@@ -24,7 +24,7 @@ const NUMBERS = {
   clockSeconds: [0, 60],
   logoSize: [50, 250],
 };
-const BOOLS = ['blockBothEnds', 'winnerStays', 'hostCanPlay', 'autoNextGame', 'showSign', 'themeAuto', 'ledOn', 'showCellLabels', 'celebrateOn', 'logoOn', 'logoBold', 'logoItalic', 'logoFrame'];
+const BOOLS = ['blockBothEnds', 'forbidX', 'winnerStays', 'hostCanPlay', 'autoNextGame', 'showSign', 'themeAuto', 'ledOn', 'showCellLabels', 'celebrateOn', 'logoOn', 'logoBold', 'logoItalic', 'logoFrame'];
 const LOGO_FONTS = ['default', 'arial', 'segoe', 'tahoma', 'trebuchet', 'verdana', 'georgia', 'times', 'palatino', 'impact', 'comic', 'courier'];
 const TEXTS = { logoName: 40, logoSub: 40 }; // chữ tự gõ: tối đa bấy nhiêu ký tự
 
