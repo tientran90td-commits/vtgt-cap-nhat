@@ -15,7 +15,7 @@ const { Settings } = require('./settings');
 const { Script, SAMPLE, VAR_HELP } = require('./script');
 const { parseMove } = require('./commands');
 const { labelOf } = require('./game');
-const { checkAnnouncement } = require('./safety');
+const { checkAnnouncement, sanitizeChat, checkLine } = require('./safety');
 
 class Hub {
   constructor(cfg) {
@@ -66,7 +66,7 @@ class Hub {
     this.chatLog.push({
       id: ++this.chatSeq,
       name: user.name,
-      text: String(text).slice(0, 70),
+      text: sanitizeChat(text), // bình luận vi phạm (cờ bạc, link, thô tục...) bị che, không hiện lên màn hình
       move: label,
       mark,
       status,
@@ -85,7 +85,8 @@ class Hub {
   }
 
   onGift(user, gift, now = Date.now()) {
-    const pts = this.interaction.addGift(user, Number(gift.diamonds) || 0, Number(gift.count) || 1);
+    // giftPoints = false: quà chỉ để cảm ơn, KHÔNG cộng điểm chọn người chơi (an toàn nhất với quy định quà tặng của TikTok)
+    if (this.cfg.giftPoints !== false) this.interaction.addGift(user, Number(gift.diamonds) || 0, Number(gift.count) || 1);
     // khán giả (không phải người chơi) tặng quà -> màn hình live zoom vào nhân vật đứng ngoài của họ
     const gu = this.interaction.users.get(user.id);
     if (gu && !this.match.seated(gu.id)) {
@@ -94,8 +95,8 @@ class Hub {
     }
     if (gift.announce !== false) {
       const n = Number(gift.count) || 1;
-      const pt = pts ? ` (+${pts} điểm)` : '';
-      this.match.feed(`🎁 Đạo hữu ${user.name} ban tặng ${gift.name}${n > 1 ? ' x' + n : ''}${pt}`, 'gift');
+      // không hiện số điểm trên màn hình: tránh trông như "quà = điểm để được chơi"
+      this.match.feed(`🎁 Đạo hữu ${user.name} ban tặng ${gift.name}${n > 1 ? ' x' + n : ''}`, 'gift');
       const cue = this.commentator.giftThanks(user, gift, now);
       if (cue && gift.key) {
         if (this.giftCues.size > 60) this.giftCues.clear();
@@ -106,7 +107,7 @@ class Hub {
 
   /** Quà liên tiếp (combo): chỉ cộng thêm điểm, không đăng thêm dòng thông báo. */
   onGiftPoints(user, unitDiamonds, delta, key, totalCount) {
-    this.interaction.addGift(user, unitDiamonds, delta);
+    if (this.cfg.giftPoints !== false) this.interaction.addGift(user, unitDiamonds, delta);
     if (key && this.giftCues.has(key)) this.commentator.updateGiftThanks(this.giftCues.get(key), totalCount);
   }
 
@@ -182,6 +183,10 @@ class Hub {
         return done({ ok: true, changed });
       }
       case 'script': {
+        if (typeof msg.text === 'string') {
+          const bad = msg.text.split('\n').map((l) => checkLine(l)).find(Boolean);
+          if (bad) return done({ ok: false, msg: 'Câu thoại bị từ chối: ' + bad + '. TikTok không cho phép, hãy sửa lại.' });
+        }
         const ok = this.script.set(String(msg.key), { text: msg.text, enabled: msg.enabled });
         return done(ok ? { ok: true } : { ok: false, msg: 'Không tìm thấy câu thoại này.' });
       }

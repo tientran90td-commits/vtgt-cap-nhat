@@ -183,7 +183,7 @@ function resultEffects(s) {
     sfx.win();
     fx.fireworks(6500);
     fx.showBanner('🏆 ' + w.name + ' ĐẠI THẮNG!', 'Xuất sắc! Khí thế ngút trời!');
-    if (!(s.settings && s.settings.celebrateOn === false)) {
+    if (s.settings && s.settings.celebrateVideo === true) {
       celebrate.start(); // video ăn mừng (celebrate.js)
       celebStartedKey = fxKey;
     }
@@ -239,7 +239,7 @@ function renderRank(s) {
   if (!s.top.length) {
     const li = document.createElement('li');
     li.className = 'hint';
-    li.textContent = 'Bình luận / thả tim / tặng quà để lên bảng cơ duyên!';
+    li.textContent = 'Bình luận / thả tim để lên bảng cơ duyên!';
     ol.appendChild(li);
     return;
   }
@@ -487,7 +487,7 @@ function processVoice() {
   const now = director.nowServer();
   // Thoại chiến thắng (chúc mừng, khen, đột phá...) KHÔNG đọc đè lên nhạc video ăn mừng: giữ lại, video hết mới đọc
   const s = state;
-  const celebOn = !(s && s.settings && s.settings.celebrateOn === false);
+  const celebOn = !!(s && s.settings && s.settings.celebrateVideo === true);
   const playing = celebrate.active(); // video đang chạy: giữ MỌI lời đọc lại (kể cả cảm ơn quà), tránh đọc đè lên nhạc
   const holdResult = celebOn && s && s.result && s.result.winner && celebStartedKey !== s.gameNo + ':' + s.result.type;
   for (const c of due) {

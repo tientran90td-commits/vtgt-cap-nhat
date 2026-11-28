@@ -6,6 +6,7 @@
  * - Lưu vào data/thoai.json. Xóa file đó hoặc bấm "Mặc định" để quay lại câu gốc.
  */
 const fs = require('fs');
+const { checkLine } = require('./safety');
 const path = require('path');
 
 const SAMPLE = {
@@ -41,17 +42,17 @@ const VAR_HELP = {
 // role: 'mc' = điều phối viên, 'ref' = trọng tài
 const DEFAULTS = [
   { key: 'welcome', group: 'Mở đầu', role: 'mc', label: 'Chào mừng (vòng đầu tiên)', vars: ['giay'],
-    text: 'Hoan nghênh chư vị đạo hữu giá lâm Caro Tiên Giới! Chư vị hãy bình luận, thả tim hoặc tặng lễ vật để giành suất lên đài thi đấu. Chỉ còn {giay} giây!\nChào mừng chư vị đến Caro Tiên Giới! Nơi đây không bán đan dược, chỉ bán sự căng thẳng! Bình luận, thả tim để lên đài, chỉ còn {giay} giây!\nĐệ tử mới đến thì cứ thả tim trước, hỏi han sau! Tại hạ hứa hiền lành, chỉ thích ngắm quân cờ. Còn {giay} giây tranh suất lên đài!\nCaro Tiên Giới khai mở! Ai thắng thì thành tiên, ai thua thì về tu luyện lại. Mau tương tác, chỉ còn {giay} giây!' },
+    text: 'Hoan nghênh chư vị đạo hữu giá lâm Caro Tiên Giới! Chư vị hãy bình luận hoặc thả tim để tham gia, hai vị được chọn sẽ lên đài thi đấu. Chỉ còn {giay} giây!\nChào mừng chư vị đến Caro Tiên Giới! Nơi đây không bán đan dược, chỉ bán sự căng thẳng! Bình luận, thả tim để lên đài, chỉ còn {giay} giây!\nĐệ tử mới đến cứ bình luận làm quen trước, hỏi han sau! Tại hạ hứa hiền lành, chỉ thích ngắm quân cờ. Còn {giay} giây nữa chọn người lên đài!\nCaro Tiên Giới khai mở! Ai thắng thì thành tiên, ai thua thì về tu luyện lại. Chỉ còn {giay} giây nữa là chọn người lên đài!' },
   { key: 'lobbyStart', group: 'Mở đầu', role: 'mc', label: 'Bắt đầu vòng mới', vars: ['giay'],
-    text: 'Một vòng tranh đài mới đã mở! Chư vị đạo hữu hãy bình luận, thả tim hoặc tặng lễ vật để giành suất lên đài. Chỉ còn {giay} giây!\nVòng mới tới rồi! Ai chưa tu luyện thì tranh thủ gõ vài câu bình luận, còn {giay} giây thôi, đừng để tiên duyên trôi mất!\nĐài thi đấu mở cửa, đạo hữu nào dám lên? Không dám thì thả tim cho có khí thế cũng được! Còn {giay} giây!\nMột vòng tranh đài nữa! Tay nhanh thì được lên đài, tay chậm thì ngồi xem hạt dưa nhé! Còn {giay} giây!' },
+    text: 'Một vòng tranh đài mới đã mở! Chư vị đạo hữu hãy bình luận hoặc thả tim để tham gia. Chỉ còn {giay} giây!\nVòng mới tới rồi! Ai muốn thử sức thì gõ vài câu bình luận nhé, còn {giay} giây nữa thôi!\nĐài thi đấu mở cửa, đạo hữu nào muốn lên? Còn {giay} giây nữa!\nMột vòng tranh đài nữa! Ai muốn lên đài thì bình luận nhé, còn {giay} giây!' },
   { key: 'howTo', group: 'Mở đầu', role: 'mc', label: 'Giải thích cách chơi (lúc chờ)', vars: [],
-    text: 'Quy củ rất đơn giản: đến lượt mình, đạo hữu hãy bình luận tọa độ, ví dụ j chín, để đặt quân. Ai kết được năm quân liền một đường là thắng. Muốn lên đài, chư vị hãy bình luận, thả tim và tặng lễ vật!\nPháp môn rất dễ: gõ cột và hàng, như ca sáu, để đặt quân. Năm quân nối liền là đại thắng, kể cả bị chặn hai đầu. Tích cực bình luận, thả tim, tặng lễ vật để được chọn lên đài nhé, chư vị đạo hữu!\nCách chơi dễ như ăn cháo: gõ cột và hàng, ví dụ j chín, là xong. Còn ai gõ nhầm thì thiên đạo cũng không cứu nổi đâu!\nNhớ nhé: năm quân thẳng hàng là thắng, bốn quân thì chưa, ba quân thì về nhà ngủ đi! Muốn lên đài thì bình luận, thả tim, tặng quà!' },
+    text: 'Quy củ rất đơn giản: đến lượt mình, đạo hữu hãy bình luận tọa độ, ví dụ j chín, để đặt quân. Ai kết được năm quân liền một đường là thắng. Muốn lên đài, chư vị hãy bình luận và thả tim!\nPháp môn rất dễ: gõ cột và hàng, như ca sáu, để đặt quân. Năm quân nối liền là đại thắng, kể cả bị chặn hai đầu. Bình luận và thả tim để có cơ hội được chọn lên đài nhé, chư vị đạo hữu!\nCách chơi dễ như ăn cháo: gõ cột và hàng, ví dụ j chín, là xong. Còn ai gõ nhầm thì thiên đạo cũng không cứu nổi đâu!\nNhớ nhé: năm quân thẳng hàng là thắng, bốn quân thì chưa, ba quân thì về nhà ngủ đi! Muốn lên đài thì bình luận và thả tim nhé!' },
   { key: 'greet', group: 'Mở đầu', role: 'mc', label: 'Chào người mới vào', vars: ['ten'],
-    text: 'Hoan nghênh đạo hữu {ten} ghé thăm! Hãy bình luận hoặc thả tim để giành suất lên đài nhé.\nBái kiến đạo hữu {ten}! Chúc đạo hữu tiêu dao thưởng lãm, nhớ bình luận để được chọn lên đài nha.\nÔi, đạo hữu {ten} ghé thăm! Ngồi xuống uống chén trà, rồi bình luận để lên đài luôn nhé!\nBái kiến đạo hữu {ten}! Nghe nói đạo hữu cờ rất cao thâm, hôm nay cho tại hạ chiêm ngưỡng xem sao!\nChào đạo hữu {ten}! Cửa tiên giới mở rộng, nhưng bình luận mới là chìa khóa. Mau gõ vài chữ đi nào!' },
+    text: 'Hoan nghênh đạo hữu {ten} ghé thăm! Hãy bình luận để cùng tham gia nhé.\nBái kiến đạo hữu {ten}! Chúc đạo hữu tiêu dao thưởng lãm, bình luận để có cơ hội lên đài nha.\nÔi, đạo hữu {ten} ghé thăm! Ngồi xuống uống chén trà, rồi bình luận cho vui nhé!\nBái kiến đạo hữu {ten}! Nghe nói đạo hữu cờ rất cao thâm, hôm nay cho tại hạ chiêm ngưỡng xem sao!\nChào đạo hữu {ten}! Cửa tiên giới mở rộng, đạo hữu cứ bình luận vài chữ cho vui nhé!' },
   { key: 'lobbyWarn', group: 'Mở đầu', role: 'mc', label: 'Sắp hết giờ đua tương tác', vars: ['ten', 'ten1', 'ten2'],
-    text: 'Còn mười giây nữa! Đạo hữu {ten} đang dẫn đầu bảng tương tác.\nCòn mười giây! Đạo hữu {ten} đang dẫn đầu, các vị khác còn ngồi đó làm gì, thả tim đi chứ!\nMười giây cuối! Đạo hữu {ten} đang dẫn đầu bảng, ai muốn giành ngôi đầu thì ngay bây giờ hoặc không bao giờ!\nSắp hết giờ rồi, tim đâu, tim đâu! Đạo hữu {ten} đang chạy nhanh nhất, các vị tăng tốc giùm tại hạ!' },
+    text: 'Còn mười giây nữa! Đạo hữu {ten} đang dẫn đầu bảng tương tác.\nCòn mười giây! Đạo hữu {ten} đang dẫn đầu, các vị khác cũng có thể tham gia nhé!\nMười giây cuối! Đạo hữu {ten} đang dẫn đầu bảng, ai muốn tham gia thì bình luận ngay bây giờ nhé!\nSắp hết giờ rồi! Đạo hữu {ten} đang dẫn đầu, ai muốn tham gia thì bình luận nhé!' },
   { key: 'lobbyEmpty', group: 'Mở đầu', role: 'mc', label: 'Chưa có ai lên bàn', vars: [],
-    text: 'Trên đài chưa có đạo hữu nào. Mời chư vị bình luận hoặc thả tim để lên đài thi đấu!\nTrên đài vắng như chùa bà đanh! Chư vị đạo hữu đâu hết rồi, bình luận một câu cho tại hạ đỡ buồn!\nKhông có ai lên đài hết, tại hạ sắp ngủ gật rồi đây! Thả tim hoặc bình luận đi mà!' },
+    text: 'Trên đài chưa có đạo hữu nào. Mời chư vị bình luận để cùng thi đấu!\nTrên đài vắng như chùa bà đanh! Chư vị đạo hữu ai muốn chơi thì bình luận một câu nhé!\nChưa có ai lên đài, ai muốn chơi thì bình luận nhé!' },
   { key: 'pickedPair', group: 'Chọn người chơi', role: 'mc', label: 'Công bố 2 người chơi', vars: ['ten1', 'ten2'],
     text: 'Hai vị đạo hữu được chọn lên đài là {ten1} và {ten2}. Xin chúc mừng!\nĐài thi đấu đã có chủ: {ten1} gặp {ten2}! Hai cao thủ ngang tài ngang sức, xem ai hơn ai!\nHai vị đạo hữu {ten1} và {ten2} lên đài! Xin chư vị chuẩn bị hạt dưa nước ngọt, trò hay sắp bắt đầu!\nMời {ten1} và {ten2} bước lên đài thi đấu! Nhớ đừng run tay, quân cờ hiền lắm!' },
   { key: 'pickedChamp', group: 'Chọn người chơi', role: 'mc', label: 'Người thắng ở lại, có người thách đấu', vars: ['ten1', 'ten2'],
@@ -101,21 +102,21 @@ const DEFAULTS = [
   { key: 'hostReset', group: 'Khác', role: 'mc', label: 'Chủ phòng làm mới trận', vars: [],
     text: 'Chủ phòng đã khai mở lại trận pháp.\nChủ phòng vừa làm mới trận pháp, coi như chưa có gì xảy ra, ai thua cũng được tha!' },
   { key: 'remindFollow', group: 'Nhắc nhở', role: 'mc', label: 'Nhắc bấm follow', vars: ['diem'],
-    text: 'Nếu đạo hữu thấy hữu duyên, xin hãy follow để khỏi lỡ các buổi tiên hội sau nhé!\nChưa follow thì bấm giúp tại hạ một cái, có thêm bạn tu tiên, vui hơn nhiều!\nFollow một cái là có thêm bạn cùng chơi cờ, lại đỡ lạc đường lần sau!\nĐạo hữu nào thấy vui thì follow nhé, không bấm cũng không sao, cứ ngồi xem thoải mái!' },
+    text: 'Nếu đạo hữu thấy hữu duyên, xin hãy follow để khỏi lỡ các buổi tiên hội sau nhé!\nNếu thấy vui, đạo hữu có thể follow để gặp lại ở các buổi sau nhé!\nĐạo hữu nào muốn xem tiếp các buổi sau thì có thể follow nhé!\nĐạo hữu nào thấy vui thì follow nhé, không bấm cũng không sao, cứ ngồi xem thoải mái!' },
   { key: 'remindShare', group: 'Nhắc nhở', role: 'mc', label: 'Nhắc chia sẻ', vars: ['diem'],
-    text: 'Nếu thấy vui, đạo hữu hãy chia sẻ buổi LIVE này cho bằng hữu nhé!\nMời thêm đồng đạo vào xem cho đông vui nào!\nRủ thêm bạn bè vào xem cho đông vui, càng đông càng náo nhiệt!\nCó thể chia sẻ buổi live cho bạn bè nếu thấy vui, không bắt buộc đâu nhé!' },
+    text: 'Nếu thấy vui, đạo hữu hãy chia sẻ buổi LIVE này cho bằng hữu nhé!\nNếu thấy vui, đạo hữu có thể rủ thêm bạn bè vào xem nhé!\nBạn bè nào thích cờ thì đạo hữu có thể chia sẻ buổi live cho họ nhé!\nCó thể chia sẻ buổi live cho bạn bè nếu thấy vui, không bắt buộc đâu nhé!' },
   { key: 'extraTime', group: 'Trong ván', role: 'ref', label: 'Người chơi xin thêm giờ', vars: ['ten', 'giay'],
     text: 'Đạo hữu {ten} xin thêm {giay} giây. Mời tiếp tục suy diễn!\nĐạo hữu {ten} xin thêm {giay} giây! Xin cứ nghĩ cho kỹ, nhưng đừng nghĩ đến mai nhé!\nCho đạo hữu {ten} thêm {giay} giây suy diễn! Xin hãy dùng cho đúng chỗ, đừng dùng để lướt điện thoại!' },
   { key: 'confirmAsk', group: 'Xác nhận thả tim', role: 'mc', label: 'Mời 2 người thả tim xác nhận', vars: ['ten1', 'ten2', 'giay'],
-    text: 'Mời đạo hữu {ten1} và đạo hữu {ten2} thả tim để xác nhận lên đài. Chỉ còn {giay} giây!\nMời {ten1} và {ten2} thả tim xác nhận lên đài! Còn {giay} giây, không thả là mất suất đó, tim đâu tim đâu!\nHai vị {ten1}, {ten2}, thả tim một cái cho tại hạ yên tâm nào! Còn {giay} giây thôi!' },
+    text: 'Mời đạo hữu {ten1} và đạo hữu {ten2} thả tim để xác nhận lên đài. Chỉ còn {giay} giây!\nMời {ten1} và {ten2} thả tim xác nhận lên đài! Còn {giay} giây!\nHai vị {ten1}, {ten2}, mời thả tim để xác nhận! Còn {giay} giây!' },
   { key: 'confirmAskOne', group: 'Xác nhận thả tim', role: 'mc', label: 'Mời 1 người thả tim xác nhận', vars: ['ten', 'giay'],
-    text: 'Mời đạo hữu {ten} thả tim để xác nhận lên đài. Chỉ còn {giay} giây!\nMời đạo hữu {ten} thả tim xác nhận! Chỉ một cái chạm thôi mà, đừng bắt tại hạ chờ lâu, còn {giay} giây!' },
+    text: 'Mời đạo hữu {ten} thả tim để xác nhận lên đài. Chỉ còn {giay} giây!\nMời đạo hữu {ten} thả tim xác nhận! Chỉ một cái chạm thôi, còn {giay} giây!' },
   { key: 'confirmOk', group: 'Xác nhận thả tim', role: 'mc', label: 'Một người đã xác nhận', vars: ['ten'],
     text: 'Đạo hữu {ten} đã sẵn sàng!\nĐạo hữu {ten} đã thả tim, sẵn sàng thi đấu rồi, quả là người có trách nhiệm!\nTim đã tới! Đạo hữu {ten} xác nhận xong, giờ chỉ còn chờ đối thủ nữa thôi!' },
   { key: 'confirmWarn', group: 'Xác nhận thả tim', role: 'mc', label: 'Sắp hết giờ xác nhận', vars: ['ten', 'giay'],
-    text: 'Đạo hữu {ten} ơi, mau thả tim để giữ suất, còn {giay} giây!\nĐạo hữu {ten} ơi, còn {giay} giây! Thả tim nhanh kẻo suất lên đài bay đi mất đó!\nTim đâu rồi đạo hữu {ten}? Còn {giay} giây thôi, đừng để tại hạ phải réo tên mãi!' },
+    text: 'Đạo hữu {ten} ơi, mau thả tim để giữ suất, còn {giay} giây!\nĐạo hữu {ten} ơi, còn {giay} giây! Mời thả tim để xác nhận!\nĐạo hữu {ten} ơi, còn {giay} giây để xác nhận nhé!' },
   { key: 'confirmFail', group: 'Xác nhận thả tim', role: 'mc', label: 'Không thả tim, mời người khác thay', vars: ['ten', 'ten2'],
-    text: 'Đạo hữu {ten} chưa thả tim nên mất suất. Mời đạo hữu {ten2} thế chỗ, xin thả tim để xác nhận!\nĐạo hữu {ten} không thả tim, mất suất rồi, tiếc quá! Mời đạo hữu {ten2} thế chỗ, nhớ thả tim đó!\nĐạo hữu {ten} ngủ quên rồi sao? Không thả tim nên mất suất. Mời {ten2} lên thay!' },
+    text: 'Đạo hữu {ten} chưa thả tim nên mất suất. Mời đạo hữu {ten2} thế chỗ, xin thả tim để xác nhận!\nĐạo hữu {ten} chưa kịp xác nhận nên mất suất. Mời đạo hữu {ten2} thế chỗ, xin thả tim để xác nhận!\nĐạo hữu {ten} chưa xác nhận kịp nên mất suất. Mời {ten2} lên thay!' },
   { key: 'confirmFailNone', group: 'Xác nhận thả tim', role: 'mc', label: 'Không thả tim, không còn ai thay', vars: ['ten'],
     text: 'Đạo hữu {ten} chưa thả tim nên mất suất. Chúng ta sẽ chọn lại người lên đài nhé!\nĐạo hữu {ten} không thả tim nên mất suất, mà cũng chẳng có ai thay! Thôi, chọn lại từ đầu nào!' },
   { key: 'giftThanks', group: 'Cảm ơn', role: 'mc', label: 'Cảm ơn tặng quà', vars: ['ten', 'qua', 'so'],
@@ -147,7 +148,7 @@ class Script {
         const it = this.items.get(k);
         if (!it || !v) continue;
         if (typeof v.text === 'string') {
-          const kept = v.text.split('\n').filter((l) => !VIOLENT.test(l));
+          const kept = v.text.split('\n').filter((l) => !VIOLENT.test(l) && !checkLine(l)); // bỏ cả câu vi phạm quy định LIVE đã lưu từ trước
           it.custom = kept.length === v.text.split('\n').length ? v.text : kept.length ? kept.join('\n') : null;
         }
         if (typeof v.enabled === 'boolean') it.enabled = v.enabled;

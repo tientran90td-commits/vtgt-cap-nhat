@@ -204,7 +204,7 @@ VIDEO AN MUNG KHI CO NGUOI THANG
   (2 nhan vat quay lai) va game chay cac buoc tiep theo binh thuong. Man hinh ket qua duoc giu it nhat 33 giay de video chay het.
 - (Ban 39) Co 3 video, MOI TRAN BOC NGAU NHIEN 1 VIDEO: video cu (hien hinh luc giay 4), video 1 moi (celebrate2, hien hinh luc giay 3),
   video 2 moi (celebrate3, dai 15 giay, hien hinh luc giay 6). Tat ca nam trong public\media.
-- Bat/tat: Bang dieu khien > cai dat van > "Video an mung khi co nguoi thang".
+- (Ban 45) Video an mung MAC DINH TAT (video trong public\media la cua nguoi khac, de bi TikTok danh dau ban quyen). Chi bat khi da thay bang video CUA BAN: Bang dieu khien > "Video an mung khi co nguoi thang".
 - Them/doi video: bo 2 file <ten>.mp4 (H.264 + AAC) va <ten>.webm vao public\media, roi them 1 dong vao danh sach VIDEOS dau file public\celebrate.js
   (ghi ten file va giay hien hinh showAt). Hinh vuong cho dep (hinh chu nhat se bi cat 2 ben). Neu video dai hon 15 giay, tang celebrateMinSeconds trong config.js.
 - Trinh duyet co the tat tieng video cho den khi bam vao trang 1 lan. Trong OBS / TikFinity thuong van co tieng.
@@ -358,3 +358,10 @@ LUẬT "O CẤM 1 Ô" (bản 41)
 - Ô bị cấm tối hẳn đi như biến mất khỏi bàn cờ. CẢ HAI BÊN (X và O) đều không được đi vào ô đó, cấm đến hết ván.
 - Chỉ cấm 1 lần mỗi ván. Hết giờ lúc đang chọn ô cấm: thiên đạo cấm thay 1 ô gần quân (tính 1 lần hết giờ).
 - Dùng chung được với luật cấm 3-3/4-4 của bản 40.
+
+=== BAN 45: TUAN THU QUY DINH LIVE CUA TIKTOK (xem TIEU-CHUAN-TIKTOK.txt) ===
+- Da go moi cau keu goi tang qua; man hinh khong hien "(+N diem)" canh qua nua. Qua chi duoc cam on.
+- Muon qua KHONG anh huong ai duoc chon len ban (an toan nhat): mo config.js, doi giftPoints: true thanh giftPoints: false.
+- Video an mung mac dinh tat. Nhac follow / share thua hon (300 giay).
+- Ten, binh luan va cau thoai tu sua: loc them quang cao nha cai / co bac / lua dao / nguoi lon. Cau thoai keu goi qua / link se bi tu choi.
+- Nho: phai co ban ngoi LIVE noi chuyen that, dung treo tu dong.

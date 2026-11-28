@@ -34,6 +34,7 @@ module.exports = {
   blockBothEnds: false, // false = đủ 5 quân liên tiếp là thắng, kể cả bị chặn 2 đầu | true = bị chặn cả 2 đầu thì KHÔNG tính thắng
   oBan: false, // true = LUẬT "O CẤM 1 Ô": sau nước đầu của X, O gõ 1 ô để cấm (X không được đi vào đó đến hết ván), rồi O mới đi quân
   oBanAfter: 2, // luật "O cấm 1 ô" cấm sau nước thứ mấy của X (1 = sau nước đầu, 2 = X đi 2 quân rồi mới cấm, 3...)
+  giftPoints: true, // true = quà tặng được cộng điểm tương tác (để dễ được chọn lên bàn). false = quà chỉ để cảm ơn, không ảnh hưởng ai được chọn (an toàn nhất)
   forbidX: false, // true = LUẬT CẤM cho quân đi trước (X): không được đánh vào ô tạo 3-3, 4-4 hoặc hàng dài hơn 5 (xem src/forbidden.js)
 
   // ===== CHỌN NGƯỜI CHƠI =====
@@ -102,7 +103,7 @@ module.exports = {
   rankLossPenalty: 'tier', // thua = ĐỘ KIẾP THẤT BẠI: 'tier' = mất hết điểm của cảnh giới đang đứng (Kết Đan 4 điểm -> Kết Đan 0 điểm, giữ cảnh giới) | 'all' = mất sạch về Phàm Nhân | số (vd 1 = trừ 1 điểm) | 0 = thua không mất điểm
   rankPromoBonus: 0, // (tùy chọn) vừa lên cảnh giới mới được tặng sẵn bấy nhiêu điểm để thua ngay 1 ván không bị tụt liền. Mặc định 0: thắng +1, thua -1 đúng như nhau
   rankBoardRows: 4, // số người hiện trên bảng rank
-  celebrateOn: true, // có người thắng -> phát video ăn mừng (mỗi trận bốc ngẫu nhiên 1 trong các video ở public/media, xem public/celebrate.js): có tiếng ngay, vài giây sau mới hiện hình thế chỗ 2 nhân vật
+  celebrateVideo: false, // MẶC ĐỊNH TẮT: video trong public/media là video của người khác (có logo TikTok, phim hoạt hình) -> rủi ro bản quyền. Chỉ bật sau khi đã thay bằng video của bạn / miễn phí bản quyền. Có người thắng -> phát video ăn mừng (mỗi trận bốc ngẫu nhiên 1 trong các video ở public/media, xem public/celebrate.js): có tiếng ngay, vài giây sau mới hiện hình thế chỗ 2 nhân vật
   celebrateMinSeconds: Number(process.env.CARO_CELEB_MIN) || (fast ? 0 : 33), // màn hình kết quả giữ ít nhất bấy nhiêu giây để video chạy hết (video dài nhất 15 giây + vài giây quân cuối còn đang đặt xuống + thời gian MC đọc lời chúc mừng SAU video)
   ledOn: true, // đèn LED chạy ở đường kẻ bàn cờ
   // Đến lượt mà người chơi chưa bình luận gì sau bấy nhiêu giây -> biển báo nhấp nháy để gây chú ý (0 = tắt).
@@ -112,7 +113,7 @@ module.exports = {
   clockSeconds: 15, // người chơi còn bấy nhiêu giây thì bắt đầu kêu tích tắc (0 = tắt)
 
   // ===== NHẮC FOLLOW / CHIA SẺ =====
-  reminderSeconds: process.env.CARO_FAST ? 0 : 150, // cứ bấy nhiêu giây nhắc 1 lần (0 = tắt)
+  reminderSeconds: process.env.CARO_FAST ? 0 : 300, // cứ bấy nhiêu giây nhắc 1 lần (0 = tắt)
 
   // ===== ĐIỂM TƯƠNG TÁC (dùng để chọn người chơi) =====
   points: {

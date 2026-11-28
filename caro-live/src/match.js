@@ -442,7 +442,7 @@ class Match {
     const name = user.name || user.uniqueId || 'Bạn';
     let text;
     if (i < 0) {
-      text = `📊 ${name}: bạn chưa có điểm. Bình luận, thả tim hoặc tặng quà để lên top!`;
+      text = `📊 ${name}: bạn chưa có điểm. Bình luận hoặc thả tim để cùng tham gia!`;
     } else {
       const need = this.chooseCandidates().need;
       const me = list[i];
@@ -698,12 +698,12 @@ class Match {
     this.phaseStartedAt = now;
     let secs = this.cfg.resultSeconds;
     // có video ăn mừng: giữ màn hình kết quả đủ lâu để video chạy hết rồi mới sang bước kế
-    if (this.cfg.celebrateOn && this.result && this.result.winner) secs = Math.max(secs, this.cfg.celebrateMinSeconds || 0);
+    if (this.cfg.celebrateVideo && this.result && this.result.winner) secs = Math.max(secs, this.cfg.celebrateMinSeconds || 0);
     // có bảng "đột phá": cộng thêm thời gian để hiện sau video ăn mừng (~8 giây)
     const ru = this.result && this.result.rankUp ? 1 : 0;
     const rd = this.result && this.result.rankDown ? 1 : 0;
     if (ru || rd) {
-      if (this.cfg.celebrateOn) secs += ru * 7 + rd * 6;
+      if (this.cfg.celebrateVideo) secs += ru * 7 + rd * 6;
       else secs = Math.max(secs, ru * 9 + rd * 8);
     }
     this.phaseEndsAt = now + secs * 1000;
