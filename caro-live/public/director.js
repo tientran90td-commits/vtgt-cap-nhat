@@ -23,6 +23,9 @@ export class Director {
     this.onReset = null;
     this.onPlaced = null; // gọi khi 1 quân vừa chạm bàn (dùng cho âm thanh/hiệu ứng)
     this.seatInit = false;
+    this.occKeys = null; // ai đang ngồi mỗi ghế (để biết khi nào đổi người)
+    this.occPhase = '';
+    this.holdPrev = { X: false, O: false };
     this.lastSpot = 0;
     this.pendingSpot = null;
     this.spotUntil = 0;
@@ -39,6 +42,7 @@ export class Director {
       for (let i = this.queued; i < s.moves.length; i++) this.queue.push(s.moves[i]);
       this.queued = s.moves.length;
     }
+    this.detectSwap();
     this.syncNames();
     // khán giả (ngoài trận) vừa tặng quà -> xếp hàng chờ để zoom camera vào họ
     const gs = s.giftSpot;
@@ -85,20 +89,56 @@ export class Director {
     if (this.onReset) this.onReset();
   }
 
-  syncNames() {
+  /** Người đang đứng tên ở mỗi ghế (cùng cách chọn với bảng tên). */
+  occupants() {
     const s = this.state;
-    const { X, O } = this.scene.chars;
     if (s.phase === 'lobby' || (s.phase === 'confirm' && s.confirm)) {
       const pv = s.phase === 'lobby' ? s.lobby.preview : s.confirm.slots;
-      X.setTag(pv[0] ? pv[0].name : 'Chờ đạo hữu…', true, pv[0] ? pv[0].avatar : '');
-      O.setTag(pv[1] ? pv[1].name : 'Chờ đạo hữu…', true, pv[1] ? pv[1].avatar : '');
+      return [pv[0] || null, pv[1] || null];
+    }
+    if (s.phase === 'coin' && s.coin && !s.players.X) return [s.coin.heads, s.coin.tails];
+    return [s.players.X || null, s.players.O || null];
+  }
+
+  /** Đổi người giữa các trận (người thua rời đi, người mới vào...): báo cho 2 ghế diễn cảnh đứng dậy đi ra rồi người mới đi vào.
+   *  Bỏ qua lúc tung đồng xu: ở đó chỉ là chia lại bên X/O của cùng 2 người, không ai đổi chỗ. */
+  detectSwap() {
+    const sc = this.scene;
+    const occ = this.occupants();
+    const keys = occ.map((p) => (p ? String(p.id || p.name || '') : ''));
+    const phase = this.state.phase;
+    const prev = this.occKeys;
+    const coinInvolved = phase === 'coin' || this.occPhase === 'coin';
+    if (prev && this.seatInit && !coinInvolved && sc.replaceSeat) {
+      ['X', 'O'].forEach((mark, i) => {
+        if (prev[i] && keys[i] && prev[i] !== keys[i]) sc.replaceSeat(mark);
+      });
+    }
+    this.occKeys = keys;
+    this.occPhase = phase;
+  }
+
+  syncNames() {
+    const s = this.state;
+    const sc = this.scene;
+    const { X, O } = sc.chars;
+    // ghế đang đổi người: giữ bảng tên cũ cho đến khi người mới bước vào
+    const hold = { X: !!(sc.seatHolding && sc.seatHolding('X')), O: !!(sc.seatHolding && sc.seatHolding('O')) };
+    this.holdPrev = hold;
+    const set = (mark, ch, name, neutral, avatar) => {
+      if (!hold[mark]) ch.setTag(name, neutral, avatar);
+    };
+    if (s.phase === 'lobby' || (s.phase === 'confirm' && s.confirm)) {
+      const pv = s.phase === 'lobby' ? s.lobby.preview : s.confirm.slots;
+      set('X', X, pv[0] ? pv[0].name : 'Chờ đạo hữu…', true, pv[0] ? pv[0].avatar : '');
+      set('O', O, pv[1] ? pv[1].name : 'Chờ đạo hữu…', true, pv[1] ? pv[1].avatar : '');
     } else if (s.phase === 'coin' && s.coin && !s.players.X) {
       // đang tung đồng xu, chưa chia X/O: chỉ hiện tên 2 người (trung tính), chưa nói ai cầm quân nào
-      X.setTag(s.coin.heads.name, true, s.coin.heads.avatar || '');
-      O.setTag(s.coin.tails.name, true, s.coin.tails.avatar || '');
+      set('X', X, s.coin.heads.name, true, s.coin.heads.avatar || '');
+      set('O', O, s.coin.tails.name, true, s.coin.tails.avatar || '');
     } else {
-      X.setTag(s.players.X ? s.players.X.name : '…', false, s.players.X ? s.players.X.avatar : '');
-      O.setTag(s.players.O ? s.players.O.name : '…', false, s.players.O ? s.players.O.avatar : '');
+      set('X', X, s.players.X ? s.players.X.name : '…', false, s.players.X ? s.players.X.avatar : '');
+      set('O', O, s.players.O ? s.players.O.name : '…', false, s.players.O ? s.players.O.avatar : '');
     }
   }
 
@@ -115,6 +155,8 @@ export class Director {
       return;
     }
     const chars = sc.chars;
+    // người mới vừa bước vào ghế đã đổi người -> cập nhật bảng tên ngay (không chờ lần cập nhật trạng thái kế tiếp)
+    if ((this.holdPrev.X && !sc.seatHolding('X')) || (this.holdPrev.O && !sc.seatHolding('O'))) this.syncNames();
 
     // 1) bắt đầu nước đi tiếp theo trong hàng chờ
     if (!this.current && this.queue.length) {

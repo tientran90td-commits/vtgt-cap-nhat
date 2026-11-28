@@ -92,6 +92,16 @@ export class Scene3D {
     this.seats[mark].want(present, instant);
   }
 
+  /** Người ngồi ở ghế `mark` đã đổi sang người khác: diễn động tác rời bàn / vào bàn. */
+  replaceSeat(mark) {
+    this.seats[mark].replace();
+  }
+
+  /** Ghế `mark` đang chờ đổi người (giữ bảng tên cũ)? */
+  seatHolding(mark) {
+    return !!this.seats[mark].holding;
+  }
+
   /** Khán giả `id` vừa tặng quà: ăn mừng và đặt camera 'gift' trước mặt họ. Trả về true nếu có nhân vật để zoom. */
   spotlight(id, label) {
     const at = this.crowd.spotlight(id, label);
@@ -583,6 +593,10 @@ export class NullScene {
   }
   setTheme() {}
   seat() {}
+  replaceSeat() {}
+  seatHolding() {
+    return false;
+  }
   setCrowd() {}
   spotlight() {
     return false;

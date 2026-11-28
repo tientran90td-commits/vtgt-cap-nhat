@@ -365,3 +365,7 @@ LUẬT "O CẤM 1 Ô" (bản 41)
 - Video an mung mac dinh tat. Nhac follow / share thua hon (300 giay).
 - Ten, binh luan va cau thoai tu sua: loc them quang cao nha cai / co bac / lua dao / nguoi lon. Cau thoai keu goi qua / link se bi tu choi.
 - Nho: phai co ban ngoi LIVE noi chuyen that, dung treo tu dong.
+
+=== BAN 49: DOI NGUOI CO DONG TAC ===
+- Moi lan doi nguoi o ban (nguoi thua roi di, nguoi moi vao, nguoi khong tha tim bi thay): nguoi cu day ghe, dung day, di ra mep phong; nguoi moi di vao, keo ghe, ngoi xuong.
+  Bang ten cu giu nguyen cho den khi nguoi moi buoc vao. Khong dien canh nay luc tung dong xu (chi chia lai ben X/O).

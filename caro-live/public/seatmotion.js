@@ -63,6 +63,8 @@ export class SeatMotion {
     this.state = 'seated'; // seated | leaving | away | arriving
     this.t = 0;
     this.desired = true;
+    this.cycle = false; // có người MỚI ngồi thay chỗ này: người cũ đứng dậy đi ra, người mới đi vào ngồi
+    this.holding = false; // đang đợi đổi người: giữ bảng tên cũ cho đến khi người mới bước vào
     this.phase = 0; // pha bước chân
     this.legs = buildLegs(ch);
   }
@@ -91,6 +93,13 @@ export class SeatMotion {
     if (present && this.state === 'away') this.setState('seated');
   }
 
+  /** Có người khác thay vào chỗ này (đổi người giữa các trận): diễn cảnh người cũ rời bàn rồi người mới đi vào. */
+  replace() {
+    if (this.state === 'away') return; // ghế đang trống: người mới tự đi vào
+    this.cycle = true;
+    this.holding = true;
+  }
+
   setState(s) {
     this.state = s;
     this.t = 0;
@@ -104,12 +113,16 @@ export class SeatMotion {
   update(dt, time) {
     const ch = this.ch;
     // đã chọn đúng trạng thái ổn định thì mới bắt đầu động tác mới
-    if (this.state === 'seated' && !this.desired) {
+    if (this.state === 'seated' && (!this.desired || this.cycle)) {
+      this.cycle = false;
       this.setState('leaving');
       ch.placing = null;
       ch.setHeld(false);
     } else if (this.state === 'away' && this.desired) {
+      this.holding = false;
       this.setState('arriving');
+    } else if (this.state === 'away') {
+      this.holding = false;
     }
     this.t += dt;
     const T = SEAT_TIMES;
