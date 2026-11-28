@@ -369,3 +369,8 @@ LUẬT "O CẤM 1 Ô" (bản 41)
 === BAN 49: DOI NGUOI CO DONG TAC ===
 - Moi lan doi nguoi o ban (nguoi thua roi di, nguoi moi vao, nguoi khong tha tim bi thay): nguoi cu day ghe, dung day, di ra mep phong; nguoi moi di vao, keo ghe, ngoi xuong.
   Bang ten cu giu nguyen cho den khi nguoi moi buoc vao. Khong dien canh nay luc tung dong xu (chi chia lai ben X/O).
+
+=== BAN 50: NHAN VAT 3D ANIME THAT ===
+- Game dung 2 nhan vat anime 3D that (VRoid, CC0): nam = Sakurada Fumiriya, nu = Vita. Ve kieu hoat hinh + vien muc mong.
+- Khi doi nguoi: nhan vat dung day, di bo (chan buoc that) ra mep phong, nguoi moi di vao ngoi.
+- Muon quay lai nhan vat dung san: xoa 2 file public\models\nam.glb va nu.glb. Muon doi nhan vat: xem public\models\DOC-LAI.txt.

@@ -197,6 +197,7 @@ export class SeatMotion {
     ch.walkDriving = driving;
     ch.walkPhase = this.phase;
     ch.walkAmp = walkAmp;
+    ch.walkLegsK = legsK; // mức đứng của chân (0 ngồi .. 1 đứng): model 3D thật dùng để duỗi chân
     ch.walkLean = lean;
     if (driving) {
       ch.mode = 'walk';

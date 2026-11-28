@@ -1,6 +1,10 @@
-Dat 2 file model 3D vao thu muc nay:
-  nam.glb  = nhan vat nam (nguoi choi X)
-  nu.glb   = nhan vat nu  (nguoi choi O)
-Co file thi game tu dung model that; khong co thi dung nhan vat dung san.
-Model phai la nguoi co khung xuong (Mixamo / Ready Player Me), huong mat ve phia truoc.
+Hai file model 3D trong thu muc nay:
+  nam.glb  = nhan vat nam (nguoi choi X)   -> Sakurada Fumiriya (VRoid, CC0 / public domain)
+  nu.glb   = nhan vat nu  (nguoi choi O)   -> Vita (VRoid, CC0 / public domain)
+Nguon: bo mau VRoid Studio ban beta, phat hanh CC0 (dung thuong mai, khong can ghi ten):
+  https://github.com/madjin/vrm-samples  (thu muc vroid/beta)  va  https://vroid.pixiv.help/hc/en-us/articles/4402614652569
+Da doi tu .vrm sang .glb bang tools\vrm2glb.py (doi ten xuong, thu nho anh con 1024px cho nhe).
+Co file thi game dung model that; xoa 2 file nay thi game quay lai nhan vat dung san.
+Doi nhan vat khac: dung tools\vrm2glb.py (can Python + Pillow):  python vrm2glb.py nhanvat.vrm nam.glb 1024
+Chi dung model CC0 hoac co giay phep cho phep phat hanh lai, vi game duoc dong goi va dua len GitHub cong khai.
 Xem muc 9 trong HUONG-DAN.txt.

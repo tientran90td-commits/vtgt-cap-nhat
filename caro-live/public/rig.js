@@ -9,6 +9,68 @@
 import * as THREE from './vendor/three.module.js';
 
 const V = (x = 0, y = 0, z = 0) => new THREE.Vector3(x, y, z);
+
+// ---- Model anime (đổi từ VRM bằng tools/vrm2glb.py): vẽ kiểu hoạt hình (toon) + viền mực mỏng
+let _grad = null;
+function gradient() {
+  if (!_grad) {
+    const d = new Uint8Array([165, 225, 255]);
+    _grad = new THREE.DataTexture(d, d.length, 1, THREE.RedFormat);
+    _grad.minFilter = _grad.magFilter = THREE.NearestFilter;
+    _grad.needsUpdate = true;
+  }
+  return _grad;
+}
+let _ink = null;
+function inkMat() {
+  if (!_ink) {
+    _ink = new THREE.MeshBasicMaterial({ color: 0x2a1a22, side: THREE.BackSide });
+    _ink.onBeforeCompile = (sh) => {
+      sh.vertexShader = sh.vertexShader.replace('#include <begin_vertex>', 'vec3 transformed = position + normal * 0.0028;');
+    };
+    _ink.customProgramCacheKey = () => 'animeInk';
+  }
+  return _ink;
+}
+function toonify(root) {
+  const cache = new Map();
+  const conv = (m) => {
+    if (!m || m.isMeshToonMaterial) return m;
+    if (!cache.has(m)) {
+      const n = new THREE.MeshToonMaterial({
+        color: m.color ? m.color.clone() : 0xffffff,
+        map: m.map || null,
+        gradientMap: gradient(),
+        transparent: !!m.transparent,
+        alphaTest: m.alphaTest || 0,
+        opacity: m.opacity === undefined ? 1 : m.opacity,
+        side: m.side,
+      });
+      if (m.emissive) n.emissive.copy(m.emissive);
+      if (m.emissiveMap) n.emissiveMap = m.emissiveMap;
+      n.name = m.name;
+      cache.set(m, n);
+    }
+    return cache.get(m);
+  };
+  const inks = [];
+  root.traverse((o) => {
+    if (!o.isMesh) return;
+    o.material = Array.isArray(o.material) ? o.material.map(conv) : conv(o.material);
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    const skip = mats.every((m) => /eye|brow|lash|mouth|highlight|iris|white/i.test(m.name || ''));
+    if (!skip && o.isSkinnedMesh) inks.push(o);
+  });
+  for (const o of inks) {
+    const ink = new THREE.SkinnedMesh(o.geometry, inkMat());
+    ink.bind(o.skeleton, o.bindMatrix);
+    ink.morphTargetInfluences = o.morphTargetInfluences;
+    ink.morphTargetDictionary = o.morphTargetDictionary;
+    ink.frustumCulled = false;
+    ink.raycast = () => {};
+    o.parent.add(ink);
+  }
+}
 const norm = (n) => String(n || '').replace(/^mixamorig[:_]?/i, '').replace(/[^a-z0-9]/gi, '').toLowerCase();
 
 const NAMES = {
@@ -83,6 +145,7 @@ export function attachModel(ch, gltfScene) {
   for (const c of ch.hips.children) c.visible = false;
   for (const a of ch.arms) for (const m of Object.values(a)) m.visible = false;
 
+  if (gltfScene.userData && gltfScene.userData.toonAnime) toonify(gltfScene);
   const holder = new THREE.Group();
   holder.add(gltfScene);
   ch.root.add(holder);
@@ -91,7 +154,7 @@ export function attachModel(ch, gltfScene) {
       o.castShadow = true;
       o.receiveShadow = true;
       o.frustumCulled = false;
-      if (o.material) o.material.side = THREE.FrontSide;
+      if (o.material && !(gltfScene.userData && gltfScene.userData.toonAnime)) o.material.side = THREE.FrontSide;
     }
   });
 
@@ -193,12 +256,20 @@ export function attachModel(ch, gltfScene) {
       put(bones.spine2, { x: lean * 0.95 });
       put(bones.neck, { x: lean + headRot.x * 0.3, y: headRot.y * 0.3, z: headRot.z * 0.3 });
       put(bones.head, { x: lean + headRot.x * 0.7, y: headRot.y * 0.7, z: headRot.z * 0.7 });
-      // chân: ngồi, đùi hướng ra trước, cẳng chân thẳng xuống
+      // chân: ngồi (đùi hướng ra trước, cẳng chân thẳng xuống). Khi đứng dậy / đi bộ (seatmotion.js) thì chuyển dần sang tư thế đứng + bước chân.
+      const stand = ch.walkDriving ? Math.max(0, Math.min(1, ch.walkLegsK || 0)) : 0;
+      const amp = ch.walkDriving ? ch.walkAmp || 0 : 0;
+      const mix = (u, v) => V(u[0] + (v[0] - u[0]) * stand, u[1] + (v[1] - u[1]) * stand, u[2] + (v[2] - u[2]) * stand);
       for (const sd of ['L', 'R']) {
         const x = sd === 'L' ? 0.07 : -0.07;
-        if (bones['thigh' + sd] && bones['shin' + sd]) aim(bones['thigh' + sd], bones['shin' + sd], dirRoot(x, -0.1, 1));
-        if (bones['shin' + sd] && bones['foot' + sd]) aim(bones['shin' + sd], bones['foot' + sd], dirRoot(x * 0.5, -1, 0.08));
-        if (bones['foot' + sd] && bones['toe' + sd]) aim(bones['foot' + sd], bones['toe' + sd], dirRoot(0, -0.25, 1));
+        const ph = (ch.walkPhase || 0) + (sd === 'L' ? 0 : Math.PI);
+        const sw = Math.sin(ph) * 0.55 * amp; // đùi vung ra trước (+) / ra sau (-)
+        const knee = (0.08 + 0.7 * Math.max(0, Math.cos(ph))) * amp; // gối gập khi đưa chân lên
+        const thighStand = [x, -Math.cos(sw), Math.sin(sw)];
+        const shinStand = [x * 0.5, -Math.cos(sw - knee), Math.sin(sw - knee)];
+        if (bones['thigh' + sd] && bones['shin' + sd]) aim(bones['thigh' + sd], bones['shin' + sd], dirRoot(...mix([x, -0.1, 1], thighStand).toArray()));
+        if (bones['shin' + sd] && bones['foot' + sd]) aim(bones['shin' + sd], bones['foot' + sd], dirRoot(...mix([x * 0.5, -1, 0.08], shinStand).toArray()));
+        if (bones['foot' + sd] && bones['toe' + sd]) aim(bones['foot' + sd], bones['toe' + sd], dirRoot(...mix([0, -0.25, 1], [0, -0.12, 1]).toArray()));
       }
       ch.root.updateMatrixWorld(true);
     },
