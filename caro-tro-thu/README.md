@@ -45,3 +45,9 @@ Khi bong bóng đang bật và app ra nền, WebView được chuyển sang mộ
 
 ## Ô cấm là "tường" (bản 3.2)
 Bộ não coi ô bị O cấm như một bức tường chặn cả hai bên: dây quân nào đi qua ô cấm là dây chết, app không còn gợi ý chặn 2 đầu một dây đã hết đường 5. Rapfi không biết ô cấm, nên khi bàn có ô cấm app vẫn dùng Rapfi nhưng kiểm tra lại từng gợi ý bằng bộ não nội bộ (hiểu ô cấm): loại gợi ý bỏ lỡ nước thắng/chặn thắng, dựa vào dây đã chết, hoặc để đối thủ ép thắng; khi đó dùng nước của bộ não nội bộ.
+
+## Rapfi và ô cấm (bản 3.3)
+Rapfi không biết ô cấm nên hay dựng thế cần nối qua ô đó (rồi thua vì dây đã chết). Từ bản 3.3, khi bàn có ô cấm,
+bộ não nội bộ (hiểu ô cấm là tường) tính cùng thế và chấm điểm cả nước Rapfi gợi ý: nước nào kém nước tốt nhất của
+bộ não nội bộ quá một mức nhỏ thì bị loại, app đi nước của bộ não nội bộ. Không có ô cấm thì vẫn dùng thẳng Rapfi.
+

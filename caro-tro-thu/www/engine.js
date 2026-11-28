@@ -601,6 +601,9 @@
       }
       if (safe.length && safe.length < pool.length) root = safe.concat(root.filter(([c]) => !safe.some(([s2]) => s2 === c)));
       else if (safe.length) root = safe;
+      // opts.include: các ô muốn so sánh thêm (vd gợi ý của Rapfi) -> luôn được chấm điểm cùng độ sâu
+      const inc = (opts.include || []).filter((c) => this.b[c] === 0 && !root.some(([r]) => r === c));
+      for (const c of inc) root.push([c, 0]);
       this.deadline = Date.now() + ms;
       this.aborted = false;
       let bestC = root[0][0];
@@ -632,7 +635,29 @@
         if (Date.now() > this.deadline - ms * 0.15) break;
       }
       const alts = scores.slice(0, 4).map(([c]) => ({ x: c % n, y: (c / n) | 0 }));
-      return mk(bestC, 'tính nước', { depth: depthDone, nodes: this.nodes, alts });
+      let cmp = null;
+      if (opts.include && opts.include.length && depthDone >= 2) {
+        // chấm lại CHÍNH XÁC (cửa sổ đầy đủ) nước tốt nhất và các nước cần so, cùng độ sâu
+        const exact = (c) => {
+          this.place(c % n, (c / n) | 0, p);
+          const sc = -this.negamax(o, depthDone - 1, -WIN * 2, WIN * 2, 1, depthDone > 4 ? 8 : 10);
+          this.undo();
+          return sc;
+        };
+        this.deadline = Date.now() + Math.max(150, ms * 0.4);
+        this.aborted = false;
+        const bs = exact(bestC);
+        const list = [];
+        for (const c of opts.include) {
+          if (this.b[c] !== 0) continue;
+          const v2 = c === bestC ? bs : exact(c);
+          if (this.aborted) break;
+          list.push({ x: c % n, y: (c / n) | 0, s: v2 });
+        }
+        if (!this.aborted) cmp = { depth: depthDone, best: bs, inc: list };
+        this.aborted = false;
+      }
+      return mk(bestC, 'tính nước', { depth: depthDone, nodes: this.nodes, alts, cmp });
     }
   }
 

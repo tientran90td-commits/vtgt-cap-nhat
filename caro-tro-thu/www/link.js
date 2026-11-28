@@ -213,7 +213,7 @@
       const eng = document.getElementById('engine').textContent;
       const tail = kind === 'nhay'
         ? '\nself.onmessage=function(e){var d=e.data;var g=CaroEngine.fromMoves(d.size,d.strict,d.moves,d.walls);var l=g.nhay(d.p,{ms:d.ms,lastOpp:d.lastOpp,max:4});self.postMessage({id:d.id,list:l});};'
-        : '\nself.onmessage=function(e){var d=e.data;var g=CaroEngine.fromMoves(d.size,d.strict,d.moves,d.walls);var m=g.bestMove(d.p,{ms:d.ms,maxDepth:d.depth});m.id=d.id;self.postMessage(m);};';
+        : '\nself.onmessage=function(e){var d=e.data;var g=CaroEngine.fromMoves(d.size,d.strict,d.moves,d.walls);var m=g.bestMove(d.p,{ms:d.ms,maxDepth:d.depth,include:d.include});m.id=d.id;self.postMessage(m);};';
       return new Worker(URL.createObjectURL(new Blob([eng + tail], { type: 'text/javascript' })));
     } catch (e) { return null; }
   }
@@ -259,10 +259,20 @@
       return g.unsafeAfter(p, cell, 250);
     } catch (e) { return false; }
   }
+  const GATE_MARGIN = 150; // chênh điểm tối đa (nhỏ hơn 1 "ba mở" ~ 1600) giữa nước Rapfi và nước tốt nhất của bộ não nội bộ
   function think(size, strict, moves, p, cb, walls) {
     const lv = LEVELS[cfg.level] || LEVELS.mid;
     const id = ++reqId;
     const done = (r) => { if (id === reqId) cb(r); };
+    const finishRapfi = (r) => {
+      const alts = [{ x: r.x, y: r.y }];
+      try {
+        const g = CaroEngine.fromMoves(size, strict, moves, walls);
+        for (const [c] of g.candidates(p, 6)) { const ax = c % size, ay = (c / size) | 0; if (!(ax === r.x && ay === r.y) && alts.length < 4) alts.push({ x: ax, y: ay }); }
+      } catch (e) {}
+      r.alts = alts;
+      done(r);
+    };
     if (window.RapfiBridge && RapfiBridge.usable(strict)) {
       RapfiBridge.think({ size, moves: moves.map((m) => ({ x: m[0], y: m[1], p: m[2] })), me: p, ms: lv.ms }, (err, r) => {
         if (id !== reqId) return;
@@ -270,28 +280,35 @@
         // Bàn có ô cấm: Rapfi không biết ô cấm chặn cả hai bên -> kiểm tra gợi ý bằng bộ não nội bộ (hiểu ô cấm).
         // Gợi ý bị loại nếu: bỏ lỡ nước thắng/chặn thắng, dựa vào dây đã chết vì ô cấm, hoặc để đối thủ ép thắng.
         if (walls && walls.length && rapfiRejected(size, strict, moves, p, r, walls)) { thinkJs(id, size, strict, moves, p, lv, done, walls); return; }
-        if (walls && walls.length) r.checked = true;
-        const alts = [{ x: r.x, y: r.y }];
-        try {
-          const g = CaroEngine.fromMoves(size, strict, moves, walls);
-          for (const [c] of g.candidates(p, 6)) { const ax = c % size, ay = (c / size) | 0; if (!(ax === r.x && ay === r.y) && alts.length < 4) alts.push({ x: ax, y: ay }); }
-        } catch (e) {}
-        r.alts = alts;
-        done(r);
+        if (walls && walls.length) {
+          // Rapfi không biết ô cấm nên hay dựng thế cần nối qua ô cấm. Bộ não nội bộ (hiểu ô cấm) tính cùng thế và chấm
+          // điểm CẢ nước của Rapfi: chỉ nhận nước Rapfi nếu không kém nước tốt nhất của bộ não nội bộ quá 1 mức "ba".
+          const rc = r.y * size + r.x;
+          thinkJs(id, size, strict, moves, p, { ms: Math.min(lv.ms, 1500), depth: lv.depth }, (m) => {
+            if (id !== reqId) return;
+            const c = m && m.cmp && m.cmp.inc && m.cmp.inc.find((q) => q.x === r.x && q.y === r.y);
+            const ok = !m || !m.cmp || !c || c.s >= m.cmp.best - GATE_MARGIN; // không chấm được -> tin Rapfi (đã qua kiểm tra cơ bản)
+            if (!ok) { m.why = m.why || 'tính nước'; m.walled = true; done(m); return; }
+            r.checked = true;
+            finishRapfi(r);
+          }, walls, [rc]);
+          return;
+        }
+        finishRapfi(r);
       });
       return;
     }
     thinkJs(id, size, strict, moves, p, lv, done, walls);
   }
-  function thinkJs(id, size, strict, moves, p, lv, done, walls) {
-    const payload = { id, size, strict, moves, p, ms: lv.ms, depth: lv.depth, walls: walls || [] };
+  function thinkJs(id, size, strict, moves, p, lv, done, walls, include) {
+    const payload = { id, size, strict, moves, p, ms: lv.ms, depth: lv.depth, walls: walls || [], include: include || [] };
     if (worker === null) worker = makeWorker('best') || false;
     if (worker) {
       worker.onmessage = (e) => { if (e.data.id === id) done(e.data); };
-      worker.onerror = () => { worker = false; setTimeout(() => thinkJs(id, size, strict, moves, p, lv, done, walls), 0); };
+      worker.onerror = () => { worker = false; setTimeout(() => thinkJs(id, size, strict, moves, p, lv, done, walls, include), 0); };
       worker.postMessage(payload);
     } else {
-      setTimeout(() => done(CaroEngine.fromMoves(size, strict, moves, walls).bestMove(p, { ms: lv.ms, maxDepth: lv.depth })), 30);
+      setTimeout(() => done(CaroEngine.fromMoves(size, strict, moves, walls).bestMove(p, { ms: lv.ms, maxDepth: lv.depth, include })), 30);
     }
   }
   function runNhay(payload, cb) {
