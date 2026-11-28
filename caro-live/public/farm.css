@@ -1,0 +1,18 @@
+/* CHẾ ĐỘ CÀY ĐIỂM: bảng điểm ở giữa bàn cờ trong khoảng cày điểm sau mỗi trận (xem farm.js) */
+body.farmOn #rank { display: none !important; } /* bảng cơ duyên bên phải nhường chỗ cho bảng giữa màn hình */
+#ovFarm { width: 100%; max-width: 92%; gap: 0.35rem; }
+#ovFarm .farmTag { font-size: 0.95rem; font-weight: 800; color: #ffd54a; letter-spacing: 0.04em; }
+#ovFarm .farmFlash { font-size: 1.5rem; font-weight: 900; color: #fff; padding: 0.25rem 1rem; border-radius: 2rem; background: linear-gradient(90deg, #ff7a18, #ffb347); box-shadow: 0 0 1.4rem rgba(255, 150, 40, 0.75); animation: farmPop 0.6s ease-out both; }
+#ovFarm .farmFlash.off { display: none; }
+@keyframes farmPop { 0% { transform: scale(0.4); opacity: 0; } 60% { transform: scale(1.12); opacity: 1; } 100% { transform: scale(1); } }
+#farmList { list-style: none; margin: 0.1rem 0; padding: 0; width: 100%; display: flex; flex-direction: column; gap: 0.25rem; }
+#farmList li { display: flex; align-items: center; gap: 0.5rem; padding: 0.22rem 0.8rem; border-radius: 0.7rem; background: rgba(255, 255, 255, 0.09); font-size: 1.15rem; font-weight: 700; text-align: left; transition: background 0.3s; }
+#farmList li.pick { background: rgba(255, 213, 74, 0.24); outline: 0.1rem solid #ffd54a; }
+#farmList li.empty { opacity: 0.28; }
+#farmList .no { flex: none; width: 1.8rem; text-align: center; font-weight: 900; }
+#farmList .nm { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+#farmList .pts { flex: none; color: #ffd54a; font-weight: 900; }
+#farmList li.bump { animation: farmBump 0.45s ease-out; }
+@keyframes farmBump { 0% { background: rgba(255, 255, 255, 0.5); transform: scale(1.04); } 100% { transform: scale(1); } }
+#farmCount { font-size: 3.4rem; }
+#farmHow { font-size: 0.85rem; color: #aab6d8; }

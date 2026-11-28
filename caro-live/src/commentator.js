@@ -94,6 +94,11 @@ class Commentator {
     this.say(first ? 'welcome' : 'lobbyStart', { giay: secs || this.cfg.lobbySeconds }, { at: now });
   }
 
+  /** Chế độ cày điểm: mở đầu khoảng cày điểm sau trận (vòng đầu tiên dùng lời chào mừng). */
+  farmStart(first, now, secs) {
+    this.say(first ? 'welcome' : 'farmStart', { giay: secs }, { at: now });
+  }
+
   lobbyWarning(preview, now) {
     if (!preview.length) {
       this.say('lobbyEmpty', {}, { at: now });

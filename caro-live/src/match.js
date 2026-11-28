@@ -169,8 +169,12 @@ class Match {
   // ---------- chuyển pha ----------
   enterLobby(now, next = false) {
     // next = vừa hết ván: tự sang ván kế tiếp với vòng chờ ngắn hơn
-    const secs = next && this.cfg.autoNextGame !== false ? this.cfg.nextLobbySeconds : this.cfg.lobbySeconds;
+    const farm = !!this.cfg.farmOn; // chế độ "cày điểm": vòng chờ = khoảng cày điểm, xóa bảng điểm cũ, bắt đầu tính điểm lại từ 0
+    const secs = farm ? Math.max(10, Number(this.cfg.farmSeconds) || 35) : next && this.cfg.autoNextGame !== false ? this.cfg.nextLobbySeconds : this.cfg.lobbySeconds;
     this.lobbySecs = secs;
+    this.farmRound = farm;
+    if (farm) this.interaction.resetPoints();
+    this.interaction.frozen = false;
     this.phase = 'lobby';
     this.players = { X: null, O: null };
     this.game.reset();
@@ -188,13 +192,17 @@ class Match {
     this.turn = 'X';
     this.turnStartedAt = now;
     this.turnEndsAt = now;
-    this.voice.lobbyStart(this.firstLobby, now, secs);
+    if (farm) {
+      this.feed(`⏱ BẮT ĐẦU CÀY ĐIỂM! ${secs} giây: bình luận, thả tim, chia sẻ để lên bảng, người dẫn đầu sẽ lên đài`, 'info');
+      this.voice.farmStart(this.firstLobby, now, secs);
+    } else this.voice.lobbyStart(this.firstLobby, now, secs);
     if (secs >= 18) this.voice.howTo(now, 10000);
     this.firstLobby = false;
   }
 
   /** Chọn xong người chơi: nếu bật xác nhận thì sang pha "thả tim", không thì tung đồng xu luôn. */
   beginSelection(c, now) {
+    if (this.cfg.farmOn) this.interaction.frozen = true; // hết khoảng cày điểm: ngưng tính điểm cho tới sau trận
     let confirmLike = this.cfg.confirmSeconds > 0;
     if (c.booked) {
       // tới lượt cặp đã hẹn: bỏ chuỗi thắng cũ, dùng lịch hẹn một lần
@@ -842,6 +850,7 @@ class Match {
 
   // ---------- nhịp thời gian ----------
   tick(now = Date.now()) {
+    this.interaction.frozen = !!this.cfg.farmOn && this.phase !== 'lobby'; // chế độ cày điểm: chỉ tính điểm trong vòng chờ sau trận
     switch (this.phase) {
       case 'lobby': {
         const left = this.phaseEndsAt - now;
@@ -966,6 +975,7 @@ class Match {
       champion: this.champion ? { name: this.champion.name, streak: this.champion.streak } : null,
       booked: this.bookedList() ? this.bookedList().map((u) => u.name) : null,
       lobby: { need: c.need, waiting: this.waiting, preview },
+      farm: this.cfg.farmOn ? { on: true, active: this.phase === 'lobby', secs: this.lobbySecs } : null,
       confirm: this.phase === 'confirm' && this.confirm ? this.confirmView() : null,
       sign: this.signView(now),
       top,

@@ -374,3 +374,11 @@ LUẬT "O CẤM 1 Ô" (bản 41)
 - Game dung 2 nhan vat anime 3D that (VRoid, CC0): nam = Sakurada Fumiriya, nu = Vita. Ve kieu hoat hinh + vien muc mong.
 - Khi doi nguoi: nhan vat dung day, di bo (chan buoc that) ra mep phong, nguoi moi di vao ngoi.
 - Muon quay lai nhan vat dung san: xoa 2 file public\models\nam.glb va nu.glb. Muon doi nhan vat: xem public\models\DOC-LAI.txt.
+
+=== BAN 51: CONG TAC "CAY DIEM" ===
+- Bang dieu khien -> o "CAY DIEM sau moi tran" (mac dinh TAT). Co o chinh so giay cay diem (30-40 la hop ly, mac dinh 35).
+- Khi BAT: trong tran KHONG tinh diem va KHONG hien bang diem (bang ben phai an di). Bang diem cu bi xoa khi vao tran.
+- Het tran (sau man hinh ket qua) la khoang cay diem: bang diem hien o GIUA man hinh + dong thong bao "BAT DAU CAY DIEM" + giong doc MC. Moi nguoi binh luan / tha tim / chia se de len bang.
+- Het gio cay diem: chon nguoi len dai nhu cu (nguoi dung dau bang), roi vao tran, diem ngung tinh cho den het tran.
+- Khi TAT: game chay nhu truoc.
+- Cau MC "farmStart" sua duoc trong muc cau thoai.

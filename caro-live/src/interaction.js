@@ -17,6 +17,7 @@ class Interaction {
     );
     this.users = new Map();
     this.seq = 0;
+    this.frozen = false; // true = tạm ngưng cộng điểm (chế độ "cày điểm": chỉ tính điểm trong khoảng cày sau mỗi trận)
   }
 
   touch(user) {
@@ -75,6 +76,7 @@ class Interaction {
 
   addComment(user, now = Date.now()) {
     const u = this.touch(user);
+    if (this.frozen) return 0;
     if (now - u.lastCommentAt < this.cfg.commentCooldownSeconds * 1000) return 0;
     u.lastCommentAt = now;
     u.points += this.cfg.comment;
@@ -84,6 +86,7 @@ class Interaction {
   /** Thả tim: ít điểm nhất. Trần (likeMaxPerEvent / likeCapPerRound) mặc định 0 = không giới hạn. */
   addLike(user, count = 1, now = Date.now()) {
     const u = this.touch(user);
+    if (this.frozen) return 0;
     let n = Math.max(0, Number(count) || 0);
     if (this.cfg.likeMaxPerEvent > 0) n = Math.min(n, this.cfg.likeMaxPerEvent); // 0 = không giới hạn
     let raw = n * this.cfg.like + u.likeFrac;
@@ -104,6 +107,7 @@ class Interaction {
   /** Tặng quà: unitDiamonds = kim cương của 1 món, count = số món. */
   addGift(user, unitDiamonds, count = 1) {
     const u = this.touch(user);
+    if (this.frozen) return 0;
     const n = Math.max(1, Number(count) || 1);
     let p = Math.round(this.giftUnitPoints(unitDiamonds) * n);
     if (this.cfg.giftCapPerRound > 0) p = Math.max(0, Math.min(p, this.cfg.giftCapPerRound - u.giftPts));
@@ -115,7 +119,7 @@ class Interaction {
 
   addShare(user) {
     const u = this.touch(user);
-    if (u.shared) return 0;
+    if (this.frozen || u.shared) return 0;
     u.shared = true;
     u.points += this.cfg.share;
     return this.cfg.share;
@@ -123,7 +127,7 @@ class Interaction {
 
   addFollow(user) {
     const u = this.touch(user);
-    if (u.followed) return 0;
+    if (this.frozen || u.followed) return 0;
     u.followed = true;
     u.points += this.cfg.follow;
     return this.cfg.follow;

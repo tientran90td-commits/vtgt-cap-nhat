@@ -34,6 +34,8 @@ module.exports = {
   blockBothEnds: false, // false = đủ 5 quân liên tiếp là thắng, kể cả bị chặn 2 đầu | true = bị chặn cả 2 đầu thì KHÔNG tính thắng
   oBan: false, // true = LUẬT "O CẤM 1 Ô": sau nước đầu của X, O gõ 1 ô để cấm (X không được đi vào đó đến hết ván), rồi O mới đi quân
   oBanAfter: 2, // luật "O cấm 1 ô" cấm sau nước thứ mấy của X (1 = sau nước đầu, 2 = X đi 2 quân rồi mới cấm, 3...)
+  farmOn: false, // true = chế độ "cày điểm": trong trận không tính điểm; hết trận có khoảng farmSeconds giây để khán giả cày điểm (bảng giữa màn hình), hết giờ chọn người lên đài
+  farmSeconds: 35, // độ dài khoảng cày điểm (30-40 giây là hợp lý)
   giftPoints: true, // true = quà tặng được cộng điểm tương tác (để dễ được chọn lên bàn). false = quà chỉ để cảm ơn, không ảnh hưởng ai được chọn (an toàn nhất)
   forbidX: false, // true = LUẬT CẤM cho quân đi trước (X): không được đánh vào ô tạo 3-3, 4-4 hoặc hàng dài hơn 5 (xem src/forbidden.js)
 

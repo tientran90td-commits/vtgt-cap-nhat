@@ -11,6 +11,7 @@ const NUMBERS = {
   nextLobbySeconds: [3, 300],
   coinSeconds: [4, 20],
   turnSeconds: [8, 180],
+  farmSeconds: [10, 120], // chế độ cày điểm: số giây cày sau mỗi trận
   oBanAfter: [1, 3], // luật "O cấm 1 ô": cấm sau nước thứ mấy của X
   extraTimeSeconds: [5, 120],
   extraTimesPerGame: [0, 5],
@@ -25,7 +26,7 @@ const NUMBERS = {
   clockSeconds: [0, 60],
   logoSize: [50, 250],
 };
-const BOOLS = ['blockBothEnds', 'forbidX', 'oBan', 'giftPoints', 'winnerStays', 'hostCanPlay', 'autoNextGame', 'showSign', 'themeAuto', 'ledOn', 'showCellLabels', 'celebrateVideo', 'logoOn', 'logoBold', 'logoItalic', 'logoFrame'];
+const BOOLS = ['blockBothEnds', 'forbidX', 'oBan', 'farmOn', 'giftPoints', 'winnerStays', 'hostCanPlay', 'autoNextGame', 'showSign', 'themeAuto', 'ledOn', 'showCellLabels', 'celebrateVideo', 'logoOn', 'logoBold', 'logoItalic', 'logoFrame'];
 const LOGO_FONTS = ['default', 'arial', 'segoe', 'tahoma', 'trebuchet', 'verdana', 'georgia', 'times', 'palatino', 'impact', 'comic', 'courier'];
 const TEXTS = { logoName: 40, logoSub: 40 }; // chữ tự gõ: tối đa bấy nhiêu ký tự
 

@@ -16,6 +16,7 @@ import { Fx } from './fx.js';
 import { Celebrate } from './celebrate.js';
 import { fourInRow } from './threat.js';
 import { avatarSrc } from './avatar.js';
+import { farmOn, farmBody, renderFarm } from './farm.js';
 import { setFrame, renderRankBoard } from './rank.js';
 import { Announcer } from './announce.js';
 import { RankUp } from './rankup.js';
@@ -438,18 +439,27 @@ function renderOverlay(s, eff, now) {
   const cfEl = $('ovConfirm');
   const resEl = $('ovResult');
   let which = '';
-  if (eff === 'lobby') which = 'lobby';
+  farmBody(s);
+  if (eff === 'lobby') which = farmOn(s) ? 'farm' : 'lobby';
   else if (eff === 'confirm') which = 'confirm';
   else if (eff === 'coin') which = 'coin';
   else if (eff === 'finished' && director.resultReady) which = 'result';
   if (which !== 'coin') coinFx.stop();
   ov.classList.toggle('hidden', !which);
   lobbyEl.classList.toggle('hidden', which !== 'lobby');
+  $('ovFarm').classList.toggle('hidden', which !== 'farm');
   cfEl.classList.toggle('hidden', which !== 'confirm');
   coinEl.classList.toggle('hidden', which !== 'coin');
   resEl.classList.toggle('hidden', which !== 'result');
 
-  if (which === 'lobby') {
+  if (which === 'farm') {
+    renderFarm(s, now, $);
+    const left = Math.ceil((s.phaseEndsAt - now) / 1000);
+    if (!s.lobby.waiting && left <= 5 && left > 0 && left !== lastTick) {
+      lastTick = left;
+      sfx.tick(left === 1);
+    }
+  } else if (which === 'lobby') {
     const left = Math.ceil((s.phaseEndsAt - now) / 1000);
     const c = $('ovCount');
     if (s.lobby.waiting || left <= 0) {
