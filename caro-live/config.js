@@ -126,9 +126,9 @@ module.exports = {
     share: 60, // chia sẻ LIVE (tính 1 lần mỗi vòng)
     follow: 100, // follow (tính 1 lần mỗi vòng)
     // Điểm của 1 món quà = giftBase + giftPerDiamond x (kim cương của món)^giftPower
-    // Ví dụ với số mặc định (bản 47): Hoa hồng (1💎) ~175 điểm, quà 10💎 ~250, quà 100💎 ~545, quà 1000💎 ~1700
-    giftBase: 150,
-    giftPerDiamond: 25,
+    // Ví dụ với số mặc định (bản 48): Hoa hồng (1💎) 300 điểm, quà 10💎 ~450, quà 100💎 ~1050, quà 1000💎 ~3400
+    giftBase: 250,
+    giftPerDiamond: 50,
     giftPower: 0.6,
     giftCapPerRound: 0, // tối đa bấy nhiêu điểm từ quà trong 1 vòng (0 = không giới hạn)
   },
